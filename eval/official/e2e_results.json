@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0",
+  "artifact_type": "end_to_end",
+  "evaluation_date": "2026-07-06",
+  "dataset": {
+    "path": "eval/dataset/eval_set.jsonl",
+    "sha256": "760e33eaa0821001d37ff974bc037043d019fc670b8f3621b6e713030274ca07",
+    "n_questions": 40,
+    "n_answerable": 30,
+    "n_unanswerable": 10
+  },
+  "config": "structure/hybrid+rerank",
+  "generator": "openai/gpt-5.1",
+  "judge": "openai/gpt-5-mini",
+  "settings": {
+    "embedding_model": "BAAI/bge-m3",
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "retrieval_mode": "hybrid",
+    "use_reranker": true,
+    "top_k_retrieve": 20,
+    "top_k_final": 5,
+    "rrf_k": 60,
+    "rerank_score_threshold": 0.03,
+    "chunking_strategy": "structure",
+    "chunk_size": 400,
+    "chunk_overlap": 80
+  },
+  "metrics": {
+    "n_questions": 40,
+    "n_answerable": 30,
+    "n_judged": 29,
+    "n_answered": 29,
+    "n_generation_calls": 31,
+    "false_refusals": [
+      "eval-10"
+    ],
+    "false_refusal_rate": 0.03333333333333333,
+    "avg_faithfulness": 4.896551724137931,
+    "avg_relevancy": 5.0,
+    "pct_faithfulness_ge4": 1.0,
+    "n_answers_with_citations": 28,
+    "citation_parse_coverage": 0.9655172413793104,
+    "uncited_answers": [
+      "eval-26"
+    ],
+    "n_unanswerable": 10,
+    "refusal_accuracy": 1.0,
+    "missed_refusals": [],
+    "direct_false_refusal_rate": 0.0,
+    "direct_unanswerable_coverage": 0.9,
+    "refusal_by_stage": {
+      "no_hits": {
+        "count": 0,
+        "answerable_qids": [],
+        "unanswerable_qids": []
+      },
+      "threshold": {
+        "count": 9,
+        "answerable_qids": [],
+        "unanswerable_qids": [
+          "eval-31",
+          "eval-33",
+          "eval-34",
+          "eval-35",
+          "eval-36",
+          "eval-37",
+          "eval-38",
+          "eval-39",
+          "eval-40"
+        ]
+      },
+      "llm": {
+        "count": 2,
+        "answerable_qids": [
+          "eval-10"
+        ],
+        "unanswerable_qids": [
+          "eval-32"
+        ]
+      }
+    }
+  }
+}

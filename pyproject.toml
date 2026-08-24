@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools==80.9.0", "wheel==0.46.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "labor-rag"
+version = "0.1.0"
+description = "繁體中文 Hybrid RAG 知識問答系統 — 以台灣勞動法規為知識庫"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Steven Tai" }]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "numpy>=1.26",
+    "torch>=2.6",
+    "flagembedding>=1.3.4",
+    # FlagEmbedding's reranker code path breaks under transformers 5.x
+    # (XLMRobertaTokenizer loses `prepare_for_model`); pin to the 4.x line.
+    "transformers>=4.44.2,<5.0",
+    "qdrant-client>=1.12",
+    "pypdf>=5.0",
+    "rank-bm25>=0.2.2",
+    "jieba>=0.42.1",
+    # jieba imports pkg_resources, which warns under setuptools 81 and is
+    # scheduled for removal; keep the locked compatibility line explicit.
+    "setuptools==80.9.0",
+    "anthropic>=0.40",
+    "openai>=1.55",
+    "google-genai>=1.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "streamlit>=1.40",
+]
+
+# On Windows, PyPI torch wheels are CPU-only; pull CUDA builds from the official
+# PyTorch index instead. Linux PyPI wheels already bundle CUDA.
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu128", marker = "platform_system == 'Windows'" },
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.12",
+]
+
+# Not installed as a package: an editable install writes the project path into a
+# .pth file, which Python <3.13 decodes with the locale encoding (cp950 on zh-TW
+# Windows) and crashes on non-ASCII paths. `src` is added to sys.path instead
+# (pytest via `pythonpath` below; scripts via a small sys.path shim).
+[tool.uv]
+package = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rag = ["indexing/dict/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+
+# Stable public-release baseline: syntax/Pyflakes correctness plus import hygiene.
+# Behavioral modernization rules stay out of this no-feature release closure.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

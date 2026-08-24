@@ -1,0 +1,39 @@
+# Secrets — never commit API keys
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Corpus & indexes (reproducible via scripts/) — keep the small sample set
+data/*
+!data/sample/
+storage/
+
+# Raw local evaluation artifacts (may contain machine-specific settings).
+# Sanitized, reproducible portfolio evidence lives in eval/official/ and is tracked.
+eval/runs/
+
+# Model caches
+.cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Streamlit local settings (may contain machine-specific paths)
+.streamlit/
+
+# Claude Code local state (machine/session-specific, not project config)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
+# Personal working notes — kept locally, not part of the public portfolio
+INTERVIEW_PREP.md
+STARTUP.md
+plan.md

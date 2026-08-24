@@ -1,0 +1,41 @@
+# Public Claim Matrix
+
+本表把 README、README.en、DESIGN 與 EVAL_REPORT 的 material claims 映射到 committed config、trace、result 與 test。`scripts/verify_release.py` 是整合 verifier,但不取代下列原始 evidence。
+
+## Evidence classes
+
+- **offline-recomputed**:只讀 committed dataset/trace 即可重新計算並與 result 比較。
+- **archived-provider/re-aggregated**:可重新聚合 committed numeric verdicts,但公開 evidence 不足以重新產生 provider output 或 judge 決定。
+- **historical-observation**:來自保留在本機、不公開的 raw run 或實際使用觀察;公開文件保留明確邊界,不宣稱可重生。
+- **configuration**:可由 committed defaults、script target list、lock、workflow 或 package artifact 核對。
+
+## Matrix
+
+| Public claim / location | Class | Config / source | Trace | Result | Test / verifier | Boundary |
+|---|---|---|---|---|---|---|
+| 目標 corpus 為 15 部（13 法律、2 命令）;README、README.en | configuration | `scripts/download_corpus.py::DUMPS` | — | — | `tests/test_eval_dataset.py` 只證明 15 部皆被題集涵蓋 | Full normalized corpus 不公開;884 條是 historical run observation |
+| 正式集 40 題、30 可答、10 不可答、15 部皆涵蓋;README、EVAL_REPORT | offline-recomputed | `eval/dataset/eval_set.jsonl` | dataset 本身 | official results 的 dataset metadata | `tests/test_eval_dataset.py`;`tests/test_release_verification.py` | Canonical UTF-8/LF SHA=`760e33…ca07` |
+| 題型 16 numeric、5 list、4 multi、4 scenario、1 negation、5 related OOKB、5 unrelated OOKB;EVAL_REPORT | offline-recomputed | `eval/dataset/eval_set.jsonl:q_type` | — | `release/manifest.json` | `scripts/verify_release.py` | 題型是策展 taxonomy,不是自然流量分布 |
+| 8 組 ablation × 40 題;README、README.en、EVAL_REPORT | offline-recomputed | `release/manifest.json` | `eval/official/ablation_trace.jsonl` 320 rows | `eval/official/ablation_results.json` | `tests/test_official_artifacts.py`;release verifier | 每組 QID set 必須與 dataset 完全相同 |
+| 主設定 Hit@5=0.967 (29/30)、MRR@10=0.906;全部四份主文件 | offline-recomputed | `src/rag/config.py` primary defaults | ablation trace 的 `structure/hybrid/reranker=true` | ablation results | `tests/test_official_artifacts.py`;release verifier | 只在 30 題可答子集計算 |
+| 八組 Hit@5/MRR/latency table;DESIGN、EVAL_REPORT | offline-recomputed | official settings | ablation trace `rank`,`elapsed_ms` | ablation results 8 rows | `test_official_ablation_metrics_recompute_from_trace`;release verifier | latency trace 四捨五入到 0.1ms,比較容差 0.1ms |
+| RRF k=60、retrieve top-20、final top-5;README 架構、DESIGN | configuration | `src/rag/config.py`;official result settings | — | both official result files | release verifier compares all three | 不是從結果反推的參數 |
+| Structure chunking、400/80 fixed fallback;README、README.en、DESIGN | configuration + offline-recomputed comparison | `src/rag/config.py`;`src/rag/ingestion/chunkers.py` | ablation trace | ablation results | chunker tests;release verifier | 884 條與平均 147 字是 historical corpus observation |
+| threshold=0.03;30/30 可答未被直接擋、9/10 不可答直接擋;README、DESIGN、EVAL_REPORT | configuration + offline-recomputed | `src/rag/config.py` | `eval/official/e2e_trace.jsonl` | e2e results | release verifier逐列核對 top score/stage;regression tests reject mismatch | 30/10 calibration range,不是 universal classifier |
+| 最終拒答 10/10、誤拒 1/30、threshold 9、LLM 2;README、README.en、EVAL_REPORT | offline-recomputed | refusal-stage contract in `src/rag/evaluation.py` | e2e trace | e2e results | `test_official_e2e_metrics_recompute_from_trace`;release verifier | LLM stage 是 recorded outcome;不需重呼 provider 即可計數 |
+| 作答 29、generation calls 31、citation parse 28/29;EVAL_REPORT | offline-recomputed | citation/refusal aggregation | e2e trace | e2e results | official artifact tests;release verifier | eval-26 空引用保留歷史 parser 結果 |
+| Faithfulness 4.90/5、relevancy 5.00/5;README、README.en、DESIGN、EVAL_REPORT | archived-provider/re-aggregated | generator `openai/gpt-5.1`;judge `openai/gpt-5-mini` recorded in result | e2e trace 29 numeric judge objects | e2e results | `compute_e2e_metrics`;official tests;release verifier | 無完整答案、judge reason/provider response,不可公開重生或獨立複判 |
+| eval-10 正解未進主設定 top-5,LLM 誤拒;EVAL_REPORT case 1 | offline-recomputed outcome + historical interpretation | dataset ground truth | ablation/e2e traces | official results | release verifier validates rank/refusal grids | 原因是文件中的 interpretation,不當作因果證明 |
+| 敘事式問法 0.0146 直接誤拒;README、README.en、DESIGN、EVAL_REPORT case 7 | historical-observation | retained deployment observation | 不在 official 40 題 trace | EVAL_REPORT table | — | 只證明 boundary 存在,不能估 prevalence |
+| Official traces 無 prompt/provider response/API metadata/private path/PII;README、official README、PUBLICATION_BOUNDARY | offline-verified schema/privacy | strict field allowlists | both official traces | — | `tests/test_release_verification.py`;`tests/test_official_artifacts.py`;release verifier | Scanner 回報只含 path/category/location,不回傳命中值 |
+| 兩份 sample 可隨 source archive 再散布;README、README.en、OGDL_ATTRIBUTION | configuration + official license | dataset 18290、OGDL 1.0、sample source URLs | — | `release/manifest.json` snapshot hashes | release verifier核對 hash/last-amended/provider URL | 必須保留 attribution;sample 不改授權為 MIT |
+| Locked clean install、package build、CLI/FastAPI import;README、README.en、REVIEWER_GUIDE | configuration + executable verification | `pyproject.toml`;`uv.lock`;CI | — | built sdist/wheel | package test covers distributions/API import;CI and reviewer guide explicitly smoke CLI/API | 不執行 API lifespan,不載入模型或 provider |
+| GitHub Actions 全 SHA pin、read-only permissions;REVIEWER_GUIDE | configuration | `.github/workflows/ci.yml` | — | — | action-pin scanner + release verifier | `actions/checkout` pin v6.0.3 commit;`setup-uv` pin v8.1.0 commit |
+
+## Resume-safe wording
+
+適合履歷或 portfolio 的一句話:
+
+> Built a Traditional-Chinese hybrid RAG system and shipped a source-only public portfolio release with a 40-question evaluation set, eight retrieval ablations, offline-recomputed Hit@5/MRR/refusal evidence, privacy-reduced traces, and an explicit archived-provider boundary for LLM-judge scores.
+
+不應寫成「fully reproducible LLM evaluation」或「100% answerability classifier」;前者缺少可公開重生的 provider judgments,後者被 eval-32 的 0.9797 與正式集外 0.0146 誤拒共同否定。

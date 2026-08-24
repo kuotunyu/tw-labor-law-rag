@@ -1,0 +1,67 @@
+# Usage (once Docker Desktop + nvidia-container-toolkit are installed):
+#   1. docker compose up -d qdrant
+#   2. QDRANT_MODE=server uv run python scripts/build_index.py --strategy all
+#      (builds the index directly against the qdrant service; only needs
+#      doing once, or after re-chunking/changing the corpus)
+#   3. docker compose up --build api ui
+#
+# No GPU on the host? Drop the `deploy.resources` block on `api` and set
+# DEVICE=cpu in .env — everything still works, just slower.
+#
+# First request after `api` starts takes ~45-60s (no persisted HF cache
+# volume, so BGE-M3 + reranker download fresh into the container); every
+# request after that is a few seconds. Verified end-to-end 2026-07: GPU
+# reservation, Qdrant server mode, and generation all work without extra
+# nvidia-container-toolkit setup on Docker Desktop's WSL2 backend.
+#
+# `docker compose build` / `up --build` may fail with a gRPC "bake" session
+# error on some Docker Desktop versions ("x-docker-expose-session-sharedkey
+# contains value with non-printable ASCII characters"). Workaround: build
+# manually and tag to match compose's expected image names, then start
+# without --build:
+#   docker build -t <project>-api -t <project>-ui .
+#   docker compose up -d api ui
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  api:
+    build: .
+    command: uvicorn rag.api.main:app --host 0.0.0.0 --port 8000
+    env_file:
+      - .env
+    environment:
+      - QDRANT_MODE=server
+      - QDRANT_URL=http://qdrant:6333
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./data:/app/data
+    depends_on:
+      - qdrant
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  ui:
+    build: .
+    command: streamlit run ui/app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+    environment:
+      - API_URL=http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+
+volumes:
+  qdrant_data:

@@ -1,0 +1,99 @@
+{
+  "schema_version": "1.0",
+  "artifact_type": "retrieval_ablation",
+  "evaluation_date": "2026-07-06",
+  "dataset": {
+    "path": "eval/dataset/eval_set.jsonl",
+    "sha256": "760e33eaa0821001d37ff974bc037043d019fc670b8f3621b6e713030274ca07",
+    "n_questions": 40,
+    "n_answerable": 30,
+    "n_unanswerable": 10
+  },
+  "settings": {
+    "embedding_model": "BAAI/bge-m3",
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "retrieval_mode": "hybrid",
+    "use_reranker": true,
+    "top_k_retrieve": 20,
+    "top_k_final": 5,
+    "rrf_k": 60,
+    "rerank_score_threshold": 0.03,
+    "chunking_strategy": "structure",
+    "chunk_size": 400,
+    "chunk_overlap": 80
+  },
+  "results": [
+    {
+      "chunking": "structure",
+      "retrieval": "bm25",
+      "reranker": false,
+      "n_answerable": 30,
+      "hit_at_5": 0.8333333333333334,
+      "mrr_at_10": 0.6722222222222223,
+      "avg_latency_ms": 18.84333333333333
+    },
+    {
+      "chunking": "structure",
+      "retrieval": "vector",
+      "reranker": false,
+      "n_answerable": 30,
+      "hit_at_5": 0.9,
+      "mrr_at_10": 0.85,
+      "avg_latency_ms": 867.6733333333333
+    },
+    {
+      "chunking": "structure",
+      "retrieval": "hybrid",
+      "reranker": false,
+      "n_answerable": 30,
+      "hit_at_5": 0.9333333333333333,
+      "mrr_at_10": 0.8222222222222223,
+      "avg_latency_ms": 58.03999999999999
+    },
+    {
+      "chunking": "structure",
+      "retrieval": "hybrid",
+      "reranker": true,
+      "n_answerable": 30,
+      "hit_at_5": 0.9666666666666667,
+      "mrr_at_10": 0.9055555555555554,
+      "avg_latency_ms": 292.0733333333332
+    },
+    {
+      "chunking": "fixed",
+      "retrieval": "bm25",
+      "reranker": false,
+      "n_answerable": 30,
+      "hit_at_5": 0.8666666666666667,
+      "mrr_at_10": 0.6383333333333333,
+      "avg_latency_ms": 1.07
+    },
+    {
+      "chunking": "fixed",
+      "retrieval": "vector",
+      "reranker": false,
+      "n_answerable": 30,
+      "hit_at_5": 0.9333333333333333,
+      "mrr_at_10": 0.825,
+      "avg_latency_ms": 50.29333333333333
+    },
+    {
+      "chunking": "fixed",
+      "retrieval": "hybrid",
+      "reranker": false,
+      "n_answerable": 30,
+      "hit_at_5": 0.9666666666666667,
+      "mrr_at_10": 0.8,
+      "avg_latency_ms": 52.88666666666666
+    },
+    {
+      "chunking": "fixed",
+      "retrieval": "hybrid",
+      "reranker": true,
+      "n_answerable": 30,
+      "hit_at_5": 1.0,
+      "mrr_at_10": 0.8472222222222221,
+      "avg_latency_ms": 265.88
+    }
+  ]
+}

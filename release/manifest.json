@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.0",
+  "release_type": "public_source_only_portfolio_release",
+  "release_version": "v0.1.0",
+  "base_commit": "24bd48f9a5ae0257f962e7401cbb3c759fbefe35",
+  "evidence": {
+    "dataset": {
+      "path": "eval/dataset/eval_set.jsonl",
+      "canonical_sha256": "760e33eaa0821001d37ff974bc037043d019fc670b8f3621b6e713030274ca07",
+      "questions": 40,
+      "answerable": 30,
+      "unanswerable": 10,
+      "laws_covered": 15,
+      "question_types": {
+        "multi_article": 4,
+        "negation": 1,
+        "out_of_kb_related": 5,
+        "out_of_kb_unrelated": 5,
+        "scenario": 4,
+        "single_article_list": 5,
+        "single_article_numeric": 16
+      }
+    },
+    "ablation": {
+      "rows": 320,
+      "configurations": [
+        "fixed/bm25",
+        "fixed/hybrid",
+        "fixed/hybrid+rerank",
+        "fixed/vector",
+        "structure/bm25",
+        "structure/hybrid",
+        "structure/hybrid+rerank",
+        "structure/vector"
+      ]
+    },
+    "e2e": {
+      "rows": 40,
+      "answered": 29,
+      "refused": 11,
+      "judged": 29
+    }
+  },
+  "runtime_config": {
+    "embedding_model": "BAAI/bge-m3",
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "retrieval_mode": "hybrid",
+    "use_reranker": true,
+    "top_k_retrieve": 20,
+    "top_k_final": 5,
+    "rrf_k": 60,
+    "rerank_score_threshold": 0.03,
+    "chunking_strategy": "structure",
+    "chunk_size": 400,
+    "chunk_overlap": 80
+  },
+  "provider_evidence": {
+    "classification": "archived_provider_evidence",
+    "generator": "openai/gpt-5.1",
+    "judge": "openai/gpt-5-mini",
+    "offline_reaggregatable": [
+      "avg_faithfulness",
+      "avg_relevancy",
+      "pct_faithfulness_ge4"
+    ],
+    "not_publicly_regenerable": [
+      "generator_outputs",
+      "judge_decisions",
+      "judge_reasons"
+    ]
+  },
+  "source_data": {
+    "provider": "法務部資訊處",
+    "dataset_id": 18290,
+    "dataset_name": "中文法規_命令資料檔下載",
+    "dataset_url": "https://data.gov.tw/dataset/18290",
+    "license": "政府資料開放授權條款－第1版",
+    "license_url": "https://data.gov.tw/license",
+    "redistribution": "allowed_with_attribution",
+    "samples": [
+      {
+        "path": "data/sample/勞工請假規則.json",
+        "sha256": "f321a5beaf23521bb572a33bf5d87d3ec4241554cd75880c9fe4bd2d7d9b3abb",
+        "last_amended": "20251209"
+      },
+      {
+        "path": "data/sample/勞動基準法施行細則.json",
+        "sha256": "99b5e4756f5f8ed53286d620ebadaefa6dc8f37e00cf62014fa8d05ff29a5e78",
+        "last_amended": "20240327"
+      }
+    ]
+  },
+  "publication": {
+    "allowlist": "release/public-files.txt",
+    "tracked_excluded": [],
+    "history": {
+      "max_commits": 1
+    },
+    "reviewed_binaries": {
+      "docs/screenshot-demo.png": "ee95af1a9a8b92d2e1b8521da48e0a56fcc7447982122193bcc251ef95b86ecb"
+    },
+    "excluded": [
+      ".claude/",
+      ".env",
+      ".venv/",
+      ".worktrees/",
+      "data/raw/",
+      "docs/superpowers/",
+      "eval/runs/",
+      "indexes/",
+      "prompts/",
+      "provider/",
+      "storage/",
+      "answers/",
+      "INTERVIEW_PREP.md",
+      "STARTUP.md",
+      "plan.md",
+      "prompts",
+      "provider responses",
+      "judge reasons",
+      "API metadata",
+      "private paths"
+    ]
+  },
+  "reviewer_commands": [
+    "uv sync --locked",
+    "uv lock --check",
+    "uv run ruff check .",
+    "uv run python scripts/verify_release.py",
+    "uv run pytest -q",
+    "uv build"
+  ]
+}
