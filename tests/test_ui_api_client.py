@@ -1,0 +1,74 @@
+import json
+
+import httpx
+import pytest
+
+from ui.api_client import fetch_models, submit_query
+
+
+def test_fetch_models_returns_discovery_payload():
+    """Catches fetching any route other than the public model catalog."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/models"
+        return httpx.Response(
+            200,
+            json={
+                "default_provider": "gemini",
+                "providers": [
+                    {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
+                    {"provider": "openai", "model": "gpt-5.6-luna"},
+                ],
+            },
+        )
+
+    payload = fetch_models("http://api", transport=httpx.MockTransport(handler))
+
+    assert payload["default_provider"] == "gemini"
+    assert [item["provider"] for item in payload["providers"]] == ["gemini", "openai"]
+
+
+def test_submit_query_includes_selected_provider():
+    """Catches dropping the provider selected from API discovery."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert request.url.path == "/query"
+        assert payload["provider"] == "openai"
+        return httpx.Response(200, json={"answer": "ok"})
+
+    response = submit_query(
+        "http://api",
+        {"question": "問題", "provider": "openai"},
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert response == {"answer": "ok"}
+
+
+@pytest.mark.parametrize(
+    ("client_call", "path"),
+    [
+        (lambda transport: fetch_models("http://api", transport=transport), "/models"),
+        (
+            lambda transport: submit_query(
+                "http://api", {"question": "問題", "provider": "gemini"}, transport=transport
+            ),
+            "/query",
+        ),
+    ],
+)
+def test_non_success_responses_raise_httpx_status_errors_without_response_body(
+    client_call, path: str
+):
+    """Catches clients that conceal HTTP failures or echo response bodies in errors."""
+    private_body = "do-not-display-provider-failure-details"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == path
+        return httpx.Response(503, text=private_body, request=request)
+
+    with pytest.raises(httpx.HTTPStatusError) as exc_info:
+        client_call(httpx.MockTransport(handler))
+
+    assert private_body not in str(exc_info.value)
