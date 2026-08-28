@@ -13,7 +13,7 @@ from types import MethodType
 from typing import Any
 
 from rag.config import DEFAULT_RERANKER_MODEL_REVISION
-from rag.indexing.embedder import resolve_device
+from rag.indexing.embedder import resolve_device, resolve_model_snapshot
 from rag.models import RetrievedChunk
 
 
@@ -86,11 +86,11 @@ class Reranker:
         if self._model is None:  # lazy: avoid loading the cross-encoder until first use
             from FlagEmbedding import FlagReranker
 
+            model_path = resolve_model_snapshot(self.model_name, self.model_revision)
             self._model = FlagReranker(
-                self.model_name,
+                model_path,
                 use_fp16=self.device.startswith("cuda"),
                 devices=[self.device],
-                revision=self.model_revision,
                 trust_remote_code=False,
             )
             tokenizer = getattr(self._model, "tokenizer", None)

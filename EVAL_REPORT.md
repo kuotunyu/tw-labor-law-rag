@@ -42,7 +42,7 @@
 
 ## v0.3.1 可靠性壓力證據
 
-`eval/dataset/reliability_stress_v0.3.1.jsonl` 有 60 題：40 題可答、20 題不可答，涵蓋全部 15 部法規；40 題含中英夾雜，55 題採敘事式長句。答案與法源標註繼承自經稽核的正式資料，不由 provider 臨時生成。執行器先重新下載法務部法律／命令 ZIP，只有在 SHA-256、15 部清單與 884 條 snapshot 完全一致時才建立隔離索引；BGE-M3 revision `5617a9f…b181`、reranker revision `953dc6f…d41e` 均固定。
+`eval/dataset/reliability_stress_v0.3.1.jsonl` 有 60 題：40 題可答、20 題不可答，涵蓋全部 15 部法規；40 題含中英夾雜，55 題採敘事式長句。答案與法源標註繼承自經稽核的正式資料，不由 provider 臨時生成。執行器先重新下載法務部法律／命令 ZIP，只有在 SHA-256、15 部清單與 884 條 snapshot 完全一致時才建立隔離索引；BGE-M3 revision `5617a9f…b181`、reranker revision `953dc6f…d41e` 先解析成該 commit 的本機 snapshot 路徑，再交給模型載入器，避免 mutable `main`。
 
 | 資料集 | Hit@5 | MRR@10 | 0.03 直接誤拒 | 0.03 不可答直接攔截 |
 |---|---:|---:|---:|---:|

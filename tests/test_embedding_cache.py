@@ -2,8 +2,9 @@ import threading
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
-from rag.indexing.embedder import BGEM3Embedder, EmbeddingCache
+from rag.indexing.embedder import BGEM3Embedder, EmbeddingCache, resolve_model_snapshot
 from rag.retrieval.reranker import Reranker, ensure_prepare_for_model
 
 
@@ -74,6 +75,11 @@ def test_embedder_uses_cache_without_model(tmp_path):
 
 def test_embedder_pins_revision_and_disables_remote_code(monkeypatch):
     captured = {}
+    revision = "a" * 40
+
+    def fake_snapshot_download(**kwargs):
+        captured["snapshot"] = kwargs
+        return "immutable-bge-m3-snapshot"
 
     def fake_model(model_name, **kwargs):
         captured.update(model_name=model_name, **kwargs)
@@ -84,14 +90,17 @@ def test_embedder_pins_revision_and_disables_remote_code(monkeypatch):
         "FlagEmbedding",
         SimpleNamespace(BGEM3FlagModel=fake_model),
     )
+    monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snapshot_download)
     embedder = BGEM3Embedder(
         model_name="BAAI/bge-m3",
-        model_revision="immutable-embedding-sha",
+        model_revision=revision,
         device="cpu",
     )
 
     assert embedder.model is not None
-    assert captured["revision"] == "immutable-embedding-sha"
+    assert captured["snapshot"] == {"repo_id": "BAAI/bge-m3", "revision": revision}
+    assert captured["model_name"] == "immutable-bge-m3-snapshot"
+    assert "revision" not in captured
     assert captured["trust_remote_code"] is False
 
 
@@ -104,6 +113,11 @@ def test_embedding_cache_key_includes_model_revision():
 
 def test_reranker_pins_revision_and_disables_remote_code(monkeypatch):
     captured = {}
+    revision = "b" * 40
+
+    def fake_snapshot_download(**kwargs):
+        captured["snapshot"] = kwargs
+        return "immutable-bge-reranker-v2-m3-snapshot"
 
     def fake_model(model_name, **kwargs):
         captured.update(model_name=model_name, **kwargs)
@@ -114,15 +128,35 @@ def test_reranker_pins_revision_and_disables_remote_code(monkeypatch):
         "FlagEmbedding",
         SimpleNamespace(FlagReranker=fake_model),
     )
+    monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snapshot_download)
     reranker = Reranker(
         model_name="BAAI/bge-reranker-v2-m3",
-        model_revision="immutable-reranker-sha",
+        model_revision=revision,
         device="cpu",
     )
 
     assert reranker.model is not None
-    assert captured["revision"] == "immutable-reranker-sha"
+    assert captured["snapshot"] == {
+        "repo_id": "BAAI/bge-reranker-v2-m3",
+        "revision": revision,
+    }
+    assert captured["model_name"] == "immutable-bge-reranker-v2-m3-snapshot"
+    assert "revision" not in captured
     assert captured["trust_remote_code"] is False
+
+
+def test_model_snapshot_requires_full_commit_sha(monkeypatch):
+    called = False
+
+    def fake_snapshot_download(**_kwargs):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snapshot_download)
+
+    with pytest.raises(ValueError, match="40-character commit SHA"):
+        resolve_model_snapshot("BAAI/bge-m3", "main")
+    assert called is False
 
 
 def test_reranker_restores_removed_prepare_for_model_api():
