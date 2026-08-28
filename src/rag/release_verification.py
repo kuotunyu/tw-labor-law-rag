@@ -368,6 +368,33 @@ def _tracked_files(project_root: Path) -> set[str] | None:
     }
 
 
+def _publishable_commit_ids(project_root: Path) -> list[str]:
+    try:
+        process = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(project_root),
+                "rev-list",
+                "--branches",
+                "--tags",
+                "--remotes",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+    except subprocess.CalledProcessError as exc:
+        raise ReleaseVerificationError(
+            "failed to enumerate publishable Git refs"
+        ) from exc
+    commits = sorted({line for line in process.stdout.splitlines() if line})
+    if not commits:
+        raise ReleaseVerificationError("Git checkout has no publishable commits")
+    return commits
+
+
 def _verify_reachable_git_history(
     project_root: Path,
     public_paths: set[str],

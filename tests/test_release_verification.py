@@ -8,6 +8,35 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PUBLIC_NAME = "kuotunyu"
+PUBLIC_EMAIL = "61350295+kuotunyu@users.noreply.github.com"
+
+
+def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        ["git", "-C", str(repo), *args],
+        check=True,
+        capture_output=True,
+    )
+
+
+def init_public_repo(repo: Path) -> None:
+    subprocess.run(
+        ["git", "init", "-b", "main", str(repo)],
+        check=True,
+        capture_output=True,
+    )
+    run_git(repo, "config", "user.name", PUBLIC_NAME)
+    run_git(repo, "config", "user.email", PUBLIC_EMAIL)
+
+
+def commit_file(repo: Path, relative_path: str, content: bytes, message: str) -> str:
+    path = repo / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    run_git(repo, "add", "--", relative_path)
+    run_git(repo, "commit", "-m", message)
+    return run_git(repo, "rev-parse", "HEAD").stdout.decode("ascii").strip()
 
 
 def release_module():
@@ -162,6 +191,62 @@ def test_design_does_not_expand_observed_corpus_scale():
 
     assert "88萬候選" not in design
     assert "884 個候選" in design
+
+
+def test_publishable_commit_ids_ignore_nonstandard_recovery_refs(tmp_path):
+    init_public_repo(tmp_path)
+    public_commit = commit_file(tmp_path, "README.md", b"public", "public")
+    recovered_commit = commit_file(
+        tmp_path,
+        ".claude/launch.json",
+        b"{}",
+        "local recovery only",
+    )
+    run_git(tmp_path, "reset", "--hard", public_commit)
+    run_git(tmp_path, "update-ref", "refs/archive/recovery", recovered_commit)
+
+    assert release_module()._publishable_commit_ids(tmp_path) == [public_commit]
+
+
+def test_publishable_commit_ids_include_archive_named_branch(tmp_path):
+    init_public_repo(tmp_path)
+    public_commit = commit_file(tmp_path, "README.md", b"public", "public")
+    second_commit = commit_file(tmp_path, "CHANGELOG.md", b"change", "change")
+    run_git(tmp_path, "reset", "--hard", public_commit)
+    run_git(tmp_path, "update-ref", "refs/heads/archive/review", second_commit)
+
+    assert set(release_module()._publishable_commit_ids(tmp_path)) == {
+        public_commit,
+        second_commit,
+    }
+
+
+def test_publishable_commit_ids_include_and_deduplicate_tags_and_remotes(tmp_path):
+    init_public_repo(tmp_path)
+    public_commit = commit_file(tmp_path, "README.md", b"public", "public")
+    release_commit = commit_file(tmp_path, "CHANGELOG.md", b"release", "release")
+    run_git(tmp_path, "reset", "--hard", public_commit)
+    run_git(tmp_path, "tag", "-a", "v0.2.0", "-m", "release", release_commit)
+    run_git(tmp_path, "update-ref", "refs/remotes/origin/release", release_commit)
+
+    assert set(release_module()._publishable_commit_ids(tmp_path)) == {
+        public_commit,
+        release_commit,
+    }
+
+
+def test_publishable_commit_ids_reject_empty_ref_set(tmp_path):
+    subprocess.run(
+        ["git", "init", "-b", "main", str(tmp_path)],
+        check=True,
+        capture_output=True,
+    )
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="no publishable commits",
+    ):
+        release_module()._publishable_commit_ids(tmp_path)
 
 
 def test_reachable_history_rejects_a_forbidden_path(tmp_path):
