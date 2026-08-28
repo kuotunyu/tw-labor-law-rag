@@ -1,7 +1,6 @@
-"""build_llm() dispatch tests. Client constructors are lazy (no network call
-on init) so these run offline with dummy keys — only .generate() would hit
-the network, and we never call that here.
-"""
+"""Offline provider-adapter contract tests using local fake SDK clients."""
+
+from types import SimpleNamespace
 
 import pytest
 
@@ -10,8 +9,11 @@ from rag.config import Settings
 from rag.generation.llm import (
     AnthropicAdapter,
     GeminiAdapter,
+    LLMOutput,
     OllamaAdapter,
     OpenAIAdapter,
+    ProviderOperationalError,
+    ProviderPolicyError,
     build_llm,
 )
 
@@ -53,6 +55,43 @@ def test_build_llm_ollama():
 def test_build_llm_model_override():
     llm = build_llm(settings_for("gemini"), model="gemini-2.5-flash")
     assert llm.model == "gemini-2.5-flash"
+
+
+def test_llm_output_defaults_to_no_fallback():
+    output = LLMOutput(text="回答", provider="gemini", model="gemini-test")
+
+    assert output.text == "回答"
+    assert output.fallback_used is False
+    assert output.fallback_from is None
+
+
+def test_build_llm_uses_provider_specific_model():
+    settings = settings_for("gemini")
+    settings.gemini_generation_model = "gemini-specific"
+    settings.openai_generation_model = "openai-specific"
+
+    assert build_llm(settings, provider="gemini").model == "gemini-specific"
+    assert build_llm(settings, provider="openai").model == "openai-specific"
+
+
+@pytest.mark.parametrize("provider", ["anthropic", "openai", "gemini", "ollama"])
+def test_build_llm_adapter_reports_its_fixed_provider(provider):
+    assert build_llm(settings_for(provider)).provider == provider
+
+
+def test_empty_provider_response_is_operational_failure(monkeypatch):
+    llm = build_llm(settings_for("gemini"), model="gemini-test")
+    monkeypatch.setattr(
+        llm.client.models,
+        "generate_content",
+        lambda **_kwargs: SimpleNamespace(text=""),
+    )
+
+    with pytest.raises(ProviderOperationalError) as exc_info:
+        llm.generate("system", "user")
+
+    assert exc_info.value.provider == "gemini"
+    assert exc_info.value.reason_code == "empty_response"
 
 
 def test_build_llm_provider_override_ignores_settings_provider():
@@ -106,7 +145,9 @@ def test_ollama_generate_disables_thinking_and_sanitizes_content(monkeypatch):
     monkeypatch.setattr("httpx.post", fake_post)
     adapter = OllamaAdapter("http://localhost:11434/", "qwen3:8b")
 
-    assert adapter.generate("system", "user") == "可見答案"
+    output = adapter.generate("system", "user")
+
+    assert output == LLMOutput("可見答案", "ollama", "qwen3:8b")
     assert captured["url"] == "http://localhost:11434/api/chat"
     assert captured["payload"]["think"] is False
     assert captured["payload"]["stream"] is False
@@ -131,3 +172,34 @@ def test_ollama_generate_keeps_malformed_response_visible(monkeypatch):
         OllamaAdapter("http://localhost:11434", "qwen3:8b").generate(
             "system", "user"
         )
+
+
+@pytest.mark.parametrize("status_code", [429, 503])
+def test_http_provider_failures_are_operational(status_code):
+    class ProviderSDKError(Exception):
+        def __init__(self):
+            self.status_code = status_code
+
+    error = llm_module._normalized_provider_error("gemini", ProviderSDKError())
+
+    assert isinstance(error, ProviderOperationalError)
+    assert error.provider == "gemini"
+    assert error.reason_code == f"http_{status_code}"
+
+
+def test_safety_provider_failure_is_policy_error():
+    class SafetyBlockedError(Exception):
+        pass
+
+    error = llm_module._normalized_provider_error("openai", SafetyBlockedError())
+
+    assert isinstance(error, ProviderPolicyError)
+    assert error.provider == "openai"
+    assert error.reason_code == "policy_rejection"
+
+
+def test_unknown_provider_failure_is_not_operational():
+    error = llm_module._normalized_provider_error("gemini", ValueError("bad input"))
+
+    assert type(error) is RuntimeError
+    assert not isinstance(error, ProviderOperationalError)
