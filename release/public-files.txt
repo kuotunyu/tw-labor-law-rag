@@ -54,6 +54,7 @@ src/rag/generation/__init__.py
 src/rag/generation/answerer.py
 src/rag/generation/llm.py
 src/rag/generation/prompts.py
+src/rag/generation/router.py
 src/rag/indexing/__init__.py
 src/rag/indexing/bm25_index.py
 src/rag/indexing/dict/legal_terms.txt
@@ -83,6 +84,7 @@ tests/test_evaluation.py
 tests/test_fusion.py
 tests/test_judge.py
 tests/test_llm.py
+tests/test_llm_router.py
 tests/test_loader.py
 tests/test_official_artifacts.py
 tests/test_packaging.py
@@ -91,6 +93,8 @@ tests/test_refusal_labels.py
 tests/test_release_verification.py
 tests/test_retriever.py
 tests/test_tokenizer.py
+tests/test_ui_api_client.py
+ui/api_client.py
 ui/app.py
 ui/refusal_labels.py
 uv.lock

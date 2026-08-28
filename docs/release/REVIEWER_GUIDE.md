@@ -43,7 +43,7 @@ The release verifier should exit zero and report:
 - provider evidence: 29 archived numeric verdicts; faithfulness `4.896551724137931`, relevancy `5.0`
 - OGDL source samples verified: 2
 - GitHub Action references: 2, both full commit SHAs
-- publication inventory: exactly 96 tracked files, empty `tracked_excluded`, 0 unexpected archive files, 1 current reviewed binary hash
+- publication inventory: exactly 100 tracked files, empty `tracked_excluded`, 0 unexpected archive files, 1 current reviewed binary hash
 - public Git history: all commits reachable from heads/tags/ordinary remotes pass identity and historical path/content/binary scanning; ephemeral `refs/remotes/pull/*` merge refs and local `refs/archive/*` recovery refs are excluded
 - locked Ruff dependency and CI lint/tag gates: verified
 - official trace issues: 0

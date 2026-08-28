@@ -224,7 +224,7 @@ def test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions():
     assert manifest["release_type"] == "public_source_only_portfolio_release"
     assert manifest["publication"]["tracked_excluded"] == []
     assert tracked == public_paths()
-    assert len(tracked) == 96
+    assert len(tracked) == 100
     assert "docs/release/RELEASE_EVOLUTION_DESIGN.md" in tracked
     assert "docs/release/RELEASE_EVOLUTION_IMPLEMENTATION_PLAN.md" in tracked
     forbidden_prefixes = (
