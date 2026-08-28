@@ -17,7 +17,7 @@ import tomllib
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -148,6 +148,28 @@ CORPUS_SOURCE_URLS = {
 
 class ReleaseVerificationError(ValueError):
     """Raised when committed release evidence violates its contract."""
+
+
+def _verify_evidence_run_date(
+    value: object,
+    *,
+    latest_valid_date: date | None = None,
+) -> date:
+    """Validate a civil run date without rejecting valid UTC+14 evidence in UTC CI."""
+
+    try:
+        run_date = date.fromisoformat(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
+        raise ReleaseVerificationError(
+            "reliability run date is not ISO YYYY-MM-DD"
+        ) from exc
+    if latest_valid_date is None:
+        latest_valid_date = datetime.now(
+            timezone(timedelta(hours=14))
+        ).date()
+    if run_date > latest_valid_date:
+        raise ReleaseVerificationError("reliability run date is in the future")
+    return run_date
 
 
 @dataclass(frozen=True)
@@ -966,11 +988,11 @@ def _verify_reliability_evidence(
 
     _assert_equal("reliability schema", result["schema_version"], "1.0")
     try:
-        run_date = date.fromisoformat(result["run_date"])
-    except (KeyError, TypeError, ValueError) as exc:
-        raise ReleaseVerificationError("reliability run date is not ISO YYYY-MM-DD") from exc
-    if run_date > date.today():
-        raise ReleaseVerificationError("reliability run date is in the future")
+        _verify_evidence_run_date(result["run_date"])
+    except KeyError as exc:
+        raise ReleaseVerificationError(
+            "reliability run date is not ISO YYYY-MM-DD"
+        ) from exc
     _assert_equal(
         "reliability result dataset",
         result["dataset"],
