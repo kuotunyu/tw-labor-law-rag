@@ -19,9 +19,9 @@ docs/release/HUGGINGFACE_ZERO_COST_DESIGN.md
 docs/release/HUGGINGFACE_ZERO_COST_IMPLEMENTATION_PLAN.md
 docs/release/OGDL_ATTRIBUTION.md
 docs/release/PUBLICATION_BOUNDARY.md
-docs/release/RELIABILITY_PROVENANCE_DESIGN.md
 docs/release/RELEASE_EVOLUTION_DESIGN.md
 docs/release/RELEASE_EVOLUTION_IMPLEMENTATION_PLAN.md
+docs/release/RELIABILITY_PROVENANCE_DESIGN.md
 docs/release/REVIEWER_GUIDE.md
 docs/screenshot-demo.png
 eval/_bootstrap.py
