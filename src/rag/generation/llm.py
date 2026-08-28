@@ -74,6 +74,8 @@ def _normalized_provider_error(provider: str, exc: Exception) -> RuntimeError:
         numeric_status = None
     if numeric_status in _OPERATIONAL_STATUS_CODES:
         return ProviderOperationalError(provider, f"http_{numeric_status}")
+    if "timeout" in class_name:
+        return ProviderOperationalError(provider, "timeout")
     if any(token in class_name for token in _OPERATIONAL_CLASS_TOKENS):
         return ProviderOperationalError(provider, "transport_or_service")
     return RuntimeError(f"unclassified {provider} provider failure")
@@ -169,10 +171,13 @@ class OpenAIAdapter:
 
     provider = "openai"
 
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, timeout_seconds: float | None = None):
         from openai import OpenAI
 
-        self.client = OpenAI(api_key=api_key)
+        client_kwargs = {"api_key": api_key}
+        if timeout_seconds is not None:
+            client_kwargs["timeout"] = timeout_seconds
+        self.client = OpenAI(**client_kwargs)
         self.model = model
         self._unsupported_params: set[str] = set()
 
@@ -222,10 +227,16 @@ class OpenAIAdapter:
 class GeminiAdapter:
     provider = "gemini"
 
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, timeout_seconds: float | None = None):
         from google import genai
+        from google.genai import types
 
-        self.client = genai.Client(api_key=api_key)
+        client_kwargs = {"api_key": api_key}
+        if timeout_seconds is not None:
+            client_kwargs["http_options"] = types.HttpOptions(
+                timeout=int(timeout_seconds * 1000)
+            )
+        self.client = genai.Client(**client_kwargs)
         self.model = model
 
     def generate(
@@ -306,15 +317,32 @@ class OllamaAdapter:
         return _provider_output(self.provider, self.model, sanitize_ollama_content(content))
 
 
-def build_llm(settings: Settings, *, provider: str | None = None, model: str | None = None) -> LLMAdapter:
+def build_llm(
+    settings: Settings,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    api_key: str | None = None,
+    timeout_seconds: float | None = None,
+) -> LLMAdapter:
     """``provider``/``model`` overrides let eval scripts request e.g. a cross-provider judge."""
     provider = provider or settings.llm_provider
     if provider == "anthropic":
         return AnthropicAdapter(settings.anthropic_api_key, model or settings.generation_model_for(provider))
     if provider == "openai":
-        return OpenAIAdapter(settings.openai_api_key, model or settings.generation_model_for(provider))
+        resolved_key = api_key if api_key is not None else settings.openai_api_key
+        return OpenAIAdapter(
+            resolved_key,
+            model or settings.generation_model_for(provider),
+            timeout_seconds=timeout_seconds,
+        )
     if provider == "gemini":
-        return GeminiAdapter(settings.gemini_api_key, model or settings.generation_model_for(provider))
+        resolved_key = api_key if api_key is not None else settings.gemini_api_key
+        return GeminiAdapter(
+            resolved_key,
+            model or settings.generation_model_for(provider),
+            timeout_seconds=timeout_seconds,
+        )
     if provider == "ollama":
         return OllamaAdapter(settings.ollama_base_url, model or settings.generation_model_for(provider))
     raise ValueError(f"unknown LLM provider: {provider}")

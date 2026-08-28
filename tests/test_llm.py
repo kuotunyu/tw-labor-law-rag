@@ -195,6 +195,80 @@ def test_build_llm_provider_override_ignores_settings_provider():
     assert isinstance(llm, GeminiAdapter)
 
 
+def test_build_llm_uses_request_key_without_mutating_owner_settings(monkeypatch):
+    captured = {}
+
+    class FakeOpenAI:
+        def __init__(self, api_key, model, timeout_seconds=None):
+            captured.update(
+                api_key=api_key,
+                model=model,
+                timeout_seconds=timeout_seconds,
+            )
+
+    monkeypatch.setattr(llm_module, "OpenAIAdapter", FakeOpenAI)
+    settings = Settings(_env_file=None, openai_api_key="owner-key")
+
+    llm_module.build_llm(
+        settings,
+        provider="openai",
+        api_key="visitor-key",
+        timeout_seconds=60.0,
+    )
+
+    assert captured == {
+        "api_key": "visitor-key",
+        "model": "gpt-5.6-luna",
+        "timeout_seconds": 60.0,
+    }
+    assert settings.openai_api_key == "owner-key"
+
+
+def test_openai_adapter_passes_request_timeout_to_sdk(monkeypatch):
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr("openai.OpenAI", FakeClient)
+
+    OpenAIAdapter("visitor-key", "openai-test", timeout_seconds=60.0)
+
+    assert captured == {"api_key": "visitor-key", "timeout": 60.0}
+
+
+def test_gemini_adapter_converts_request_timeout_to_milliseconds(monkeypatch):
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr("google.genai.Client", FakeClient)
+
+    GeminiAdapter("visitor-key", "gemini-test", timeout_seconds=60.0)
+
+    assert captured["api_key"] == "visitor-key"
+    assert captured["http_options"].timeout == 60_000
+
+
+def test_timeout_failure_has_specific_safe_reason_code():
+    secret = "raw-provider-timeout-body"
+
+    class ProviderTimeoutError(Exception):
+        pass
+
+    error = llm_module._normalized_provider_error(
+        "gemini", ProviderTimeoutError(secret)
+    )
+
+    assert isinstance(error, ProviderOperationalError)
+    assert error.reason_code == "timeout"
+    assert secret not in str(error)
+    assert secret not in repr(error)
+
+
 def test_build_llm_unknown_provider_raises():
     with pytest.raises(ValueError):
         build_llm(settings_for("anthropic"), provider="bedrock")
