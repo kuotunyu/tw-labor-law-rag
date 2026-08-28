@@ -343,6 +343,27 @@ def test_threshold_contract_rejects_score_stage_disagreement(row):
         release_module()._verify_e2e_threshold_contract([row], threshold=0.03)
 
 
+def test_public_entry_scan_reports_secret_without_leaking_value():
+    module = release_module()
+    secret = "sk-" + "A" * 32
+    entries = [module.PublicEntry(path="README.md", data=secret.encode("utf-8"))]
+
+    issues = module._scan_public_entries(entries)
+    serialized = json.dumps(issues)
+
+    assert [issue["category"] for issue in issues] == ["provider_token"]
+    assert secret not in serialized
+
+
+def test_public_file_scan_preserves_missing_sensitive_path_findings(tmp_path):
+    issues = release_module().scan_public_files(tmp_path, [".env"])
+
+    assert {issue["category"] for issue in issues} == {
+        "missing_public_file",
+        "sensitive_public_path",
+    }
+
+
 def test_public_scan_reports_categories_without_leaking_values(tmp_path):
     private_value = "do-not-print-this-provider-response"
     private_name = "PrivatePerson"

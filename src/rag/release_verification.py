@@ -14,6 +14,7 @@ import subprocess
 import tomllib
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -116,6 +117,12 @@ class ReleaseVerificationError(ValueError):
     """Raised when committed release evidence violates its contract."""
 
 
+@dataclass(frozen=True)
+class PublicEntry:
+    path: str
+    data: bytes
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8") as handle:
         value = json.load(handle)
@@ -198,24 +205,19 @@ def _is_placeholder_secret(raw: str) -> bool:
     )
 
 
-def scan_public_files(
-    project_root: Path, relative_paths: Sequence[str]
+def _scan_public_entries(
+    entries: Sequence[PublicEntry],
 ) -> list[dict[str, str]]:
-    """Return sanitized privacy/secret issues without returning matched values."""
-
     issues: list[dict[str, str]] = []
-    for relative_path in relative_paths:
-        normalized = relative_path.replace("\\", "/")
-        path = project_root / Path(normalized)
+    for entry in entries:
+        normalized = entry.path.replace("\\", "/")
+        suffix = Path(normalized).suffix.lower()
         if _is_sensitive_public_path(normalized):
             issues.append(_issue(normalized, "sensitive_public_path", "path"))
-        if not path.is_file():
-            issues.append(_issue(normalized, "missing_public_file", "path"))
-            continue
-        if path.suffix.lower() in BINARY_PUBLIC_SUFFIXES:
+        if suffix in BINARY_PUBLIC_SUFFIXES:
             continue
         try:
-            text = path.read_text(encoding="utf-8")
+            text = entry.data.decode("utf-8")
         except UnicodeDecodeError:
             issues.append(_issue(normalized, "non_utf8_public_text", "file"))
             continue
@@ -232,12 +234,10 @@ def scan_public_files(
             for match in _EMAIL_ADDRESS.finditer(text)
         )
         if private_email or (
-            path.suffix.lower() in {".json", ".jsonl"} and _IP_ADDRESS.search(text)
+            suffix in {".json", ".jsonl"} and _IP_ADDRESS.search(text)
         ):
             categories.add(("personal_identifier", "text"))
-        if path.suffix.lower() in {".json", ".jsonl"} and _PROVIDER_PAYLOAD_KEY.search(
-            text
-        ):
+        if suffix in {".json", ".jsonl"} and _PROVIDER_PAYLOAD_KEY.search(text):
             categories.add(("provider_payload", "JSON field"))
         for match in _SECRET_ASSIGNMENT.finditer(text):
             if not _is_placeholder_secret(match.group(1)):
@@ -246,7 +246,32 @@ def scan_public_files(
         for category, location in sorted(categories):
             issues.append(_issue(normalized, category, location))
 
-    return sorted(issues, key=lambda item: (item["path"], item["category"], item["location"]))
+    return sorted(
+        issues,
+        key=lambda item: (item["path"], item["category"], item["location"]),
+    )
+
+
+def scan_public_files(
+    project_root: Path, relative_paths: Sequence[str]
+) -> list[dict[str, str]]:
+    """Return sanitized privacy/secret issues without returning matched values."""
+
+    issues: list[dict[str, str]] = []
+    entries: list[PublicEntry] = []
+    for relative_path in relative_paths:
+        normalized = relative_path.replace("\\", "/")
+        path = project_root / Path(normalized)
+        if not path.is_file():
+            if _is_sensitive_public_path(normalized):
+                issues.append(_issue(normalized, "sensitive_public_path", "path"))
+            issues.append(_issue(normalized, "missing_public_file", "path"))
+            continue
+        entries.append(PublicEntry(path=normalized, data=path.read_bytes()))
+    return sorted(
+        [*issues, *_scan_public_entries(entries)],
+        key=lambda item: (item["path"], item["category"], item["location"]),
+    )
 
 
 def scan_trace_rows(
