@@ -24,7 +24,7 @@ def collection_for(settings: Settings, strategy: str) -> str:
 
 
 def bm25_path_for(settings: Settings, strategy: str) -> Path:
-    return settings.storage_dir / f"bm25_{strategy}.pkl"
+    return settings.storage_dir / f"bm25_{strategy}.json"
 
 
 class Retriever(Protocol):

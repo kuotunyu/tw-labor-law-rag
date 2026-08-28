@@ -23,6 +23,11 @@ class SessionQuotaExceeded(RuntimeError):
         super().__init__("demo session query quota exceeded")
 
 
+class SessionCapacityExceeded(RuntimeError):
+    def __init__(self):
+        super().__init__("demo session capacity exceeded")
+
+
 class DemoBusy(RuntimeError):
     def __init__(self):
         super().__init__("demo is currently busy")
@@ -35,16 +40,18 @@ class ByokSessionManager:
         secret: str,
         query_limit: int,
         ttl_seconds: int,
+        max_tracked_sessions: int = 1000,
         clock: Callable[[], float] = time.time,
         token_factory: Callable[[], str] = lambda: secrets.token_urlsafe(24),
     ):
         if not secret:
             raise ValueError("session signing secret must not be empty")
-        if query_limit < 1 or ttl_seconds < 1:
-            raise ValueError("session query limit and TTL must be positive")
+        if query_limit < 1 or ttl_seconds < 1 or max_tracked_sessions < 1:
+            raise ValueError("session limits and TTL must be positive")
         self._secret = secret.encode("utf-8")
         self._query_limit = query_limit
         self._ttl_seconds = ttl_seconds
+        self._max_tracked_sessions = max_tracked_sessions
         self._clock = clock
         self._token_factory = token_factory
         self._sessions: dict[str, tuple[int, int]] = {}
@@ -70,6 +77,8 @@ class ByokSessionManager:
         with self._lock:
             now = self._clock()
             self._cleanup_expired(now)
+            if len(self._sessions) >= self._max_tracked_sessions:
+                raise SessionCapacityExceeded()
             session_id = self._token_factory()
             if not session_id or "." in session_id:
                 raise ValueError("session token factory returned an invalid identifier")

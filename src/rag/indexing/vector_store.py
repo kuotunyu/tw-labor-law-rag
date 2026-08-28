@@ -54,7 +54,8 @@ class VectorStore:
         self, name: str, chunks: list[Chunk], vectors: np.ndarray, batch_size: int = 256
     ) -> None:
         self._require_writable()
-        assert len(chunks) == len(vectors)
+        if len(chunks) != len(vectors):
+            raise ValueError("chunk and vector counts must match")
         for start in range(0, len(chunks), batch_size):
             points = [
                 qm.PointStruct(

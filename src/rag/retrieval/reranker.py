@@ -9,13 +9,20 @@ answerable ones), but the cross-encoder score is.
 
 from __future__ import annotations
 
+from rag.config import DEFAULT_RERANKER_MODEL_REVISION
 from rag.indexing.embedder import resolve_device
 from rag.models import RetrievedChunk
 
 
 class Reranker:
-    def __init__(self, model_name: str = "BAAI/bge-reranker-v2-m3", device: str = "auto"):
+    def __init__(
+        self,
+        model_name: str = "BAAI/bge-reranker-v2-m3",
+        model_revision: str = DEFAULT_RERANKER_MODEL_REVISION,
+        device: str = "auto",
+    ):
         self.model_name = model_name
+        self.model_revision = model_revision
         self.device = resolve_device(device)
         self._model = None
 
@@ -25,7 +32,11 @@ class Reranker:
             from FlagEmbedding import FlagReranker
 
             self._model = FlagReranker(
-                self.model_name, use_fp16=self.device.startswith("cuda"), devices=[self.device]
+                self.model_name,
+                use_fp16=self.device.startswith("cuda"),
+                devices=[self.device],
+                revision=self.model_revision,
+                trust_remote_code=False,
             )
         return self._model
 

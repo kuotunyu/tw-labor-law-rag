@@ -109,6 +109,19 @@ def test_validate_dump_zip_accepts_law_xml(tmp_path):
     assert download_corpus.validate_dump_zip(path) == "laws.xml"
 
 
+def test_validate_dump_zip_rejects_xml_entities(tmp_path):
+    path = tmp_path / "entity.zip"
+    path.write_bytes(
+        make_dump_zip(
+            "<!DOCTYPE 法規資料 [<!ENTITY injected '勞動基準法'>]>"
+            "<法規資料><法規><法規名稱>&injected;</法規名稱></法規></法規資料>"
+        )
+    )
+
+    with pytest.raises(download_corpus.CorpusArchiveError, match="unsafe XML"):
+        download_corpus.validate_dump_zip(path)
+
+
 @pytest.mark.parametrize(
     ("payload", "message"),
     [

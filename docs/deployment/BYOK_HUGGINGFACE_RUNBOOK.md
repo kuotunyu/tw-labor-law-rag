@@ -10,6 +10,8 @@
 - 禁止在 Space 設定 `GEMINI_API_KEY`、`OPENAI_API_KEY` 或 Qdrant write/manage Key。
 - 訪客 Key 不得貼入 issue、commit、終端輸出、聊天或 `.env`；只可輸入 UI 密碼欄位。
 - 本部署只允許 Qdrant Free Tier 與 Hugging Face `cpu-basic`；不得申請付費硬體、持久 storage 或額外 replica。
+- LLM 費用由訪客自己的 API Key 承擔，部署端不持有或代付模型額度。
+- BGE-M3 與 reranker 固定在已審閱的官方 immutable revision，且 `trust_remote_code=False`。Transformers 4.x 因 FlagEmbedding 相容性暫留四組已知 advisory 例外；專案不使用其 Trainer、LightGlue、X-CLIP 或遠端自訂程式碼路徑，CI 只忽略這四組明確編號，任何新增 advisory 仍會失敗。
 
 ## 2. 本機驗證
 
@@ -19,6 +21,8 @@
 uv sync --locked
 uv run pytest -q
 uv run ruff check .
+uv run bandit -r src scripts -ll
+uv run pip-audit --local --ignore-vuln PYSEC-2025-217 --ignore-vuln PYSEC-2026-2288 --ignore-vuln PYSEC-2026-2289 --ignore-vuln PYSEC-2026-2290
 uv run python scripts/verify_release.py
 ```
 
@@ -70,6 +74,7 @@ GEMINI_GENERATION_MODEL=gemini-3.5-flash-lite
 OPENAI_GENERATION_MODEL=gpt-5.6-luna
 BYOK_SESSION_QUERY_LIMIT=20
 BYOK_SESSION_TTL_SECONDS=86400
+BYOK_MAX_TRACKED_SESSIONS=1000
 BYOK_MAX_CONCURRENCY=2
 BYOK_REQUEST_TIMEOUT_SECONDS=60
 BYOK_MAX_QUESTION_CHARS=2000
@@ -121,7 +126,7 @@ GitHub `main`、release tags 與其他 worktrees 在此步保持不變。
 6. 第 21 次請求被 session quota 拒絕；同時超過 2 題時立即回 429。
 7. Space logs 找不到測試 Key 全值或任一事先記錄的 8 字元片段，也沒有問題、答案、provider body 或 Qdrant URL。
 8. runtime Qdrant Key 可讀，create/upsert/delete 操作遭拒。
-9. image/repository 不含 private `data/raw/` 或 `storage/bm25_*.pkl`。
+9. image/repository 不含 private `data/raw/` 或 `storage/bm25_*.json`。
 
 記錄 branch commit、完整測試數、release verifier 結果、Space revision、硬體 tier 與兩個 collection point counts。Key、endpoint、session token 不列入證據。
 

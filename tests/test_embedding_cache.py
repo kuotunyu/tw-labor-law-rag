@@ -1,8 +1,10 @@
 import threading
+from types import SimpleNamespace
 
 import numpy as np
 
 from rag.indexing.embedder import BGEM3Embedder, EmbeddingCache
+from rag.retrieval.reranker import Reranker
 
 
 def test_cache_roundtrip(tmp_path):
@@ -68,3 +70,56 @@ def test_embedder_uses_cache_without_model(tmp_path):
     assert vectors.shape == (2, 4)
     assert embedder._model is None, "model should stay unloaded on full cache hit"
     np.testing.assert_array_equal(vectors[1], np.ones(4, dtype=np.float32))
+
+
+def test_embedder_pins_revision_and_disables_remote_code(monkeypatch):
+    captured = {}
+
+    def fake_model(model_name, **kwargs):
+        captured.update(model_name=model_name, **kwargs)
+        return object()
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "FlagEmbedding",
+        SimpleNamespace(BGEM3FlagModel=fake_model),
+    )
+    embedder = BGEM3Embedder(
+        model_name="BAAI/bge-m3",
+        model_revision="immutable-embedding-sha",
+        device="cpu",
+    )
+
+    assert embedder.model is not None
+    assert captured["revision"] == "immutable-embedding-sha"
+    assert captured["trust_remote_code"] is False
+
+
+def test_embedding_cache_key_includes_model_revision():
+    first = BGEM3Embedder(model_revision="revision-a", device="cpu")
+    second = BGEM3Embedder(model_revision="revision-b", device="cpu")
+
+    assert first._key("相同文字") != second._key("相同文字")
+
+
+def test_reranker_pins_revision_and_disables_remote_code(monkeypatch):
+    captured = {}
+
+    def fake_model(model_name, **kwargs):
+        captured.update(model_name=model_name, **kwargs)
+        return object()
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "FlagEmbedding",
+        SimpleNamespace(FlagReranker=fake_model),
+    )
+    reranker = Reranker(
+        model_name="BAAI/bge-reranker-v2-m3",
+        model_revision="immutable-reranker-sha",
+        device="cpu",
+    )
+
+    assert reranker.model is not None
+    assert captured["revision"] == "immutable-reranker-sha"
+    assert captured["trust_remote_code"] is False

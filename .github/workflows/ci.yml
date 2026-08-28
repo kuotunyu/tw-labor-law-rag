@@ -41,6 +41,15 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
+      - name: Audit Python security
+        run: |
+          uv run bandit -r src scripts -ll
+          uv run pip-audit --local \
+            --ignore-vuln PYSEC-2025-217 \
+            --ignore-vuln PYSEC-2026-2288 \
+            --ignore-vuln PYSEC-2026-2289 \
+            --ignore-vuln PYSEC-2026-2290
+
       - name: Verify release evidence and public boundary
         run: uv run python scripts/verify_release.py
 

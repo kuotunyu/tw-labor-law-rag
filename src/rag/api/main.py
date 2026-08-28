@@ -20,6 +20,7 @@ from rag.api.byok import (
     ByokSessionManager,
     DemoBusy,
     InvalidDemoSession,
+    SessionCapacityExceeded,
     SessionQuotaExceeded,
 )
 from rag.config import PUBLIC_LLM_PROVIDERS, Settings, get_settings
@@ -161,6 +162,7 @@ class AppState:
             secret=settings.session_signing_secret.get_secret_value(),
             query_limit=settings.byok_session_query_limit,
             ttl_seconds=settings.byok_session_ttl_seconds,
+            max_tracked_sessions=settings.byok_max_tracked_sessions,
         )
         self.byok_gate = ByokConcurrencyGate(settings.byok_max_concurrency)
 
@@ -203,11 +205,16 @@ async def lifespan(app: FastAPI):
     state.clear_caches()
     state.embedder = BGEM3Embedder(
         model_name=settings.embedding_model,
+        model_revision=settings.embedding_model_revision,
         device=settings.device,
         cache_path=settings.storage_dir / "emb_cache.sqlite",
     )
     state.store = VectorStore(settings)
-    state.reranker = Reranker(model_name=settings.reranker_model, device=settings.device)
+    state.reranker = Reranker(
+        model_name=settings.reranker_model,
+        model_revision=settings.reranker_model_revision,
+        device=settings.device,
+    )
     try:
         state.configure_runtime(settings)
         yield
@@ -334,10 +341,11 @@ def create_session() -> SessionResponse:
         raise HTTPException(status_code=404, detail="byok_not_enabled")
     if state.byok_sessions is None:
         raise HTTPException(status_code=503, detail="runtime_not_ready")
-    return SessionResponse(
-        token=state.byok_sessions.issue(),
-        query_limit=settings.byok_session_query_limit,
-    )
+    try:
+        token = state.byok_sessions.issue()
+    except SessionCapacityExceeded as exc:
+        raise HTTPException(status_code=429, detail="session_capacity_exceeded") from exc
+    return SessionResponse(token=token, query_limit=settings.byok_session_query_limit)
 
 
 def _query_response(result, *, strategy: str, mode: str, use_reranker: bool) -> QueryResponse:

@@ -31,7 +31,8 @@ def ui_command() -> list[str]:
         "run",
         "ui/app.py",
         "--server.address",
-        "0.0.0.0",
+        # Hugging Face requires the single public UI port to bind all interfaces.
+        "0.0.0.0",  # nosec B104
         "--server.port",
         "7860",
         "--server.headless",
