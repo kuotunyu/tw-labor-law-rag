@@ -40,6 +40,41 @@
       "answered": 29,
       "refused": 11,
       "judged": 29
+    },
+    "reliability": {
+      "dataset": {
+        "path": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f",
+        "questions": 60,
+        "answerable": 40,
+        "unanswerable": 20
+      },
+      "results_path": "eval/official/reliability_results.json",
+      "trace_path": "eval/official/reliability_trace.jsonl",
+      "production_threshold": 0.03,
+      "threshold_candidates": [
+        0.0,
+        0.005,
+        0.01,
+        0.02,
+        0.03,
+        0.04,
+        0.05,
+        0.1
+      ],
+      "stress": {
+        "hit_at_5": 0.95,
+        "mrr_at_10": 0.9083333333333334,
+        "direct_false_refusals": 1,
+        "direct_unanswerable_coverage": 0.85
+      },
+      "formal_guard": {
+        "hit_at_5": 0.9666666666666667,
+        "mrr_at_10": 0.9055555555555554,
+        "direct_false_refusals": 0,
+        "direct_unanswerable_coverage": 0.9
+      },
+      "decision": "retain_0.03"
     }
   },
   "runtime_config": {

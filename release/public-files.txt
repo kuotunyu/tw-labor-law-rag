@@ -39,7 +39,10 @@ eval/official/ablation_results.json
 eval/official/ablation_trace.jsonl
 eval/official/e2e_results.json
 eval/official/e2e_trace.jsonl
+eval/official/reliability_results.json
+eval/official/reliability_trace.jsonl
 eval/run_e2e_eval.py
+eval/run_reliability_eval.py
 eval/run_retrieval_eval.py
 pyproject.toml
 release/corpus_snapshot.json
@@ -78,6 +81,7 @@ src/rag/ingestion/cleaner.py
 src/rag/ingestion/loader.py
 src/rag/models.py
 src/rag/release_verification.py
+src/rag/reliability.py
 src/rag/retrieval/__init__.py
 src/rag/retrieval/fusion.py
 src/rag/retrieval/pipeline.py
@@ -105,6 +109,7 @@ tests/test_packaging.py
 tests/test_pipeline.py
 tests/test_refusal_labels.py
 tests/test_release_verification.py
+tests/test_reliability.py
 tests/test_reliability_dataset.py
 tests/test_retriever.py
 tests/test_space_runner.py
