@@ -802,12 +802,13 @@ def _verify_release_version_contract(
     formal_evidence_version = manifest["formal_evidence_version"]
     _assert_equal("package release version", f"v{package_version}", release_version)
     _assert_equal("formal evidence version", formal_evidence_version, "v0.1.0")
-    _assert_equal("release version", release_version, "v0.2.0")
+    _assert_equal("release version", release_version, "v0.3.0")
     readme = (project_root / "README.md").read_text(encoding="utf-8")
     readme_en = (project_root / "README.en.md").read_text(encoding="utf-8")
-    if f"`{release_version}` source-only reliability release" not in readme:
+    release_phrase = f"`{release_version}` source-only runtime and deployment release"
+    if release_phrase not in readme:
         raise ReleaseVerificationError("README release wording mismatch")
-    if f"`{release_version}` source-only reliability release" not in readme_en:
+    if release_phrase not in readme_en:
         raise ReleaseVerificationError("README.en release wording mismatch")
     return {
         "version": release_version,

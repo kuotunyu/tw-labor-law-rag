@@ -86,8 +86,8 @@ def git_tracked_paths() -> set[str]:
 def write_version_contract_fixture(
     root: Path,
     *,
-    package_version: str = "0.2.0",
-    release_version: str = "v0.2.0",
+    package_version: str = "0.3.0",
+    release_version: str = "v0.3.0",
     evidence_version: str = "v0.1.0",
 ) -> dict:
     (root / "pyproject.toml").write_text(
@@ -95,11 +95,11 @@ def write_version_contract_fixture(
         encoding="utf-8",
     )
     (root / "README.md").write_text(
-        f"這是 `{release_version}` source-only reliability release。",
+        f"這是 `{release_version}` source-only runtime and deployment release。",
         encoding="utf-8",
     )
     (root / "README.en.md").write_text(
-        f"This is the `{release_version}` source-only reliability release.",
+        f"This is the `{release_version}` source-only runtime and deployment release.",
         encoding="utf-8",
     )
     return {
@@ -113,12 +113,12 @@ def test_release_version_contract_is_explicit_and_consistent(tmp_path):
     manifest = write_version_contract_fixture(tmp_path)
 
     assert module._verify_release_version_contract(tmp_path, manifest) == {
-        "version": "v0.2.0",
-        "package_version": "0.2.0",
+        "version": "v0.3.0",
+        "package_version": "0.3.0",
         "formal_evidence_version": "v0.1.0",
     }
 
-    manifest["release_version"] = "v0.3.0"
+    manifest["release_version"] = "v0.4.0"
     with pytest.raises(module.ReleaseVerificationError, match="package release version"):
         module._verify_release_version_contract(tmp_path, manifest)
 
@@ -139,8 +139,8 @@ def test_release_verifier_recomputes_committed_evidence():
 
     assert report["status"] == "pass"
     assert report["release"] == {
-        "version": "v0.2.0",
-        "package_version": "0.2.0",
+        "version": "v0.3.0",
+        "package_version": "0.3.0",
         "formal_evidence_version": "v0.1.0",
     }
     assert report["dataset"] == {
