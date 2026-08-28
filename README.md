@@ -31,11 +31,13 @@ Streamlit 側邊欄的「回答模型」只顯示 API `/models` 回傳的已設�
 
 `v0.1.0` 的正式指標仍是歷史結果，由 `release/manifest.json` 所列 generator 與 judge 模型產生；本版 runtime 沒有重跑、取代或重新審計這些數值。
 
-### 公開 BYOK Docker Space（部署分支，尚未公開）
+### 公開 BYOK Docker Space（已上線）
+
+**Live Demo：** [steven0226-tw-labor-law-rag-demo.hf.space](https://steven0226-tw-labor-law-rag-demo.hf.space)
 
 公開作品集模式採 BYOK（Bring Your Own Key）：訪客選擇 Gemini `gemini-3.5-flash-lite` 或 OpenAI `gpt-5.6-luna`，並在遮罩欄位輸入自己的專用 API Key。Key 只存在目前 Streamlit 工作階段、送往同容器 loopback FastAPI 的單次內部 header，以及該次請求建立的 provider client；不寫入檔案、聊天紀錄、共用設定或跨請求快取。公開 Space 不設定站長的 `GEMINI_API_KEY`／`OPENAI_API_KEY`，也不做跨 provider fallback，因此訪客不會消耗站長的模型 token 額度。
 
-Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.pkl` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，並先在 private Space 完成 Key 隔離、log scan 與唯讀權限驗收，取得最終確認後才公開。完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
+Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.json` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，最多保留 1,000 個未過期的匿名工作階段。公開前已完成 Key 隔離、唯讀權限與免費 `cpu-basic` 驗收；完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
 
 ## 架構
 
@@ -160,4 +162,4 @@ Repository **有散布兩份小型 OGDL 命令樣本**供 loader/chunking smoke 
 
 ## 公開範圍
 
-這是 `v0.3.0` source-only runtime and deployment release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版新增雙模型路由、請求級備援邊界、visitor BYOK 與 private-Space 部署支援，不代表重新執行 provider benchmark，也不宣稱 hosted public acceptance 已完成。它是 evidence-backed software portfolio artifact，不是法律意見，也不是 production legal service。完整 corpus、模型權重、私有索引、provider artifacts 與公開 Space 驗收證據仍不在本次 source release 範圍。
+這是 `v0.3.0` source-only runtime and deployment release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版新增雙模型路由、請求級備援邊界與 visitor BYOK，hosted public Demo 已於後續 `main` 部署完成，但不代表重新執行 provider benchmark。它是 evidence-backed software portfolio artifact，不是法律意見，也不是 production legal service。完整 corpus、模型權重、私有索引與 provider artifacts 仍不在本次 source release 範圍。
