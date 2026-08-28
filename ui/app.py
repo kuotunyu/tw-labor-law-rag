@@ -26,6 +26,7 @@ API_URL = os.environ.get("API_URL", "http://localhost:8000")
 
 STRATEGY_LABELS = {"structure": "依條文結構切分 (structure-aware)", "fixed": "固定長度切分 (fixed-size)"}
 MODE_LABELS = {"hybrid": "Hybrid (BM25 + 向量)", "vector": "純向量 (BGE-M3)", "bm25": "純關鍵字 (BM25)"}
+PROVIDER_NAMES = {"gemini": "Gemini", "openai": "OpenAI"}
 
 st.set_page_config(page_title="勞動法規 RAG 問答", page_icon="⚖️", layout="centered")
 st.title("⚖️ 繁體中文勞動法規問答系統")
@@ -73,11 +74,11 @@ if requires_api_key and "demo_session" not in st.session_state:
 
 
 def provider_label(provider: str) -> str:
-    return f"{provider}（{provider_models[provider]}）"
+    return f"{PROVIDER_NAMES.get(provider, provider)} · {provider_models[provider]}"
 
 
-def clear_provider_key(provider: str) -> None:
-    st.session_state[f"provider_key_{provider}"] = ""
+def clear_provider_key() -> None:
+    st.session_state["visitor_provider_key"] = ""
 
 
 def byok_error_message(status_code: int) -> str:
@@ -117,43 +118,62 @@ with st.sidebar:
     st.divider()
     st.caption("調整設定後,下一個問題會用新設定重新檢索——可直接比較不同組合的效果與引用結果。")
 
-    st.divider()
-    st.subheader("回答模型")
+selected_provider = None
+visitor_key = None
+with st.container(border=True):
+    st.subheader("🔐 開始安全問答")
+    st.caption("選擇模型並貼上你自己的 API Key；本站不使用站長的模型額度。")
+
     if available_providers:
-        selected_provider = st.selectbox(
+        selected_provider = st.segmented_control(
             "回答模型",
             available_providers,
-            index=available_providers.index(default_provider),
+            default=default_provider,
             format_func=provider_label,
-            label_visibility="collapsed",
+            selection_mode="single",
+            key="selected_provider",
         )
     else:
-        selected_provider = None
         st.warning("目前沒有可用的回答模型，請稍後再試。")
 
-    visitor_key = None
     if requires_api_key and selected_provider is not None:
-        st.divider()
-        st.subheader("你的 API Key")
+        if st.session_state.get("provider_key_provider") != selected_provider:
+            st.session_state["visitor_provider_key"] = ""
+            st.session_state["provider_key_provider"] = selected_provider
+
+        provider_name = PROVIDER_NAMES.get(selected_provider, selected_provider)
+        key_column, clear_column = st.columns([4, 1], vertical_alignment="bottom")
+        with key_column:
+            visitor_key = st.text_input(
+                f"{provider_name} API Key",
+                type="password",
+                placeholder=f"貼上 {provider_name} API Key（輸入內容會隱藏）",
+                key="visitor_provider_key",
+            )
+        with clear_column:
+            st.button(
+                "清除 API Key",
+                on_click=clear_provider_key,
+                disabled=not bool(visitor_key),
+                use_container_width=True,
+            )
+
+        if visitor_key.strip():
+            st.success("API Key 已填入，可以開始問答。")
+        else:
+            st.info(f"請輸入 {provider_name} API Key，再到下方提出問題。")
+
         st.caption(
-            "此公開 Demo 不使用站長的模型額度。Key 只保留在目前的 Streamlit "
-            "工作階段，會傳到容器內 API，但不會寫入檔案、聊天紀錄或快取。"
-        )
-        visitor_key = st.text_input(
-            f"{selected_provider} API Key",
-            type="password",
-            key=f"provider_key_{selected_provider}",
-        )
-        st.button(
-            "清除 API Key",
-            on_click=clear_provider_key,
-            args=(selected_provider,),
+            "只保留在目前瀏覽器工作階段　•　不寫入檔案或聊天紀錄　•　"
+            "模型費用由 API Key 持有人承擔"
         )
         query_limit = st.session_state.get("demo_query_limit")
         if query_limit:
             st.caption(f"每個展示工作階段最多 {query_limit} 次查詢。")
         if not st.session_state.get("demo_session"):
             st.warning("目前無法建立展示工作階段，請稍後重新整理頁面。")
+    elif selected_provider is not None:
+        st.success("模型服務已由部署環境設定完成，可以開始問答。")
 
 if "history" not in st.session_state:
     st.session_state.history = []
