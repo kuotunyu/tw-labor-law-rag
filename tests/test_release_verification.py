@@ -609,6 +609,55 @@ def test_publishable_history_rejects_unexpected_identity(tmp_path):
         )
 
 
+def test_publishable_history_allows_github_squash_committer(tmp_path):
+    init_public_repo(tmp_path)
+    run_git(tmp_path, "config", "user.name", "GitHub")
+    run_git(tmp_path, "config", "user.email", "noreply" + "@" + "github.com")
+    (tmp_path / "README.md").write_bytes(b"public")
+    run_git(tmp_path, "add", "--", "README.md")
+    run_git(
+        tmp_path,
+        "commit",
+        f"--author={PUBLIC_NAME} <{PUBLIC_EMAIL}>",
+        "-m",
+        "GitHub squash",
+    )
+
+    assert release_module()._verify_publishable_git_history(
+        tmp_path,
+        {"README.md"},
+        legacy_public_paths=set(),
+        reviewed_binary_hashes=set(),
+    ) == 1
+
+
+def test_publishable_history_rejects_wrong_author_with_github_committer(tmp_path):
+    init_public_repo(tmp_path)
+    run_git(tmp_path, "config", "user.name", "GitHub")
+    run_git(tmp_path, "config", "user.email", "noreply" + "@" + "github.com")
+    (tmp_path / "README.md").write_bytes(b"public")
+    run_git(tmp_path, "add", "--", "README.md")
+    wrong_email = "unexpected" + "@" + "example.test"
+    run_git(
+        tmp_path,
+        "commit",
+        f"--author=Unexpected Author <{wrong_email}>",
+        "-m",
+        "wrong author",
+    )
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="public commit identity",
+    ):
+        release_module()._verify_publishable_git_history(
+            tmp_path,
+            {"README.md"},
+            legacy_public_paths=set(),
+            reviewed_binary_hashes=set(),
+        )
+
+
 def test_source_archive_skips_only_git_tracking_check(tmp_path):
     module = release_module()
 
