@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from rag.evaluation import RefusalStage
 from rag.generation.llm import LLMAdapter
 from rag.generation.prompts import REFUSAL_PHRASE, SYSTEM_PROMPT, build_user_prompt
+from rag.generation.router import RoutedLLM
 from rag.retrieval.pipeline import RetrievalPipeline, RetrievalResult
 
 # Models writing Traditional Chinese sometimes emit full-width brackets ［1］
@@ -35,13 +36,19 @@ class Answer:
     # Kept last to preserve positional construction compatibility for callers
     # written before refusal-layer observability was added.
     refusal_stage: RefusalStage | None = None
+    generation_called: bool = False
+    requested_provider: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    fallback_used: bool = False
+    fallback_from: str | None = None
 
 
 class Answerer:
     def __init__(
         self,
         pipeline: RetrievalPipeline,
-        llm: LLMAdapter,
+        llm: LLMAdapter | RoutedLLM,
         refusal_threshold: float = 0.0,
         temperature: float = 0.0,
     ):
@@ -58,28 +65,45 @@ class Answerer:
         if self.pipeline.reranker is not None and retrieval.top_score < self.refusal_threshold:
             return self._refuse(retrieval, stage="threshold")
 
-        raw = self.llm.generate(
+        generation = self.llm.generate(
             SYSTEM_PROMPT, build_user_prompt(question, retrieval.hits), temperature=self.temperature
         )
-        refused = REFUSAL_PHRASE in raw
-        sources = [] if refused else self._parse_sources(raw, retrieval.hits)
+        refused = REFUSAL_PHRASE in generation.text
+        sources = [] if refused else self._parse_sources(generation.text, retrieval.hits)
         return Answer(
-            text=raw,
+            text=generation.text,
             sources=sources,
             refused=refused,
             refusal_stage="llm" if refused else None,
             retrieval=retrieval,
+            generation_called=True,
+            requested_provider=self._requested_provider(),
+            provider=generation.provider,
+            model=generation.model,
+            fallback_used=generation.fallback_used,
+            fallback_from=generation.fallback_from,
         )
 
-    @staticmethod
-    def _refuse(retrieval: RetrievalResult, stage: RefusalStage) -> Answer:
+    def _refuse(self, retrieval: RetrievalResult, stage: RefusalStage) -> Answer:
         return Answer(
             text=f"{REFUSAL_PHRASE},無法回答此問題。",
             sources=[],
             refused=True,
             refusal_stage=stage,
             retrieval=retrieval,
+            generation_called=False,
+            requested_provider=self._requested_provider(),
+            provider=None,
+            model=None,
+            fallback_used=False,
+            fallback_from=None,
         )
+
+    def _requested_provider(self) -> str:
+        primary_provider = getattr(self.llm, "primary_provider", None)
+        if primary_provider is not None:
+            return primary_provider
+        return self.llm.provider
 
     @staticmethod
     def _parse_sources(raw: str, hits) -> list[dict]:

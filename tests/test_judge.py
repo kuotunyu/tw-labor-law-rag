@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+from rag.generation.llm import LLMOutput
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
 
 from judge import Judge, parse_judge_output  # noqa: E402
@@ -51,7 +53,7 @@ class FakeLLM:
         item = self.responses.pop(0)
         if isinstance(item, Exception):
             raise item
-        return item
+        return LLMOutput(text=item, provider="gemini", model="gemini-test")
 
 
 def test_judge_scores_happy_path():

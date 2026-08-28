@@ -12,6 +12,7 @@ from __future__ import annotations
 from rag.config import Settings
 from rag.generation.answerer import Answerer
 from rag.generation.llm import LLMAdapter, build_llm
+from rag.generation.router import RoutedLLM
 from rag.indexing.bm25_index import BM25Index
 from rag.indexing.embedder import BGEM3Embedder
 from rag.indexing.vector_store import VectorStore
@@ -79,7 +80,7 @@ def build_answerer(
     mode: str | None = None,
     use_reranker: bool | None = None,
     reranker: Reranker | None = None,
-    llm: LLMAdapter | None = None,
+    llm: LLMAdapter | RoutedLLM | None = None,
 ) -> Answerer:
     pipeline = build_retrieval_pipeline(
         settings,
