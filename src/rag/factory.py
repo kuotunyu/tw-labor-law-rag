@@ -12,6 +12,7 @@ from __future__ import annotations
 from rag.config import Settings
 from rag.generation.answerer import Answerer
 from rag.generation.llm import LLMAdapter, build_llm
+from rag.generation.router import RoutedLLM
 from rag.indexing.bm25_index import BM25Index
 from rag.indexing.embedder import BGEM3Embedder
 from rag.indexing.vector_store import VectorStore
@@ -35,6 +36,7 @@ def build_retrieval_pipeline(
     mode: str | None = None,
     use_reranker: bool | None = None,
     reranker: Reranker | None = None,
+    bm25_index: BM25Index | None = None,
 ) -> RetrievalPipeline:
     strategy = strategy or settings.chunking_strategy
     mode = mode or settings.retrieval_mode
@@ -46,7 +48,12 @@ def build_retrieval_pipeline(
 
     bm25_retriever = None
     if mode in ("bm25", "hybrid"):
-        bm25_retriever = BM25Retriever(BM25Index.load(bm25_path_for(settings, strategy)))
+        active_bm25 = (
+            bm25_index
+            if bm25_index is not None
+            else BM25Index.load(bm25_path_for(settings, strategy))
+        )
+        bm25_retriever = BM25Retriever(active_bm25)
 
     retriever = build_retriever(
         mode,
@@ -79,7 +86,8 @@ def build_answerer(
     mode: str | None = None,
     use_reranker: bool | None = None,
     reranker: Reranker | None = None,
-    llm: LLMAdapter | None = None,
+    llm: LLMAdapter | RoutedLLM | None = None,
+    bm25_index: BM25Index | None = None,
 ) -> Answerer:
     pipeline = build_retrieval_pipeline(
         settings,
@@ -89,6 +97,7 @@ def build_answerer(
         mode=mode,
         use_reranker=use_reranker,
         reranker=reranker,
+        bm25_index=bm25_index,
     )
     return Answerer(
         pipeline,

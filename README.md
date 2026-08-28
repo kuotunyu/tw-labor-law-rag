@@ -1,3 +1,8 @@
+---
+title: Taiwan Labor Law RAG
+sdk: docker
+app_port: 7860
+---
 # 繁體中文 Hybrid RAG 知識問答系統
 
 [English](README.en.md) ｜ [繁體中文](README.md)
@@ -15,6 +20,22 @@
 ### Release evidence boundary
 
 `uv run python scripts/verify_release.py` 不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,會核對 40 題資料集、8×40 ablation grid、Hit@5/MRR、0.03 score/stage 契約、設定一致性、OGDL samples、official trace schema、完整 publication inventory、secret/privacy scan、人工審閱 binary hashes 與 GitHub Action pins。Git 歷史稽核涵蓋 heads、tags、remotes 的所有可公開 commits；GitHub Actions 暫時產生、不可發布的 `refs/remotes/pull/*` 合成 merge refs 除外，本機 `refs/archive/*` recovery evidence 也會保留在 publication graph 之外。0.03 reranker threshold 只在正式集的 30 題可答/10 題不可答範圍內有量測支持,不是通用 answerability classifier;一筆正式集外的口語敘事問法曾以 0.0146 被第一層誤拒,目前證據只能確認此失敗邊界存在,不能估計發生率。詳見 [EVAL_REPORT.md](EVAL_REPORT.md) 案例 7。
+
+## v0.3.0 雙模型 runtime
+
+這是 `v0.3.0` source-only runtime and deployment release。公開 API/UI 預設使用 Gemini `gemini-3.5-flash-lite`，若伺服器同時設定 OpenAI，使用者可逐次請求選擇 `gpt-5.6-luna`。這些型號可分別由 server-side `GEMINI_GENERATION_MODEL` 與 `OPENAI_GENERATION_MODEL` 覆寫；對應 key 已設定時，`LLM_PROVIDER=gemini` 決定省略請求選擇時的預設 provider，否則 API 會改用另一個已設定的公開 provider；`LLM_FALLBACK_ENABLED=true` 才允許備援。`GEMINI_API_KEY` 與 `OPENAI_API_KEY` 只存在 API 伺服器環境，前端不接收、保存或顯示 key。
+
+備援邊界是固定的：只有主 provider 發生連線、限流、5xx 服務或空回應等 operational failure 時，才會最多嘗試另一個已設定的公開 provider 一次。檢索階段拒答不會呼叫生成模型；模型依據條文拒答、provider 安全擋下或政策拒絕也不會 fallback。正式評估路徑仍直接固定單一 generator/judge provider，不使用 runtime fallback，避免路由變動改寫評估設定。
+
+Streamlit 側邊欄的「回答模型」只顯示 API `/models` 回傳的已設定 Gemini/OpenAI；送出問題時會將選擇的 provider 一併傳給 `/query`。回應中 `requested_provider` 保留指定 provider，`provider` 與 `model` 是實際生成結果的 metadata，`fallback_used`/`fallback_from` 說明是否改走備援，`generation_called=false` 表示在檢索層已拒答。UI 會分開顯示指定與實際作答模型，並在改走備援時警示。Live provider smoke test 需要伺服器端本機 secrets，不屬公開 offline CI。
+
+`v0.1.0` 的正式指標仍是歷史結果，由 `release/manifest.json` 所列 generator 與 judge 模型產生；本版 runtime 沒有重跑、取代或重新審計這些數值。
+
+### 公開 BYOK Docker Space（部署分支，尚未公開）
+
+公開作品集模式採 BYOK（Bring Your Own Key）：訪客選擇 Gemini `gemini-3.5-flash-lite` 或 OpenAI `gpt-5.6-luna`，並在遮罩欄位輸入自己的專用 API Key。Key 只存在目前 Streamlit 工作階段、送往同容器 loopback FastAPI 的單次內部 header，以及該次請求建立的 provider client；不寫入檔案、聊天紀錄、共用設定或跨請求快取。公開 Space 不設定站長的 `GEMINI_API_KEY`／`OPENAI_API_KEY`，也不做跨 provider fallback，因此訪客不會消耗站長的模型 token 額度。
+
+Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.pkl` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，並先在 private Space 完成 Key 隔離、log scan 與唯讀權限驗收，取得最終確認後才公開。完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
 
 ## 架構
 
@@ -61,9 +82,9 @@ flowchart TB
 # 1. 安裝依賴
 uv sync
 
-# 2. 設定環境變數(至少填一組 LLM key:Anthropic / OpenAI / Gemini 擇一,或改用本機 Ollama)
+# 2. 設定環境變數（公開 API/UI 至少在伺服器端填 Gemini / OpenAI 一組 key）
 cp .env.example .env
-# 編輯 .env,填入 LLM_PROVIDER 與對應的 API key
+# 編輯 .env，填入對應 API key；不要將 .env 提交到 Git
 
 # 3. 下載語料(全國法規資料庫官方開放資料,約 30MB,首次執行)
 uv run python scripts/download_corpus.py
@@ -139,4 +160,4 @@ Repository **有散布兩份小型 OGDL 命令樣本**供 loader/chunking smoke 
 
 ## 公開範圍
 
-這是 `v0.2.0` source-only reliability release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版新增 release-history、下載完整性與 Ollama thinking 邊界的可靠性強化，不代表重新執行 provider benchmark。它是 evidence-backed software portfolio artifact,不是法律意見,也不是 production legal service。完整 corpus、模型、索引、provider artifacts 與 hosted deployment 均不在發布範圍。
+這是 `v0.3.0` source-only runtime and deployment release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版新增雙模型路由、請求級備援邊界、visitor BYOK 與 private-Space 部署支援，不代表重新執行 provider benchmark，也不宣稱 hosted public acceptance 已完成。它是 evidence-backed software portfolio artifact，不是法律意見，也不是 production legal service。完整 corpus、模型權重、私有索引、provider artifacts 與公開 Space 驗收證據仍不在本次 source release 範圍。

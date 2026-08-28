@@ -85,7 +85,9 @@ class Judge:
             try:
                 # Generous budget: reasoning models spend hidden tokens before
                 # emitting the (small) JSON verdict.
-                raw = self.llm.generate(_JUDGE_SYSTEM, prompt, temperature=0.0, max_tokens=2000)
+                raw = self.llm.generate(
+                    _JUDGE_SYSTEM, prompt, temperature=0.0, max_tokens=2000
+                ).text
                 return parse_judge_output(raw)
             except ValueError as exc:  # malformed verdict — retry without sleeping
                 last_error = exc

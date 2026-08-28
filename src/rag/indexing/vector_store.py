@@ -20,15 +20,29 @@ from rag.models import Chunk, RetrievedChunk
 class VectorStore:
     def __init__(self, settings: Settings):
         if settings.qdrant_mode == "local":
+            self._read_only = False
             path = Path(settings.qdrant_path)
             if not path.is_absolute():
                 path = PROJECT_ROOT / path
             path.mkdir(parents=True, exist_ok=True)
             self.client = QdrantClient(path=str(path))
         else:
-            self.client = QdrantClient(url=settings.qdrant_url)
+            self._read_only = settings.public_byok_enabled
+            api_key = settings.qdrant_api_key.get_secret_value().strip()
+            kwargs = {
+                "url": settings.qdrant_url,
+                "timeout": settings.qdrant_timeout_seconds,
+            }
+            if api_key:
+                kwargs["api_key"] = api_key
+            self.client = QdrantClient(**kwargs)
+
+    def _require_writable(self) -> None:
+        if self._read_only:
+            raise RuntimeError("write operation is disabled in the read-only Qdrant runtime")
 
     def recreate_collection(self, name: str, dim: int) -> None:
+        self._require_writable()
         if self.client.collection_exists(name):
             self.client.delete_collection(name)
         self.client.create_collection(
@@ -39,6 +53,7 @@ class VectorStore:
     def upsert_chunks(
         self, name: str, chunks: list[Chunk], vectors: np.ndarray, batch_size: int = 256
     ) -> None:
+        self._require_writable()
         assert len(chunks) == len(vectors)
         for start in range(0, len(chunks), batch_size):
             points = [
@@ -61,6 +76,25 @@ class VectorStore:
 
     def count(self, name: str) -> int:
         return self.client.count(collection_name=name, exact=True).count
+
+    def scroll_payloads(self, name: str, batch_size: int = 256) -> list[dict]:
+        payloads: list[dict] = []
+        offset = None
+        while True:
+            records, next_offset = self.client.scroll(
+                collection_name=name,
+                limit=batch_size,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+            for record in records:
+                if not isinstance(record.payload, dict):
+                    raise ValueError("Qdrant scroll returned a missing or invalid payload")
+                payloads.append(record.payload)
+            if next_offset is None:
+                return payloads
+            offset = next_offset
 
     def close(self) -> None:
         self.client.close()

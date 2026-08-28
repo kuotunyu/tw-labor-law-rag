@@ -1,5 +1,10 @@
+from types import SimpleNamespace
+
+from rag import factory
 from rag.generation.answerer import Answerer
+from rag.generation.llm import LLMOutput
 from rag.generation.prompts import REFUSAL_PHRASE
+from rag.generation.router import RoutedLLM
 from rag.models import RetrievedChunk
 from rag.retrieval.pipeline import RetrievalPipeline
 
@@ -34,13 +39,46 @@ class FakeReranker:
 
 
 class FakeLLM:
-    def __init__(self, response):
+    def __init__(
+        self,
+        response: str,
+        *,
+        primary_provider: str = "gemini",
+        provider: str | None = None,
+        model: str | None = None,
+        fallback_used: bool = False,
+        fallback_from: str | None = None,
+    ):
+        self.response = response
+        self.primary_provider = primary_provider
+        self.provider = provider or primary_provider
+        self.model = model or f"{self.provider}-test"
+        self.fallback_used = fallback_used
+        self.fallback_from = fallback_from
+        self.calls = []
+
+    def generate(self, system, user, temperature=0.0, max_tokens=1024):
+        self.calls.append({"system": system, "user": user, "temperature": temperature})
+        return LLMOutput(
+            text=self.response,
+            provider=self.provider,
+            model=self.model,
+            fallback_used=self.fallback_used,
+            fallback_from=self.fallback_from,
+        )
+
+
+class FakeConcreteLLM:
+    provider = "gemini"
+    model = "gemini-test"
+
+    def __init__(self, response: str = "unused"):
         self.response = response
         self.calls = []
 
     def generate(self, system, user, temperature=0.0, max_tokens=1024):
         self.calls.append({"system": system, "user": user, "temperature": temperature})
-        return self.response
+        return LLMOutput(text=self.response, provider=self.provider, model=self.model)
 
 
 def make_pipeline(hits, reranker=None, top_k_final=5):
@@ -61,6 +99,41 @@ def test_answerer_parses_citations():
         {"index": 1, "doc": "勞動基準法", "article": "第 24 條", "content": "加班費規定..."}
     ]
     assert llm.calls[0]["temperature"] == 0.0
+
+
+def test_answerer_reports_generation_provider_metadata():
+    hits = [make_hit("c1", "勞動基準法", "第 24 條", "內容")]
+    llm = FakeLLM("依 [1] 回答。", model="gemini-2.5-flash")
+
+    result = Answerer(make_pipeline(hits), llm).answer("問題")
+
+    assert result.generation_called is True
+    assert result.requested_provider == "gemini"
+    assert result.provider == "gemini"
+    assert result.model == "gemini-2.5-flash"
+    assert result.fallback_used is False
+    assert result.fallback_from is None
+
+
+def test_answerer_reports_actual_fallback_provider():
+    hits = [make_hit("c1", "勞動基準法", "第 24 條", "內容")]
+    llm = FakeLLM(
+        "依 [1] 回答。",
+        primary_provider="gemini",
+        provider="openai",
+        model="gpt-5.6-luna",
+        fallback_used=True,
+        fallback_from="gemini",
+    )
+
+    result = Answerer(make_pipeline(hits), llm).answer("問題")
+
+    assert result.generation_called is True
+    assert result.requested_provider == "gemini"
+    assert result.provider == "openai"
+    assert result.model == "gpt-5.6-luna"
+    assert result.fallback_used is True
+    assert result.fallback_from == "gemini"
 
 
 def test_answerer_parses_fullwidth_bracket_citations():
@@ -99,6 +172,12 @@ def test_answerer_no_hits_refuses_without_calling_llm():
     result = Answerer(make_pipeline([]), llm).answer("問題")
     assert result.refused
     assert result.refusal_stage == "no_hits"
+    assert result.generation_called is False
+    assert result.requested_provider == "gemini"
+    assert result.provider is None
+    assert result.model is None
+    assert result.fallback_used is False
+    assert result.fallback_from is None
     assert llm.calls == []
 
 
@@ -109,6 +188,72 @@ def test_answerer_retrieval_layer_refusal_below_threshold():
     result = Answerer(pipeline, llm, refusal_threshold=0.5).answer("問題")
     assert result.refused
     assert result.refusal_stage == "threshold"
+    assert llm.calls == []
+
+
+def test_threshold_refusal_reports_no_generation_provider():
+    hits = [make_hit("c1", "勞動基準法", "第 1 條", "內容", score=0.1)]
+    llm = FakeLLM("unused", primary_provider="gemini")
+    result = Answerer(
+        make_pipeline(hits, reranker=FakeReranker(hits)),
+        llm,
+        refusal_threshold=0.5,
+    ).answer("問題")
+
+    assert result.generation_called is False
+    assert result.requested_provider == "gemini"
+    assert result.provider is None
+    assert result.model is None
+    assert result.fallback_used is False
+    assert result.fallback_from is None
+    assert llm.calls == []
+
+
+def test_routed_llm_refusal_reports_primary_without_generation():
+    primary = FakeConcreteLLM()
+    fallback = FakeConcreteLLM()
+    fallback.provider = "openai"
+    fallback.model = "openai-test"
+    llm = RoutedLLM(primary, fallback)
+
+    result = Answerer(make_pipeline([]), llm).answer("問題")
+
+    assert result.generation_called is False
+    assert result.requested_provider == "gemini"
+    assert result.provider is None
+    assert primary.calls == []
+    assert fallback.calls == []
+
+
+def test_factory_uses_injected_routed_llm_for_refusal(monkeypatch):
+    pipeline = make_pipeline([])
+    llm = RoutedLLM(FakeConcreteLLM())
+    settings = SimpleNamespace(rerank_score_threshold=0.5, llm_temperature=0.0)
+    monkeypatch.setattr(factory, "build_retrieval_pipeline", lambda *args, **kwargs: pipeline)
+
+    def fail_if_default_llm_is_built(settings):
+        raise AssertionError("build_llm must not run for an injected LLM")
+
+    monkeypatch.setattr(factory, "build_llm", fail_if_default_llm_is_built)
+
+    result = factory.build_answerer(settings, object(), object(), llm=llm).answer("問題")
+
+    assert result.generation_called is False
+    assert result.requested_provider == "gemini"
+
+
+def test_factory_default_concrete_llm_refusal_is_compatible(monkeypatch):
+    pipeline = make_pipeline([])
+    llm = FakeConcreteLLM()
+    settings = SimpleNamespace(rerank_score_threshold=0.5, llm_temperature=0.0)
+    monkeypatch.setattr(factory, "build_retrieval_pipeline", lambda *args, **kwargs: pipeline)
+    monkeypatch.setattr(factory, "build_llm", lambda settings: llm)
+
+    result = factory.build_answerer(settings, object(), object()).answer("問題")
+
+    assert result.generation_called is False
+    assert result.requested_provider == "gemini"
+    assert result.provider is None
     assert llm.calls == []
 
 

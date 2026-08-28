@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "release_type": "public_source_only_portfolio_release",
-  "release_version": "v0.2.0",
+  "release_version": "v0.3.0",
   "formal_evidence_version": "v0.1.0",
   "base_commit": "24bd48f9a5ae0257f962e7401cbb3c759fbefe35",
   "evidence": {

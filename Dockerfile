@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml uv.lock* ./
 # Not installed as a package (see pyproject.toml [tool.uv] package = false);
 # src/ is put on PYTHONPATH instead, same as local dev.
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-cache
 
 COPY src ./src
 COPY scripts ./scripts
@@ -20,6 +20,9 @@ COPY ui ./ui
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app/src" \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    API_URL="http://127.0.0.1:8000"
 
-EXPOSE 8000 8501
+EXPOSE 7860
+
+CMD ["python", "scripts/run_space.py"]

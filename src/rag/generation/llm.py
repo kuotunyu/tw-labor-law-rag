@@ -1,13 +1,13 @@
 """Thin adapters over Anthropic / OpenAI / Gemini / Ollama chat-completion APIs.
 
-Deliberately minimal: one ``generate(system, user) -> str`` method per
-provider, so swapping ``LLM_PROVIDER`` never touches the retrieval or
-answer-assembly logic that calls it.
+Each provider returns structured generation metadata while keeping provider
+selection isolated from retrieval and answer assembly.
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Protocol
 
 from rag.config import Settings
@@ -21,13 +21,117 @@ from rag.config import Settings
 DEFAULT_MAX_TOKENS = 2048
 
 
+@dataclass(frozen=True)
+class LLMOutput:
+    text: str
+    provider: str
+    model: str
+    fallback_used: bool = False
+    fallback_from: str | None = None
+
+
+class ProviderOperationalError(RuntimeError):
+    def __init__(self, provider: str, reason_code: str):
+        super().__init__(f"{provider} provider unavailable")
+        self.provider = provider
+        self.reason_code = reason_code
+
+
+class ProviderPolicyError(RuntimeError):
+    def __init__(self, provider: str, reason_code: str = "policy_rejection"):
+        super().__init__(f"{provider} provider rejected the request")
+        self.provider = provider
+        self.reason_code = reason_code
+
+
+_OPERATIONAL_STATUS_CODES = {401, 403, 404, 408, 409, 429, 500, 502, 503, 504}
+_OPERATIONAL_CLASS_TOKENS = (
+    "connection",
+    "timeout",
+    "authentication",
+    "permission",
+    "ratelimit",
+    "servererror",
+    "notfound",
+    "serviceunavailable",
+)
+_POLICY_TOKENS = ("safety", "policy", "content_filter", "blocked")
+
+
+def _normalized_provider_error(provider: str, exc: Exception) -> RuntimeError:
+    class_name = type(exc).__name__.lower()
+    message = str(exc).lower()
+    if any(token in class_name or token in message for token in _POLICY_TOKENS):
+        return ProviderPolicyError(provider)
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        status = getattr(exc, "code", None)
+    if status is None:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+    try:
+        numeric_status = int(status)
+    except (TypeError, ValueError):
+        numeric_status = None
+    if numeric_status in _OPERATIONAL_STATUS_CODES:
+        return ProviderOperationalError(provider, f"http_{numeric_status}")
+    if "timeout" in class_name:
+        return ProviderOperationalError(provider, "timeout")
+    if any(token in class_name for token in _OPERATIONAL_CLASS_TOKENS):
+        return ProviderOperationalError(provider, "transport_or_service")
+    return RuntimeError(f"unclassified {provider} provider failure")
+
+
+def _provider_output(provider: str, model: str, text: str) -> LLMOutput:
+    if not text or not text.strip():
+        raise ProviderOperationalError(provider, "empty_response")
+    return LLMOutput(text=text, provider=provider, model=model)
+
+
+def _gemini_response_is_policy_blocked(response, types) -> bool:
+    policy_block_reasons = {
+        types.BlockedReason.SAFETY,
+        types.BlockedReason.BLOCKLIST,
+        types.BlockedReason.PROHIBITED_CONTENT,
+        types.BlockedReason.IMAGE_SAFETY,
+        types.BlockedReason.MODEL_ARMOR,
+        types.BlockedReason.JAILBREAK,
+    }
+    policy_finish_reasons = {
+        types.FinishReason.SAFETY,
+        types.FinishReason.BLOCKLIST,
+        types.FinishReason.PROHIBITED_CONTENT,
+        types.FinishReason.SPII,
+        types.FinishReason.RECITATION,
+        types.FinishReason.IMAGE_SAFETY,
+        types.FinishReason.IMAGE_PROHIBITED_CONTENT,
+        types.FinishReason.IMAGE_RECITATION,
+    }
+    prompt_feedback = getattr(response, "prompt_feedback", None)
+    if prompt_feedback is not None:
+        if getattr(prompt_feedback, "block_reason", None) in policy_block_reasons:
+            return True
+        if any(rating.blocked for rating in (prompt_feedback.safety_ratings or [])):
+            return True
+    for candidate in getattr(response, "candidates", None) or []:
+        if candidate.finish_reason in policy_finish_reasons:
+            return True
+        if any(rating.blocked for rating in (candidate.safety_ratings or [])):
+            return True
+    return False
+
+
 class LLMAdapter(Protocol):
+    provider: str
+    model: str
+
     def generate(
         self, system: str, user: str, temperature: float = 0.0, max_tokens: int = DEFAULT_MAX_TOKENS
-    ) -> str: ...
+    ) -> LLMOutput: ...
 
 
 class AnthropicAdapter:
+    provider = "anthropic"
+
     def __init__(self, api_key: str, model: str):
         from anthropic import Anthropic
 
@@ -36,15 +140,21 @@ class AnthropicAdapter:
 
     def generate(
         self, system: str, user: str, temperature: float = 0.0, max_tokens: int = DEFAULT_MAX_TOKENS
-    ) -> str:
-        resp = self.client.messages.create(
-            model=self.model,
-            system=system,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            messages=[{"role": "user", "content": user}],
-        )
-        return "".join(block.text for block in resp.content if block.type == "text")
+    ) -> LLMOutput:
+        from anthropic import AnthropicError
+
+        try:
+            resp = self.client.messages.create(
+                model=self.model,
+                system=system,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=[{"role": "user", "content": user}],
+            )
+        except AnthropicError as exc:
+            raise _normalized_provider_error(self.provider, exc) from None
+        text = "".join(block.text for block in resp.content if block.type == "text")
+        return _provider_output(self.provider, self.model, text)
 
 
 class OpenAIAdapter:
@@ -59,17 +169,22 @@ class OpenAIAdapter:
     for all subsequent calls on this adapter instance.
     """
 
-    def __init__(self, api_key: str, model: str):
+    provider = "openai"
+
+    def __init__(self, api_key: str, model: str, timeout_seconds: float | None = None):
         from openai import OpenAI
 
-        self.client = OpenAI(api_key=api_key)
+        client_kwargs = {"api_key": api_key}
+        if timeout_seconds is not None:
+            client_kwargs["timeout"] = timeout_seconds
+        self.client = OpenAI(**client_kwargs)
         self.model = model
         self._unsupported_params: set[str] = set()
 
     def generate(
         self, system: str, user: str, temperature: float = 0.0, max_tokens: int = DEFAULT_MAX_TOKENS
-    ) -> str:
-        from openai import BadRequestError
+    ) -> LLMOutput:
+        from openai import APIError, BadRequestError
 
         kwargs = {
             "model": self.model,
@@ -87,7 +202,6 @@ class OpenAIAdapter:
         while True:
             try:
                 resp = self.client.chat.completions.create(**kwargs)
-                return resp.choices[0].message.content or ""
             except BadRequestError as exc:
                 message = str(exc)
                 dropped = False
@@ -98,20 +212,37 @@ class OpenAIAdapter:
                         dropped = True
                         break
                 if not dropped:
-                    raise
+                    raise _normalized_provider_error(self.provider, exc) from None
+            except APIError as exc:
+                raise _normalized_provider_error(self.provider, exc) from None
+            else:
+                choice = resp.choices[0]
+                message = choice.message
+                if message.refusal is not None or choice.finish_reason == "content_filter":
+                    raise ProviderPolicyError(self.provider)
+                text = message.content or ""
+                return _provider_output(self.provider, self.model, text)
 
 
 class GeminiAdapter:
-    def __init__(self, api_key: str, model: str):
-        from google import genai
+    provider = "gemini"
 
-        self.client = genai.Client(api_key=api_key)
+    def __init__(self, api_key: str, model: str, timeout_seconds: float | None = None):
+        from google import genai
+        from google.genai import types
+
+        client_kwargs = {"api_key": api_key}
+        if timeout_seconds is not None:
+            client_kwargs["http_options"] = types.HttpOptions(
+                timeout=int(timeout_seconds * 1000)
+            )
+        self.client = genai.Client(**client_kwargs)
         self.model = model
 
     def generate(
         self, system: str, user: str, temperature: float = 0.0, max_tokens: int = DEFAULT_MAX_TOKENS
-    ) -> str:
-        from google.genai import types
+    ) -> LLMOutput:
+        from google.genai import errors, types
 
         # RAG synthesis over supplied context doesn't need multi-step reasoning, so
         # turn thinking off on flash models (budget=0 is supported there) to spend
@@ -119,17 +250,22 @@ class GeminiAdapter:
         # non-zero thinking budget (would error on 0), so it's left at the default.
         thinking_config = types.ThinkingConfig(thinking_budget=0) if "flash" in self.model else None
 
-        resp = self.client.models.generate_content(
-            model=self.model,
-            contents=user,
-            config=types.GenerateContentConfig(
-                system_instruction=system,
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-                thinking_config=thinking_config,
-            ),
-        )
-        return resp.text or ""
+        try:
+            resp = self.client.models.generate_content(
+                model=self.model,
+                contents=user,
+                config=types.GenerateContentConfig(
+                    system_instruction=system,
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                    thinking_config=thinking_config,
+                ),
+            )
+        except errors.APIError as exc:
+            raise _normalized_provider_error(self.provider, exc) from None
+        if _gemini_response_is_policy_blocked(resp, types):
+            raise ProviderPolicyError(self.provider)
+        return _provider_output(self.provider, self.model, resp.text or "")
 
 
 _COMPLETE_THINK_BLOCK = re.compile(r"<think>.*?</think>", flags=re.DOTALL)
@@ -148,43 +284,65 @@ def sanitize_ollama_content(text: str) -> str:
 
 
 class OllamaAdapter:
+    provider = "ollama"
+
     def __init__(self, base_url: str, model: str):
         self.base_url = base_url.rstrip("/")
         self.model = model
 
     def generate(
         self, system: str, user: str, temperature: float = 0.0, max_tokens: int = DEFAULT_MAX_TOKENS
-    ) -> str:
+    ) -> LLMOutput:
         import httpx
 
-        resp = httpx.post(
-            f"{self.base_url}/api/chat",
-            json={
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                "stream": False,
-                "think": False,
-                "options": {"temperature": temperature, "num_predict": max_tokens},
-            },
-            timeout=180.0,
-        )
-        resp.raise_for_status()
+        try:
+            resp = httpx.post(
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    "stream": False,
+                    "think": False,
+                    "options": {"temperature": temperature, "num_predict": max_tokens},
+                },
+                timeout=180.0,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise _normalized_provider_error(self.provider, exc) from None
         content = resp.json()["message"]["content"]
-        return sanitize_ollama_content(content)
+        return _provider_output(self.provider, self.model, sanitize_ollama_content(content))
 
 
-def build_llm(settings: Settings, *, provider: str | None = None, model: str | None = None) -> LLMAdapter:
+def build_llm(
+    settings: Settings,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    api_key: str | None = None,
+    timeout_seconds: float | None = None,
+) -> LLMAdapter:
     """``provider``/``model`` overrides let eval scripts request e.g. a cross-provider judge."""
     provider = provider or settings.llm_provider
     if provider == "anthropic":
-        return AnthropicAdapter(settings.anthropic_api_key, model or settings.resolved_generation_model)
+        return AnthropicAdapter(settings.anthropic_api_key, model or settings.generation_model_for(provider))
     if provider == "openai":
-        return OpenAIAdapter(settings.openai_api_key, model or settings.resolved_generation_model)
+        resolved_key = api_key if api_key is not None else settings.openai_api_key
+        return OpenAIAdapter(
+            resolved_key,
+            model or settings.generation_model_for(provider),
+            timeout_seconds=timeout_seconds,
+        )
     if provider == "gemini":
-        return GeminiAdapter(settings.gemini_api_key, model or settings.resolved_generation_model)
+        resolved_key = api_key if api_key is not None else settings.gemini_api_key
+        return GeminiAdapter(
+            resolved_key,
+            model or settings.generation_model_for(provider),
+            timeout_seconds=timeout_seconds,
+        )
     if provider == "ollama":
-        return OllamaAdapter(settings.ollama_base_url, model or settings.resolved_generation_model)
+        return OllamaAdapter(settings.ollama_base_url, model or settings.generation_model_for(provider))
     raise ValueError(f"unknown LLM provider: {provider}")

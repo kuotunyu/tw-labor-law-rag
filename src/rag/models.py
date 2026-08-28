@@ -3,6 +3,25 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from pathlib import PurePosixPath, PureWindowsPath
+
+
+def _public_source_path(value: str) -> str:
+    """Return portable provenance without serializing host filesystem layout."""
+    if not value:
+        return ""
+    windows_path = PureWindowsPath(value)
+    posix_path = PurePosixPath(value.replace("\\", "/"))
+    unsafe = bool(
+        windows_path.drive
+        or windows_path.root
+        or posix_path.root
+        or ".." in windows_path.parts
+        or ".." in posix_path.parts
+    )
+    if unsafe:
+        return windows_path.name or posix_path.name
+    return posix_path.as_posix()
 
 
 @dataclass
@@ -51,6 +70,7 @@ class Chunk:
 
     def payload(self) -> dict:
         data = asdict(self)
+        data["source_path"] = _public_source_path(self.source_path)
         data["article_label"] = self.article_label
         return data
 

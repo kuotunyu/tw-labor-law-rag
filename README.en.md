@@ -1,3 +1,8 @@
+---
+title: Taiwan Labor Law RAG
+sdk: docker
+app_port: 7860
+---
 # Traditional Chinese Hybrid RAG for Taiwan Labor Law
 
 [繁體中文](README.md) | [English](README.en.md)
@@ -23,6 +28,22 @@ The primary `structure-aware / hybrid + reranker` configuration was evaluated on
 The retrieval, answerability, refusal, citation, configuration, and ablation arithmetic is recomputed by `scripts/verify_release.py`. Faithfulness and relevancy are different: their committed numeric verdicts can be re-aggregated, but the public evidence intentionally excludes complete generated answers, judge reasons, and provider responses. The underlying provider judgments therefore cannot be regenerated or independently re-judged from this repository.
 
 The 0.03 reranker gate is calibrated only against this formal 30-answerable/10-unanswerable set. It is not a universal answerability classifier. A real-use question outside the formal set, written as a long colloquial narrative with the English word “deadline,” scored 0.0146 and was directly false-refused even though the correct article remained in the candidates. This demonstrates a query-style boundary; the available evidence does not estimate its prevalence.
+
+## Public BYOK Docker Space (deployment branch, not public yet)
+
+The portfolio deployment uses BYOK (Bring Your Own Key). A visitor selects Gemini `gemini-3.5-flash-lite` or OpenAI `gpt-5.6-luna` and enters a dedicated key in a masked field. The key exists only in the current Streamlit session, one loopback request header, and one request-scoped provider client. It is never written to files, chat history, shared settings, or cross-request caches. The public Space has no owner `GEMINI_API_KEY` or `OPENAI_API_KEY` and performs no cross-provider fallback, so visitors cannot spend the owner's model-token balance.
+
+The Space receives a collection-scoped read-only Qdrant key. A temporary write/manage key is revoked immediately after the two collections are built locally. Startup scrolls payloads read-only and rebuilds the structure/fixed BM25 indexes in memory; private `data/raw/` and `storage/bm25_*.pkl` artifacts are not shipped. Defaults are 20 queries per demo session, two concurrent queries globally, and a 60-second provider timeout. The Space remains private until key-isolation, log-scan, and read-only acceptance checks pass and the owner gives the final visibility approval. See the [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md).
+
+## v0.3.0 dual-model runtime
+
+This is the `v0.3.0` source-only runtime and deployment release. The public API/UI defaults to Gemini `gemini-3.5-flash-lite`. When OpenAI is also configured on the server, a user may select `gpt-5.6-luna` per request. The model names can be overridden independently with server-side `GEMINI_GENERATION_MODEL` and `OPENAI_GENERATION_MODEL`. When its key is configured, `LLM_PROVIDER=gemini` controls the default for a request that omits a provider; otherwise the API uses the other configured public provider. `LLM_FALLBACK_ENABLED=true` permits fallback. `GEMINI_API_KEY` and `OPENAI_API_KEY` remain only in the API server environment: the UI neither accepts, stores, nor displays them.
+
+The fallback boundary is fixed: only an operational failure of the primary provider—such as transport failure, rate limiting, a 5xx service response, or an empty response—may trigger at most one attempt through the other configured public provider. Retrieval-layer refusal does not call a generator. A model refusal based on the retrieved law, a provider safety block, or a policy rejection never falls back. The formal evaluation path continues to bind directly to one generator and one judge provider with runtime fallback off, so routing changes cannot silently change the evaluated configuration.
+
+The Streamlit sidebar's **Answer model** selector shows only configured Gemini/OpenAI entries returned by API `/models`; the selected provider is sent with each `/query`. In a query response, `requested_provider` records the requested route, `provider` and `model` are metadata for the model that actually generated the answer, `fallback_used`/`fallback_from` describe rerouting, and `generation_called=false` means retrieval refused before generation. The UI displays requested and actual models separately and warns when fallback occurred. Live provider smoke tests require local server-side secrets and are outside public offline CI.
+
+The `v0.1.0` formal metrics remain historical results produced by the generator and judge models recorded in `release/manifest.json`; this runtime release has not rerun, replaced, or independently re-judged those values.
 
 ## Architecture
 
@@ -85,4 +106,4 @@ Private raw runs are preserved locally and excluded from the public allowlist. P
 
 ## Scope
 
-This is the `v0.2.0` source-only reliability release. Its formal model-quality metrics retain the unchanged `v0.1.0` formal evidence baseline; this release hardens publishable-history auditing, corpus-download integrity, and the Ollama thinking boundary without claiming a newly executed provider benchmark. It is an evidence-backed software portfolio artifact, not legal advice and not a production legal service. The complete corpus, model weights, indexes, provider artifacts, and a hosted deployment are outside the publication scope.
+This is the `v0.3.0` source-only runtime and deployment release. Its formal model-quality metrics retain the unchanged `v0.1.0` formal evidence baseline. This release adds dual-model routing, request-scoped fallback boundaries, visitor BYOK, and private-Space deployment support without claiming a newly executed provider benchmark or completed hosted public acceptance. It is an evidence-backed software portfolio artifact, not legal advice and not a production legal service. The complete corpus, model weights, private indexes, provider artifacts, and public-Space acceptance evidence remain outside this source release.

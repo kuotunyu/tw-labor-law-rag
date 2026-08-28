@@ -3,9 +3,12 @@ from pathlib import Path
 
 import pytest
 
+from rag.generation.llm import LLMOutput, ProviderOperationalError
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
 
 from judge import Judge, parse_judge_output  # noqa: E402
+from lib import retry_rate_limited  # noqa: E402
 
 VALID = '{"faithfulness": 5, "faithfulness_reason": "皆有依據", "relevancy": 4, "relevancy_reason": "涵蓋主要問題"}'
 
@@ -51,7 +54,7 @@ class FakeLLM:
         item = self.responses.pop(0)
         if isinstance(item, Exception):
             raise item
-        return item
+        return LLMOutput(text=item, provider="gemini", model="gemini-test")
 
 
 def test_judge_scores_happy_path():
@@ -66,6 +69,58 @@ def test_judge_retries_rate_limit_then_succeeds():
     verdict = judge.score("問題", "條文", "回答")
     assert verdict["relevancy"] == 4
     assert llm.calls == 2
+
+
+def test_generator_wrapper_retries_normalized_429_then_succeeds():
+    """Catches retries depending only on provider SDK message text."""
+    responses = [ProviderOperationalError("gemini", "http_429"), "answer"]
+    calls = 0
+
+    def generate():
+        nonlocal calls
+        calls += 1
+        item = responses.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    assert retry_rate_limited(generate, max_retries=2, backoff_base=0.0) == "answer"
+    assert calls == 2
+
+
+def test_generator_wrapper_stops_at_normalized_429_retry_limit():
+    """Catches normalized 429 retries exceeding the established attempt limit."""
+    calls = 0
+
+    def generate():
+        nonlocal calls
+        calls += 1
+        raise ProviderOperationalError("gemini", "http_429")
+
+    with pytest.raises(RuntimeError, match="rate-limited after 3 retries"):
+        retry_rate_limited(generate, max_retries=3, backoff_base=0.0)
+
+    assert calls == 3
+
+
+def test_judge_retries_normalized_429_then_succeeds():
+    """Catches Judge losing retries after provider errors are sanitized."""
+    llm = FakeLLM([ProviderOperationalError("gemini", "http_429"), VALID])
+    judge = Judge(llm, max_retries=2, backoff_base=0.0)
+
+    assert judge.score("problem", "context", "answer")["relevancy"] == 4
+    assert llm.calls == 2
+
+
+def test_judge_stops_at_normalized_429_retry_limit():
+    """Catches Judge exceeding its configured normalized-429 attempt limit."""
+    llm = FakeLLM([ProviderOperationalError("gemini", "http_429")] * 3)
+    judge = Judge(llm, max_retries=3, backoff_base=0.0)
+
+    with pytest.raises(RuntimeError, match="judge failed after 3 attempts"):
+        judge.score("problem", "context", "answer")
+
+    assert llm.calls == 3
 
 
 def test_judge_retries_malformed_output():
