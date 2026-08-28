@@ -38,6 +38,9 @@ class SourceUnit:
     article_no: str = ""  # e.g. "第 24 條" (law documents only)
     chapter: str = ""  # e.g. "第 三 章 工資", or a markdown heading path
     source_path: str = ""
+    source_url: str = ""
+    last_amended: str = ""
+    effective_date: str = ""
 
 
 @dataclass
@@ -58,6 +61,9 @@ class Chunk:
     chapter: str = ""
     seq: int = 0
     source_path: str = ""
+    source_url: str = ""
+    last_amended: str = ""
+    effective_date: str = ""
 
     @property
     def article_label(self) -> str:

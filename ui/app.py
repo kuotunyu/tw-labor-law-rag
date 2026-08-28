@@ -8,6 +8,7 @@ a live version of the ablation study.
 """
 
 import os
+from urllib.parse import urlparse
 
 import httpx
 import streamlit as st
@@ -186,6 +187,17 @@ def render_sources(sources: list[dict]) -> None:
         for src in sources:
             st.markdown(f"**[{src['index']}] {src['doc']} {src['article']}**")
             st.caption(src["content"])
+            last_amended = str(src.get("last_amended", "")).strip()
+            if len(last_amended) == 8 and last_amended.isdigit():
+                last_amended = (
+                    f"{last_amended[:4]}-{last_amended[4:6]}-{last_amended[6:]}"
+                )
+            if last_amended:
+                st.caption(f"最新異動：{last_amended}")
+            source_url = str(src.get("source_url", "")).strip()
+            parsed_url = urlparse(source_url)
+            if parsed_url.scheme == "https" and parsed_url.hostname == "law.moj.gov.tw":
+                st.markdown(f"[全國法規資料庫]({source_url})")
 
 
 def render_debug(payload: dict) -> None:

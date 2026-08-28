@@ -23,6 +23,9 @@ _MD_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 def load_law_json(path: Path) -> list[SourceUnit]:
     data = json.loads(path.read_text(encoding="utf-8"))
     title = data["name"]
+    source_url = str(data.get("url", "")).strip()
+    last_amended = str(data.get("last_amended", "")).strip()
+    effective_date = str(data.get("effective_date", "")).strip()
     units = []
     for article in data.get("articles", []):
         text = clean_text(article.get("content", ""))
@@ -36,6 +39,9 @@ def load_law_json(path: Path) -> list[SourceUnit]:
                 article_no=normalize_label(article.get("no", "")),
                 chapter=normalize_label(article.get("chapter", "")),
                 source_path=str(path),
+                source_url=source_url,
+                last_amended=last_amended,
+                effective_date=effective_date,
             )
         )
     return units

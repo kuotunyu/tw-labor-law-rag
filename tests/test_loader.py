@@ -30,6 +30,26 @@ def test_load_law_json(sample_law):
     assert all("刪除" not in u.text or len(u.text) > 10 for u in units)
 
 
+def test_law_loader_preserves_public_provenance(tmp_path):
+    law_path = tmp_path / "測試法.json"
+    law_path.write_text(
+        """{
+          "name": "測試法",
+          "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0000001",
+          "last_amended": "20260121",
+          "effective_date": "20260123",
+          "articles": [{"no": "第 1 條", "content": "測試內容。"}]
+        }""",
+        encoding="utf-8",
+    )
+
+    unit = load_law_json(law_path)[0]
+
+    assert unit.source_url == "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0000001"
+    assert unit.last_amended == "20260121"
+    assert unit.effective_date == "20260123"
+
+
 def test_load_corpus_directory():
     if not SAMPLE_DIR.exists():
         pytest.skip("sample corpus not present")

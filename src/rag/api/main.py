@@ -238,6 +238,9 @@ class SourceOut(BaseModel):
     doc: str
     article: str
     content: str
+    source_url: str = ""
+    last_amended: str = ""
+    effective_date: str = ""
 
 
 class RetrievalHitOut(BaseModel):

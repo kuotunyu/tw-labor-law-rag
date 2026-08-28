@@ -64,6 +64,9 @@ def test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history(monkeypat
                             "doc": "勞動基準法",
                             "article": "第 24 條",
                             "content": "延長工作時間之工資應依法加給。",
+                            "source_url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001",
+                            "last_amended": "20250718",
+                            "effective_date": "20250718",
                         }
                     ],
                     "retrieval_hits": [
@@ -136,6 +139,28 @@ def test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history(monkeypat
             for element in collection
         )
         assert visitor_key not in rendered
+        assert "最新異動：2025-07-18" in rendered
+        assert any(
+            "[全國法規資料庫](https://law.moj.gov.tw/" in str(element.value)
+            for element in app.markdown
+        )
+
+        app.session_state["history"].append(
+            {
+                "role": "assistant",
+                "content": "舊索引引用仍可顯示。",
+                "sources": [
+                    {
+                        "index": 1,
+                        "doc": "工會法",
+                        "article": "第 11 條",
+                        "content": "舊資料沒有來源網址與日期。",
+                    }
+                ],
+            }
+        )
+        app.run()
+        assert not app.exception
 
         clear_button = next(
             button for button in app.button if button.label == "清除 API Key"
