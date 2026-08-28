@@ -28,7 +28,8 @@
 - `release/public-files.txt`: exact tracked publication inventory; include both new release documents.
 - `tests/test_release_verification.py`: enforces the exact tracked count and required release documents.
 - `tests/test_byok_policy.py`: add the zero-cost deployment documentation assertions.
-- No runtime source file changes are planned unless an observed CPU failure receives a separate design approval.
+- `ui/app.py`: keep retrieval controls in the sidebar and render the approved main-content BYOK activation card.
+- `tests/test_ui_byok_app.py`: exercise the real Streamlit app, including key gating, provider switching, clearing, and non-retention.
 
 ### Task 1: Preserve the Exact Publication Boundary
 
@@ -235,3 +236,102 @@ Post the zero-cost and acceptance evidence to `https://github.com/kuotunyu/tw-la
 - [ ] **Step 4: Preserve the no-cost end state**
 
 Leave requested hardware `cpu-basic`, storage `None`, replicas `1`, and default free-tier sleep. If acceptance is incomplete, pause the Space. Public visibility and merging `main` remain separate explicit approval gates.
+
+### Task 7: Move BYOK Activation Into the Main Content
+
+**Files:**
+- Modify: `tests/test_ui_byok_app.py`
+- Modify: `ui/app.py`
+
+**Interfaces:**
+- Consumes: `/models` records with `provider`, `model`, `requires_api_key`, and `/session` with `token`, `query_limit`.
+- Produces: a main-content `開始安全問答` card, `st.segmented_control` provider selection, one masked `visitor_provider_key` field, provider-switch clearing, and the existing query header contract.
+
+- [ ] **Step 1: Extend the real Streamlit integration test**
+
+Add assertions to `test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history` that the first run exposes one segmented provider selector with literal values `gemini` and `openai`, renders `開始安全問答`, and keeps the chat input disabled before a Key is entered. After entering a literal visitor Key, require the ready status and enabled chat input. Switch the segmented selector to `openai` and require the masked field to be empty and chat input disabled again. Re-enter a Key, submit, and retain the existing assertions that the Key appears only in `X-Provider-Api-Key`, never in query JSON, history, or rendered copy. Click `清除 API Key` and require an empty field and disabled chat input.
+
+The production regression this catches is moving the field back below the sidebar fold, retaining a Gemini Key after switching to OpenAI, or accidentally placing the Key into visible/history state.
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+```powershell
+uv run pytest tests/test_ui_byok_app.py -q
+```
+
+Expected: FAIL because the current app has no segmented control or main-content activation card, and switching provider retains provider-specific Key state.
+
+- [ ] **Step 3: Implement the minimal activation card**
+
+In `ui/app.py`, keep only chunking, retrieval mode, reranker, and explanatory copy inside `st.sidebar`. Add provider display helpers for `Gemini` and `OpenAI`, then render this structure in the main content immediately below the page caption:
+
+```python
+with st.container(border=True):
+    st.subheader("🔐 開始安全問答")
+    st.caption("選擇模型並貼上你自己的 API Key；本站不使用站長的模型額度。")
+    selected_provider = st.segmented_control(
+        "回答模型",
+        available_providers,
+        default=default_provider,
+        format_func=provider_label,
+        selection_mode="single",
+        key="selected_provider",
+    )
+```
+
+Before creating the password input, compare `st.session_state["provider_key_provider"]` with `selected_provider`; when they differ, set `st.session_state["visitor_provider_key"] = ""` and update the owner field. Render `st.text_input(..., type="password", key="visitor_provider_key")`, a `清除 API Key` button, accurate ready/missing status, the session query limit, and the approved three-part security copy. Do not add custom JavaScript, external fonts, owner provider credentials, or persistence.
+
+- [ ] **Step 4: Run focused tests and lint**
+
+```powershell
+uv run pytest tests/test_ui_byok_app.py tests/test_ui_api_client.py tests/test_byok_policy.py -q
+uv run ruff check ui/app.py tests/test_ui_byok_app.py
+```
+
+Expected: all focused tests pass and Ruff reports no errors.
+
+- [ ] **Step 5: Commit the tested interface**
+
+```powershell
+git add ui/app.py tests/test_ui_byok_app.py
+git commit -m "feat: surface secure BYOK activation"
+```
+
+### Task 8: Verify and Redeploy the Private Zero-Cost Space
+
+**Files:**
+- No additional repository files unless bounded visual verification finds a defect covered by a new failing test.
+
+**Interfaces:**
+- Consumes: Task 7 commit and the existing exact 110-file public allowlist.
+- Produces: desktop and narrow-screen evidence, a passing full gate, synchronized PR branch, and a private free-CPU Space revision.
+
+- [ ] **Step 1: Run full local verification**
+
+```powershell
+uv run pytest -q
+uv run ruff check .
+uv run python scripts/verify_release.py
+```
+
+Expected: zero failures, `status=pass`, 110 publication files, and zero privacy findings.
+
+- [ ] **Step 2: Inspect desktop and narrow layouts once**
+
+Run the Streamlit app against the existing test/local API, capture one desktop and one narrow screenshot, and check that the activation card appears before chat, labels do not clip, native controls stack without horizontal overflow, and the API Key remains masked. If defects exist, add one failing behavior test where possible, fix them in one batch, and perform at most one confirmation pass.
+
+- [ ] **Step 3: Push and wait for CI**
+
+```powershell
+git push origin codex/byok-huggingface-deployment
+```
+
+Require the pull-request CI for the new HEAD to complete successfully. Keep PR #2 draft.
+
+- [ ] **Step 4: Deploy only the exact allowlisted tree**
+
+Create a normal Hugging Face Space repository commit without force-pushing or rewriting Space history. Verify before and after: private `true`, requested/current hardware `cpu-basic`, storage `None`, requested replicas `1`, `DEVICE=cpu`, and no owner LLM key variable. Do not request hardware, storage, or extra replicas.
+
+- [ ] **Step 5: Confirm the private live UI**
+
+Require Space stage `RUNNING`, domain stage `READY`, and a masked main-content BYOK card showing both `gemini-3.5-flash-lite` and `gpt-5.6-luna`. Real provider-key acceptance remains a separate owner-entered step; never paste a provider Key into shell, logs, source, or chat.
