@@ -96,9 +96,39 @@ def test_answerer_parses_citations():
     assert not result.refused
     assert result.refusal_stage is None
     assert result.sources == [
-        {"index": 1, "doc": "勞動基準法", "article": "第 24 條", "content": "加班費規定..."}
+        {
+            "index": 1,
+            "doc": "勞動基準法",
+            "article": "第 24 條",
+            "content": "加班費規定...",
+            "source_url": "",
+            "last_amended": "",
+            "effective_date": "",
+        }
     ]
     assert llm.calls[0]["temperature"] == 0.0
+
+
+def test_answerer_exposes_provenance_and_accepts_legacy_payloads():
+    current = make_hit("c1", "勞動基準法", "第 24 條", "加班費規定...")
+    current.payload.update(
+        {
+            "source_url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001",
+            "last_amended": "20250718",
+            "effective_date": "20250718",
+        }
+    )
+    legacy = make_hit("c2", "工會法", "第 11 條", "連署規定...")
+    llm = FakeLLM("依 [1] 與 [2] 回答。")
+
+    sources = Answerer(make_pipeline([current, legacy]), llm).answer("問題").sources
+
+    assert sources[0]["source_url"].startswith("https://law.moj.gov.tw/")
+    assert sources[0]["last_amended"] == "20250718"
+    assert sources[0]["effective_date"] == "20250718"
+    assert sources[1]["source_url"] == ""
+    assert sources[1]["last_amended"] == ""
+    assert sources[1]["effective_date"] == ""
 
 
 def test_answerer_reports_generation_provider_metadata():

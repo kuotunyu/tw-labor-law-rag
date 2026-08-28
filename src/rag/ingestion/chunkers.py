@@ -82,6 +82,9 @@ class StructureAwareChunker:
                         chapter=unit.chapter,
                         seq=seq,
                         source_path=unit.source_path,
+                        source_url=unit.source_url,
+                        last_amended=unit.last_amended,
+                        effective_date=unit.effective_date,
                     )
                 )
         return chunks
@@ -156,6 +159,9 @@ class FixedSizeChunker:
                     chapter=buffer[0][1].chapter,
                     seq=seq,
                     source_path=buffer[0][1].source_path,
+                    source_url=buffer[0][1].source_url,
+                    last_amended=buffer[0][1].last_amended,
+                    effective_date=buffer[0][1].effective_date,
                 )
             )
 

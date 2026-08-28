@@ -93,6 +93,28 @@ def test_chunk_payload_preserves_safe_relative_source_path():
     assert payload["source_path"] == "corpus/law.json"
 
 
+@pytest.mark.parametrize(
+    "chunker",
+    [StructureAwareChunker(), FixedSizeChunker(chunk_size=200, overlap=40)],
+)
+def test_chunkers_preserve_public_law_provenance(chunker):
+    unit = SourceUnit(
+        text="法規內容。",
+        doc_id="測試法",
+        doc_title="測試法",
+        article_no="第 1 條",
+        source_url="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0000001",
+        last_amended="20260121",
+        effective_date="20260123",
+    )
+
+    payload = chunker.chunk([unit])[0].payload()
+
+    assert payload["source_url"].startswith("https://law.moj.gov.tw/")
+    assert payload["last_amended"] == "20260121"
+    assert payload["effective_date"] == "20260123"
+
+
 # ── FixedSizeChunker ────────────────────────────────────
 
 
