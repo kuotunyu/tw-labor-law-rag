@@ -1,0 +1,155 @@
+{
+  "schema_version": "1.0",
+  "snapshot_date": "2026-08-29",
+  "sources": [
+    {
+      "id": "acts",
+      "url": "https://sendlaw.moj.gov.tw/PublicData/GetFile.ashx?DType=XML&AuData=CF",
+      "sha256": "aa1ce7e877f1899e15d52bd3a194454f679628985a17b7b7f49bd3c056a03d66"
+    },
+    {
+      "id": "regulations",
+      "url": "https://sendlaw.moj.gov.tw/PublicData/GetFile.ashx?DType=XML&AuData=CM",
+      "sha256": "b956c1c974fef30f18969d3023c68a1bebe6c0e03b9ea0f62d906662afe587b5"
+    }
+  ],
+  "law_count": 15,
+  "article_count": 884,
+  "laws": [
+    {
+      "name": "勞動事件法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=B0010064",
+      "last_amended": "20231215",
+      "effective_date": "",
+      "num_articles": 53,
+      "content_sha256": "d68140d093ccecf13e4be37eb478486b8d897353fbc291534bbd2e9ba596c1cd"
+    },
+    {
+      "name": "勞動基準法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001",
+      "last_amended": "20240731",
+      "effective_date": "",
+      "num_articles": 98,
+      "content_sha256": "25790838c3edf9797b2a36134fdcc0216ef5e5dd92a95549c0e8876f73a65ac7"
+    },
+    {
+      "name": "勞動基準法施行細則",
+      "nature": "命令",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030002",
+      "last_amended": "20240327",
+      "effective_date": "",
+      "num_articles": 63,
+      "content_sha256": "29c3c680b5c51ea053381cc845f9c2c27267a22e94a01efdc511a19463cf4570"
+    },
+    {
+      "name": "勞工保險條例",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0050001",
+      "last_amended": "20260121",
+      "effective_date": "",
+      "num_articles": 97,
+      "content_sha256": "326b15a24d5187bf42cc2e767f818531b14fde559beab250054d0a07500e1c9c"
+    },
+    {
+      "name": "勞工職業災害保險及保護法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0050031",
+      "last_amended": "20210430",
+      "effective_date": "",
+      "num_articles": 109,
+      "content_sha256": "2171522f79b6faeec26ca758e28f7c96d3f28712cd98704c4e269a41e9f11b4e"
+    },
+    {
+      "name": "勞工請假規則",
+      "nature": "命令",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030006",
+      "last_amended": "20251209",
+      "effective_date": "20260101",
+      "num_articles": 13,
+      "content_sha256": "893bd49b3e5052eebce8c5450456dc961c7862396063074a46bca677d03e972e"
+    },
+    {
+      "name": "勞工退休金條例",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030020",
+      "last_amended": "20190515",
+      "effective_date": "",
+      "num_articles": 67,
+      "content_sha256": "1cef893a7d2473efa72e0c3ae5778f33584d879c506a13f132a7d27ef13ef7b7"
+    },
+    {
+      "name": "勞資爭議處理法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0020007",
+      "last_amended": "20210428",
+      "effective_date": "",
+      "num_articles": 67,
+      "content_sha256": "11882a009c592de499ade96911b16cc2b238b39313d97c31c6c7b4a63c892a9c"
+    },
+    {
+      "name": "團體協約法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0020006",
+      "last_amended": "20150701",
+      "effective_date": "",
+      "num_articles": 34,
+      "content_sha256": "0a0328fa20ff780850b7e17c3da7df4797ecd636d5df4b84f2b04189f3867fd9"
+    },
+    {
+      "name": "大量解僱勞工保護法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0020012",
+      "last_amended": "20150701",
+      "effective_date": "",
+      "num_articles": 21,
+      "content_sha256": "ad01d6a8caad23e67a6a788d8dbddcc7a163e9a4d1096400d688f575adaec2b3"
+    },
+    {
+      "name": "就業服務法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0090001",
+      "last_amended": "20250120",
+      "effective_date": "",
+      "num_articles": 84,
+      "content_sha256": "3e92fbab7800805d7a20e389dab7c5c7ccc07066c2c29b27ed962974e1dc3bdc"
+    },
+    {
+      "name": "工會法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0020001",
+      "last_amended": "20221130",
+      "effective_date": "",
+      "num_articles": 49,
+      "content_sha256": "4748518e8478749974f3b146c63508d014f7f8990371ba6aef9a3a8188a4d4fe"
+    },
+    {
+      "name": "性別平等工作法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030014",
+      "last_amended": "20230816",
+      "effective_date": "20240308",
+      "num_articles": 49,
+      "content_sha256": "536f36f8f1389c123c8d6fe01494611aabd1fd6d1171aa0d8d1ac044bb00ee4c"
+    },
+    {
+      "name": "最低工資法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030028",
+      "last_amended": "20231227",
+      "effective_date": "20240101",
+      "num_articles": 19,
+      "content_sha256": "577e7731a99bcf46ae519708dd6d62f3c6c0d40f1e5bcf874645a67b6416f8f0"
+    },
+    {
+      "name": "職業安全衛生法",
+      "nature": "法律",
+      "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0060001",
+      "last_amended": "20251219",
+      "effective_date": "20260701",
+      "num_articles": 61,
+      "content_sha256": "149a424775d34ca50622c4db83f794be28d0e8451437ef7cc4620a80462fa1e1"
+    }
+  ]
+}

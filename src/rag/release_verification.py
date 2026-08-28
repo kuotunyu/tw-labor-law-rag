@@ -17,6 +17,7 @@ import tomllib
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -113,6 +114,30 @@ SOURCE_ARCHIVE_GENERATED_PREFIXES = (
     "htmlcov/",
     "storage/",
 )
+
+TARGET_LAW_NAMES = frozenset(
+    {
+        "勞動基準法",
+        "勞工退休金條例",
+        "勞工保險條例",
+        "性別平等工作法",
+        "職業安全衛生法",
+        "就業服務法",
+        "最低工資法",
+        "勞資爭議處理法",
+        "勞動事件法",
+        "勞工職業災害保險及保護法",
+        "工會法",
+        "團體協約法",
+        "大量解僱勞工保護法",
+        "勞動基準法施行細則",
+        "勞工請假規則",
+    }
+)
+CORPUS_SOURCE_URLS = {
+    "acts": "https://sendlaw.moj.gov.tw/PublicData/GetFile.ashx?DType=XML&AuData=CF",
+    "regulations": "https://sendlaw.moj.gov.tw/PublicData/GetFile.ashx?DType=XML&AuData=CM",
+}
 
 
 class ReleaseVerificationError(ValueError):
@@ -799,6 +824,83 @@ def _verify_source_data(project_root: Path, source_data: Mapping[str, Any]) -> i
     return len(samples)
 
 
+def _verify_full_corpus_snapshot(
+    project_root: Path,
+    snapshot_contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    relative_path = snapshot_contract["path"]
+    path = project_root / relative_path
+    _assert_equal(f"corpus snapshot exists {relative_path}", path.is_file(), True)
+    snapshot = _read_json(path)
+
+    _assert_equal(
+        "corpus snapshot schema",
+        snapshot.get("schema_version"),
+        snapshot_contract["schema_version"],
+    )
+    _assert_equal(
+        "corpus snapshot date",
+        snapshot.get("snapshot_date"),
+        snapshot_contract["snapshot_date"],
+    )
+    try:
+        date.fromisoformat(snapshot["snapshot_date"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ReleaseVerificationError("corpus snapshot date is not ISO YYYY-MM-DD") from exc
+
+    sources = snapshot.get("sources", [])
+    source_ids = [row.get("id") for row in sources]
+    _assert_equal("corpus snapshot source ids", source_ids, sorted(CORPUS_SOURCE_URLS))
+    for source in sources:
+        source_id = source["id"]
+        _assert_equal(
+            f"corpus snapshot source URL {source_id}",
+            source.get("url"),
+            CORPUS_SOURCE_URLS[source_id],
+        )
+        if not re.fullmatch(r"[0-9a-f]{64}", str(source.get("sha256", ""))):
+            raise ReleaseVerificationError(f"corpus snapshot source SHA-256: {source_id}")
+
+    laws = snapshot.get("laws", [])
+    law_names = [law.get("name") for law in laws]
+    _assert_equal("corpus snapshot sorted law names", law_names, sorted(law_names))
+    _assert_equal("corpus snapshot unique law names", len(set(law_names)), len(law_names))
+    _assert_equal("corpus snapshot target laws", set(law_names), set(TARGET_LAW_NAMES))
+    _assert_equal("corpus snapshot law count", snapshot.get("law_count"), len(laws))
+    _assert_equal("corpus snapshot contract laws", len(laws), snapshot_contract["laws"])
+
+    article_count = 0
+    for law in laws:
+        name = law["name"]
+        if law.get("nature") not in {"法律", "命令"}:
+            raise ReleaseVerificationError(f"corpus snapshot law nature: {name}")
+        if not str(law.get("url", "")).startswith("https://law.moj.gov.tw/"):
+            raise ReleaseVerificationError(f"corpus snapshot law URL: {name}")
+        if not re.fullmatch(r"\d{8}", str(law.get("last_amended", ""))):
+            raise ReleaseVerificationError(f"corpus snapshot last amended: {name}")
+        effective_date = str(law.get("effective_date", ""))
+        if effective_date and not re.fullmatch(r"\d{8}", effective_date):
+            raise ReleaseVerificationError(f"corpus snapshot effective date: {name}")
+        num_articles = law.get("num_articles")
+        if not isinstance(num_articles, int) or isinstance(num_articles, bool) or num_articles <= 0:
+            raise ReleaseVerificationError(f"corpus snapshot article count: {name}")
+        article_count += num_articles
+        if not re.fullmatch(r"[0-9a-f]{64}", str(law.get("content_sha256", ""))):
+            raise ReleaseVerificationError(f"corpus snapshot content SHA-256: {name}")
+
+    _assert_equal("corpus snapshot article arithmetic", snapshot.get("article_count"), article_count)
+    _assert_equal(
+        "corpus snapshot contract articles",
+        article_count,
+        snapshot_contract["articles"],
+    )
+    return {
+        "snapshot_date": snapshot["snapshot_date"],
+        "laws": len(laws),
+        "articles": article_count,
+    }
+
+
 def _verify_release_version_contract(
     project_root: Path,
     manifest: dict[str, Any],
@@ -925,6 +1027,10 @@ def verify_release(project_root: Path) -> dict[str, Any]:
     )
 
     samples_verified = _verify_source_data(root, manifest["source_data"])
+    full_snapshot = _verify_full_corpus_snapshot(
+        root,
+        manifest["source_data"]["full_snapshot"],
+    )
 
     public_paths = _load_public_file_list(root / manifest["publication"]["allowlist"])
     history_config = manifest["publication"]["history"]
@@ -1035,6 +1141,9 @@ def verify_release(project_root: Path) -> dict[str, Any]:
             "license": manifest["source_data"]["license"],
             "redistribution": manifest["source_data"]["redistribution"],
             "samples_verified": samples_verified,
+            "full_snapshot_date": full_snapshot["snapshot_date"],
+            "full_snapshot_laws": full_snapshot["laws"],
+            "full_snapshot_articles": full_snapshot["articles"],
         },
         "ci": {
             "action_pins": action_pin_count,

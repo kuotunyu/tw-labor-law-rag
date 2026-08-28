@@ -41,10 +41,12 @@ eval/official/e2e_trace.jsonl
 eval/run_e2e_eval.py
 eval/run_retrieval_eval.py
 pyproject.toml
+release/corpus_snapshot.json
 release/manifest.json
 release/public-files.txt
 scripts/_bootstrap.py
 scripts/ask.py
+scripts/audit_corpus.py
 scripts/build_index.py
 scripts/download_corpus.py
 scripts/run_api.py
@@ -55,6 +57,7 @@ src/rag/api/__init__.py
 src/rag/api/byok.py
 src/rag/api/main.py
 src/rag/config.py
+src/rag/corpus_audit.py
 src/rag/evaluation.py
 src/rag/factory.py
 src/rag/generation/__init__.py
@@ -86,6 +89,7 @@ tests/test_byok_policy.py
 tests/test_chunkers.py
 tests/test_cleaner.py
 tests/test_config.py
+tests/test_corpus_audit.py
 tests/test_embedding_cache.py
 tests/test_eval_dataset.py
 tests/test_evaluation.py
