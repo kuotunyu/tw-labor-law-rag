@@ -31,6 +31,7 @@ def test_server_store_uses_secret_api_key_and_public_byok_blocks_writes(monkeypa
     assert captured == {
         "url": "https://demo.cloud.qdrant.io:6333",
         "api_key": "read-only-secret",
+        "timeout": 60.0,
     }
     with pytest.raises(RuntimeError, match="read-only Qdrant runtime"):
         store.recreate_collection("labor_laws_structure", 1024)

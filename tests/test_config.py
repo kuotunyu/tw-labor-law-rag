@@ -8,6 +8,7 @@ def test_defaults():
     s = Settings(_env_file=None)
     assert s.llm_provider == "gemini"
     assert s.qdrant_mode == "local"
+    assert s.qdrant_timeout_seconds == 60.0
     assert s.llm_temperature == 0.0
     assert s.top_k_retrieve == 20
     assert s.top_k_final == 5
@@ -94,6 +95,7 @@ def test_public_byok_settings_are_explicit_and_bounded():
         ("byok_max_concurrency", 0),
         ("byok_request_timeout_seconds", 0),
         ("byok_max_question_chars", 0),
+        ("qdrant_timeout_seconds", 0),
     ],
 )
 def test_public_byok_limits_reject_non_positive_values(field, value):

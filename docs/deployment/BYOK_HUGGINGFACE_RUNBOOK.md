@@ -35,7 +35,7 @@ $env:DATA_DIR = Read-Host 'Paste the private corpus laws directory'
 $env:QDRANT_MODE = 'server'
 $env:QDRANT_URL = Read-Host 'Paste the Qdrant cluster endpoint'
 $env:QDRANT_API_KEY = Read-Host -MaskInput 'Paste the temporary Qdrant writer key'
-uv run python scripts/build_index.py --strategy all
+uv run python scripts/build_index.py --strategy all --corpus $env:DATA_DIR
 Remove-Item Env:QDRANT_API_KEY
 Remove-Item Env:DATA_DIR
 Remove-Item Env:QDRANT_URL
@@ -63,6 +63,7 @@ uvx --from huggingface_hub hf auth login
 DEPLOYMENT_MODE=public_byok
 QDRANT_MODE=server
 QDRANT_URL=<cluster endpoint; non-secret>
+QDRANT_TIMEOUT_SECONDS=60
 COLLECTION_NAME=labor_laws
 API_URL=http://127.0.0.1:8000
 GEMINI_GENERATION_MODEL=gemini-3.5-flash-lite

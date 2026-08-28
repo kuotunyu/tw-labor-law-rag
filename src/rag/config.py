@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     qdrant_path: str = "storage/qdrant"
     qdrant_url: str = "http://localhost:6333"
     collection_name: str = "labor_laws"
+    qdrant_timeout_seconds: float = Field(default=60.0, gt=0, le=300)
 
     # ── Deployment / public BYOK ─────────────────────
     deployment_mode: Literal["standard", "public_byok"] = "standard"

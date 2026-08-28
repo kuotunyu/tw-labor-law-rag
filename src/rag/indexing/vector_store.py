@@ -29,7 +29,10 @@ class VectorStore:
         else:
             self._read_only = settings.public_byok_enabled
             api_key = settings.qdrant_api_key.get_secret_value().strip()
-            kwargs = {"url": settings.qdrant_url}
+            kwargs = {
+                "url": settings.qdrant_url,
+                "timeout": settings.qdrant_timeout_seconds,
+            }
             if api_key:
                 kwargs["api_key"] = api_key
             self.client = QdrantClient(**kwargs)

@@ -1,3 +1,5 @@
+from pathlib import PurePosixPath, PureWindowsPath
+
 import pytest
 
 from rag.ingestion.chunkers import (
@@ -63,6 +65,32 @@ def test_structure_long_article_split_shares_metadata():
 def test_structure_article_label():
     chunks = StructureAwareChunker().chunk([make_unit("內容。", "第 5 條")])
     assert chunks[0].article_label == "第 5 條"
+
+
+def test_chunk_payload_does_not_serialize_private_or_absolute_source_paths(tmp_path):
+    source_paths = [
+        str(tmp_path / "private" / "law.json"),
+        str(PureWindowsPath("D" + ":/") / "private" / "corpus" / "law.json"),
+        str(PurePosixPath("/") / "srv" / "private" / "corpus" / "law.json"),
+        str(PurePosixPath("..") / "private" / "law.json"),
+    ]
+
+    for source_path in source_paths:
+        unit = make_unit("內容。", "第 5 條")
+        unit.source_path = source_path
+
+        payload = StructureAwareChunker().chunk([unit])[0].payload()
+
+        assert payload["source_path"] == "law.json"
+
+
+def test_chunk_payload_preserves_safe_relative_source_path():
+    unit = make_unit("內容。", "第 5 條")
+    unit.source_path = "corpus/law.json"
+
+    payload = StructureAwareChunker().chunk([unit])[0].payload()
+
+    assert payload["source_path"] == "corpus/law.json"
 
 
 # ── FixedSizeChunker ────────────────────────────────────
