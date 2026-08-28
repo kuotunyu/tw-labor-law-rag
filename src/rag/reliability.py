@@ -104,3 +104,47 @@ def compute_reliability_metrics(
         "avg_latency_ms": round(sum(row[4] for row in validated) / len(validated), 1),
         "threshold_sweep": sweep,
     }
+
+
+def pareto_better_thresholds(
+    stress_metrics: Mapping[str, Any],
+    formal_metrics: Mapping[str, Any],
+    *,
+    production: float,
+) -> list[float]:
+    """Recompute thresholds that dominate production across both evidence sets."""
+    stress_sweep = stress_metrics.get("threshold_sweep")
+    formal_sweep = formal_metrics.get("threshold_sweep")
+    if not isinstance(stress_sweep, Mapping) or not isinstance(formal_sweep, Mapping):
+        raise ValueError("metrics must contain threshold sweeps")
+    if set(stress_sweep) != set(formal_sweep):
+        raise ValueError("stress and formal sweeps must use the same thresholds")
+    production_key = str(float(production))
+    if production_key not in stress_sweep:
+        raise ValueError("production threshold must exist in both sweeps")
+
+    axes = (
+        ("direct_false_refusal_rate", lambda candidate, baseline: candidate <= baseline),
+        ("direct_unanswerable_coverage", lambda candidate, baseline: candidate >= baseline),
+    )
+    baselines = (stress_sweep[production_key], formal_sweep[production_key])
+    candidates = []
+    for key in sorted(stress_sweep, key=float):
+        if key == production_key:
+            continue
+        rows = (stress_sweep[key], formal_sweep[key])
+        comparisons = []
+        strictly_better = False
+        for row, baseline in zip(rows, baselines, strict=True):
+            if not isinstance(row, Mapping) or not isinstance(baseline, Mapping):
+                raise ValueError("threshold entries must be mappings")
+            for field, no_worse in axes:
+                candidate_value = float(row[field])
+                baseline_value = float(baseline[field])
+                if not math.isfinite(candidate_value) or not math.isfinite(baseline_value):
+                    raise ValueError("threshold metrics must be finite")
+                comparisons.append(no_worse(candidate_value, baseline_value))
+                strictly_better = strictly_better or candidate_value != baseline_value
+        if all(comparisons) and strictly_better:
+            candidates.append(float(key))
+    return candidates

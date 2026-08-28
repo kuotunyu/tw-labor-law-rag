@@ -195,3 +195,18 @@ def test_audit_corpus_cli_is_directly_executable():
     stdout = process.stdout.decode("utf-8", errors="replace")
     assert process.returncode == 0, stderr
     assert "--snapshot-date" in stdout
+
+
+def test_audit_corpus_cli_returns_two_for_invalid_source_without_leaking_detail(
+    monkeypatch,
+    capsys,
+):
+    def fail_audit(**_kwargs):
+        raise ValueError("private malformed source detail")
+
+    monkeypatch.setattr(audit_corpus, "build_live_snapshot", fail_audit)
+
+    assert audit_corpus.main(["--check", "release/corpus_snapshot.json"]) == 2
+    captured = capsys.readouterr()
+    assert "invalid_source" in captured.err
+    assert "private malformed source detail" not in captured.err

@@ -1,12 +1,20 @@
 """Provider cross-check evidence must be useful without leaking content."""
 
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 
+from rag.provider_budget import BudgetLedger
 from rag.provider_crosscheck import (
     PUBLIC_PROVIDER_TRACE_FIELDS,
+    BudgetSafetyError,
     compute_provider_metrics,
+    generate_with_budget,
     privacy_reduced_provider_trace,
+    resolve_private_run_dir,
     select_crosscheck_rows,
+    validate_request_maxima,
 )
 
 
@@ -154,3 +162,80 @@ def test_selection_rejects_missing_dataset_evidence() -> None:
             initial_count=5,
             maximum_count=5,
         )
+
+
+class _RecordingAdapter:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def generate(self, *_args, **_kwargs):
+        self.calls += 1
+        return SimpleNamespace(input_tokens=10, output_tokens=5)
+
+
+def _ledger() -> BudgetLedger:
+    return BudgetLedger(
+        cap_usd="5.00",
+        authorized_cap_usd="5.00",
+        input_per_million="0.30",
+        output_per_million="2.50",
+    )
+
+
+def test_oversized_prompt_is_rejected_before_adapter_call() -> None:
+    adapter = _RecordingAdapter()
+    ledger = _ledger()
+
+    with pytest.raises(BudgetSafetyError, match="prompt") as error:
+        generate_with_budget(
+            adapter,
+            system_prompt="system",
+            user_prompt="x" * 20_000,
+            ledger=ledger,
+            max_input_tokens=20_000,
+            max_output_tokens=1_024,
+        )
+
+    assert error.value.reason_code == "prompt_exceeds_conservative_maximum"
+    assert adapter.calls == 0
+    assert ledger.requests == 0
+
+
+def test_generation_preflights_actual_prompt_bound_and_records_usage() -> None:
+    adapter = _RecordingAdapter()
+    ledger = _ledger()
+
+    generation, charge, elapsed_ms = generate_with_budget(
+        adapter,
+        system_prompt="system",
+        user_prompt="short prompt",
+        ledger=ledger,
+        max_input_tokens=20_000,
+        max_output_tokens=1_024,
+    )
+
+    assert generation.input_tokens == 10
+    assert charge > 0
+    assert elapsed_ms >= 0
+    assert adapter.calls == 1
+    assert ledger.requests == 1
+
+
+def test_authorized_request_maxima_cannot_enter_unpriced_tier() -> None:
+    assert validate_request_maxima(20_000, 1_024) == (20_000, 1_024)
+    with pytest.raises(ValueError, match="authorized input maximum"):
+        validate_request_maxima(20_001, 1_024)
+    with pytest.raises(ValueError, match="authorized output maximum"):
+        validate_request_maxima(20_000, 1_025)
+
+
+def test_run_directory_must_remain_under_ignored_runs_root(tmp_path: Path) -> None:
+    runs_root = tmp_path / "eval" / "runs"
+    expected = runs_root / "safe-run"
+
+    assert resolve_private_run_dir(None, runs_root, "safe-run") == expected.resolve()
+    assert resolve_private_run_dir(expected, runs_root, "ignored") == expected.resolve()
+    with pytest.raises(ValueError, match="inside eval/runs"):
+        resolve_private_run_dir(tmp_path / "public-output", runs_root, "ignored")
+    with pytest.raises(ValueError, match="child directory"):
+        resolve_private_run_dir(runs_root, runs_root, "ignored")

@@ -39,6 +39,7 @@ eval/official/ablation_results.json
 eval/official/ablation_trace.jsonl
 eval/official/e2e_results.json
 eval/official/e2e_trace.jsonl
+eval/official/reliability_formal_trace.jsonl
 eval/official/reliability_results.json
 eval/official/reliability_trace.jsonl
 eval/run_e2e_eval.py

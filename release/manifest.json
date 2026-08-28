@@ -51,6 +51,7 @@
       },
       "results_path": "eval/official/reliability_results.json",
       "trace_path": "eval/official/reliability_trace.jsonl",
+      "formal_trace_path": "eval/official/reliability_formal_trace.jsonl",
       "production_threshold": 0.03,
       "threshold_candidates": [
         0.0,

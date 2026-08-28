@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from rag.indexing.embedder import BGEM3Embedder, EmbeddingCache
-from rag.retrieval.reranker import Reranker
+from rag.retrieval.reranker import Reranker, ensure_prepare_for_model
 
 
 def test_cache_roundtrip(tmp_path):
@@ -123,3 +123,26 @@ def test_reranker_pins_revision_and_disables_remote_code(monkeypatch):
     assert reranker.model is not None
     assert captured["revision"] == "immutable-reranker-sha"
     assert captured["trust_remote_code"] is False
+
+
+def test_reranker_restores_removed_prepare_for_model_api():
+    class XLMRobertaTokenizer:
+        bos_token_id = 0
+        eos_token_id = 2
+
+    tokenizer = XLMRobertaTokenizer()
+    ensure_prepare_for_model(tokenizer)
+
+    encoded = tokenizer.prepare_for_model(
+        [10, 11],
+        [20, 21, 22, 23],
+        truncation="only_second",
+        max_length=8,
+        padding=False,
+    )
+
+    assert encoded == {
+        "input_ids": [0, 10, 11, 2, 2, 20, 21, 2],
+        "attention_mask": [1] * 8,
+        "token_type_ids": [0] * 8,
+    }

@@ -111,8 +111,14 @@
 
 ## 12. 為什麼 provider cross-check 要先做硬預算，而不是跑完再算錢?
 
-**選擇**:`BudgetLedger` 使用 `Decimal`，CLI cap 預設為 0 且不得高於每家 US$5 的本次授權；每次呼叫前用最大輸入／輸出 token 計算最壞成本，若剩餘額度不足就不開始。Gemini 成本把 `candidatesTokenCount + thoughtsTokenCount` 都算輸出，OpenAI 使用回傳的 prompt／completion usage；缺欄位、負值或超出 maxima 都停止。
+**選擇**:`BudgetLedger` 使用 `Decimal`，CLI cap 預設為 0 且不得高於每家 US$5 的本次授權；每次呼叫前對實際 system + user prompt 以 UTF-8 byte 數加 1,024-token message envelope 做保守上界，再連同最大 1,024 output tokens 計算最壞成本。請求 maxima 固定不得高於 20,000 input／1,024 output tokens，額度不足或 prompt 超界就不送出。Gemini 成本把 `candidatesTokenCount + thoughtsTokenCount` 都算輸出，OpenAI 使用回傳的 prompt／completion usage；缺欄位、負值或超出 maxima 都停止。
 
 **理由**:事後統計只能描述已經花掉的錢，不能限制下一次呼叫。先各跑 5 題、確認模型與 usage 完整後才擴張，可同時驗證指定模型沒有 fallback，並把故障半徑限制在很小的初始批次。
 
-**Tradeoff**:保守 maxima 會提早停止而留下未使用額度；這是刻意的安全偏向。公開 trace 只留 qid、provider/model、拒答、引用數、token、成本與 0/1 verdict，完整問題／答案只進 ignored `eval/runs/`。目前因缺本專案專用金鑰而沒有正式 trace，release contract 明確標記 `pending_credentials`。
+**Tradeoff**:保守 maxima 會提早停止而留下未使用額度；這是刻意的安全偏向。公開 trace 只留 qid、provider/model、拒答、引用數、token、成本與 0/1 verdict，完整問題／答案只能進 ignored `eval/runs/`，任意 `--work-dir` 若逃出該目錄會在呼叫前被拒絕。目前因缺本專案專用金鑰而沒有正式 trace，release contract 明確標記 `pending_credentials`。
+
+## 13. 為什麼升級 Transformers 5.x 但保留 FlagEmbedding？
+
+**選擇**:`transformers>=5.5,<6` 避開已公告的 4.x 模型設定載入 RCE；BGE-M3 在 5.x 原生可用。FlagEmbedding 1.4 的 reranker 仍呼叫已移除的 `prepare_for_model`，因此本專案只對固定的 XLM-R tokenizer 補回等價的 pair special-token 組裝，遇到其他 tokenizer 或不支援的 truncation/padding 參數就 fail closed。
+
+**驗證**:固定 revision 的 `bge-reranker-v2-m3` 在 4.57.6 與 5.16.1 對同一組樣本產生完全相同的 normalized scores (`0.966139`, `0.000103`)；BGE-M3 embedding shape 仍為 1,024。完整測試與 `pip-audit --local` 均通過，沒有用 vulnerability ignore 取得綠燈。

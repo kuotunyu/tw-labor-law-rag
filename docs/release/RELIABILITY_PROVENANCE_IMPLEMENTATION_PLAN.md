@@ -335,6 +335,10 @@ Commit: `eval: publish offline reliability stress evidence`.
 - Produces: `BudgetLedger.can_start(max_input_tokens, max_output_tokens) -> bool`,
   `record(usage)`, and privacy-reduced provider evidence.
 
+The reviewed safety envelope caps request maxima at 20,000 input and 1,024 output tokens,
+bounds each real system + user prompt from UTF-8 bytes plus message overhead before I/O, and
+allows raw output only below ignored `eval/runs/`.
+
 - [ ] **Step 1: Write failing hard-cap tests**
 
 ```python

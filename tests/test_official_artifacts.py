@@ -99,7 +99,9 @@ def test_official_ablation_metrics_recompute_from_trace():
 def test_official_reliability_metrics_recompute_from_privacy_reduced_trace():
     result = json.loads((OFFICIAL / "reliability_results.json").read_text(encoding="utf-8"))
     traces = read_jsonl(OFFICIAL / "reliability_trace.jsonl")
+    formal_traces = read_jsonl(OFFICIAL / "reliability_formal_trace.jsonl")
     dataset = read_jsonl(STRESS_DATASET)
+    formal_dataset = read_jsonl(DATASET)
 
     assert len(traces) == 60
     assert {row["qid"] for row in traces} == {row["qid"] for row in dataset}
@@ -110,7 +112,17 @@ def test_official_reliability_metrics_recompute_from_privacy_reduced_trace():
     assert recomputed["mrr_at_10"] == pytest.approx(0.9083333333333334)
     assert recomputed["threshold_sweep"]["0.03"]["direct_false_refusals"] == 1
     assert recomputed["threshold_sweep"]["0.03"]["direct_unanswerable_coverage"] == 0.85
-    assert result["formal_guard_metrics"]["hit_at_5"] == pytest.approx(29 / 30)
+    assert len(formal_traces) == 40
+    assert {row["qid"] for row in formal_traces} == {
+        row["qid"] for row in formal_dataset
+    }
+    assert all(tuple(row) == PUBLIC_TRACE_FIELDS for row in formal_traces)
+    formal_recomputed = compute_reliability_metrics(
+        formal_traces,
+        result["threshold_candidates"],
+    )
+    assert formal_recomputed == result["formal_guard_metrics"]
+    assert formal_recomputed["hit_at_5"] == pytest.approx(29 / 30)
     assert result["decision"] == {
         "pareto_better_candidates": [],
         "outcome": "retain_0.03",
@@ -132,7 +144,12 @@ def test_official_artifacts_have_no_local_paths_or_secret_fields():
 
 @pytest.mark.parametrize(
     "filename",
-    ["ablation_results.json", "e2e_results.json", "reliability_results.json"],
+    [
+        "ablation_results.json",
+        "e2e_results.json",
+        "reliability_results.json",
+        "reliability_formal_trace.jsonl",
+    ],
 )
 def test_official_json_ends_with_newline(filename):
     assert (OFFICIAL / filename).read_bytes().endswith(b"\n")
