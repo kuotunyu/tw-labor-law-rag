@@ -29,11 +29,13 @@ The retrieval, answerability, refusal, citation, configuration, and ablation ari
 
 The 0.03 reranker gate is calibrated only against this formal 30-answerable/10-unanswerable set. It is not a universal answerability classifier. A real-use question outside the formal set, written as a long colloquial narrative with the English word “deadline,” scored 0.0146 and was directly false-refused even though the correct article remained in the candidates. This demonstrates a query-style boundary; the available evidence does not estimate its prevalence.
 
-## Public BYOK Docker Space (deployment branch, not public yet)
+## Public BYOK Docker Space (live)
+
+**Live demo:** [steven0226-tw-labor-law-rag-demo.hf.space](https://steven0226-tw-labor-law-rag-demo.hf.space)
 
 The portfolio deployment uses BYOK (Bring Your Own Key). A visitor selects Gemini `gemini-3.5-flash-lite` or OpenAI `gpt-5.6-luna` and enters a dedicated key in a masked field. The key exists only in the current Streamlit session, one loopback request header, and one request-scoped provider client. It is never written to files, chat history, shared settings, or cross-request caches. The public Space has no owner `GEMINI_API_KEY` or `OPENAI_API_KEY` and performs no cross-provider fallback, so visitors cannot spend the owner's model-token balance.
 
-The Space receives a collection-scoped read-only Qdrant key. A temporary write/manage key is revoked immediately after the two collections are built locally. Startup scrolls payloads read-only and rebuilds the structure/fixed BM25 indexes in memory; private `data/raw/` and `storage/bm25_*.pkl` artifacts are not shipped. Defaults are 20 queries per demo session, two concurrent queries globally, and a 60-second provider timeout. The Space remains private until key-isolation, log-scan, and read-only acceptance checks pass and the owner gives the final visibility approval. See the [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md).
+The Space receives a collection-scoped read-only Qdrant key. A temporary write/manage key is revoked immediately after the two collections are built locally. Startup scrolls payloads read-only and rebuilds the structure/fixed BM25 indexes in memory; private `data/raw/` and `storage/bm25_*.json` artifacts are not shipped. Defaults are 20 queries per demo session, two concurrent queries globally, a 60-second provider timeout, and at most 1,000 unexpired anonymous sessions. Key isolation, read-only access, and free `cpu-basic` acceptance passed before the Space was made public. See the [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md).
 
 ## v0.3.0 dual-model runtime
 
@@ -106,4 +108,4 @@ Private raw runs are preserved locally and excluded from the public allowlist. P
 
 ## Scope
 
-This is the `v0.3.0` source-only runtime and deployment release. Its formal model-quality metrics retain the unchanged `v0.1.0` formal evidence baseline. This release adds dual-model routing, request-scoped fallback boundaries, visitor BYOK, and private-Space deployment support without claiming a newly executed provider benchmark or completed hosted public acceptance. It is an evidence-backed software portfolio artifact, not legal advice and not a production legal service. The complete corpus, model weights, private indexes, provider artifacts, and public-Space acceptance evidence remain outside this source release.
+This is the `v0.3.0` source-only runtime and deployment release. Its formal model-quality metrics retain the unchanged `v0.1.0` formal evidence baseline. This release adds dual-model routing, request-scoped fallback boundaries, and visitor BYOK; the hosted public demo was completed later on `main`, but that operational deployment is not a newly executed provider benchmark. It is an evidence-backed software portfolio artifact, not legal advice and not a production legal service. The complete corpus, model weights, private indexes, and provider artifacts remain outside this source release.

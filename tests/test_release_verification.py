@@ -309,6 +309,19 @@ def test_readme_first_screen_links_english_and_ci():
     assert "actions/workflows/ci.yml/badge.svg?branch=main" in first_screen
 
 
+def test_readmes_link_the_live_demo_without_stale_private_status():
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    readme_en = (PROJECT_ROOT / "README.en.md").read_text(encoding="utf-8")
+    live_url = "https://steven0226-tw-labor-law-rag-demo.hf.space"
+
+    assert live_url in readme
+    assert live_url in readme_en
+    assert "尚未公開" not in readme
+    assert "not public yet" not in readme_en
+    assert "bm25_*.pkl" not in readme
+    assert "bm25_*.pkl" not in readme_en
+
+
 def test_design_does_not_expand_observed_corpus_scale():
     design = (PROJECT_ROOT / "DESIGN.md").read_text(encoding="utf-8")
 
