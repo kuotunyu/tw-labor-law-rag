@@ -552,76 +552,6 @@ def _verify_publishable_git_history(
     return len(commits)
 
 
-def _verify_reachable_git_history(
-    project_root: Path,
-    public_paths: set[str],
-    *,
-    max_commits: int,
-) -> int:
-    """Preserve the v0.1 manifest path until Task 5 migrates its call site."""
-
-    commit_process = subprocess.run(
-        ["git", "-C", str(project_root), "rev-list", "--all"],
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    commits = [line for line in commit_process.stdout.splitlines() if line]
-    if len(commits) > max_commits:
-        raise ReleaseVerificationError(
-            f"reachable history has {len(commits)} commits; maximum is {max_commits}"
-        )
-    expected_identity = (
-        "kuotunyu",
-        "61350295+kuotunyu@users.noreply.github.com",
-        "kuotunyu",
-        "61350295+kuotunyu@users.noreply.github.com",
-    )
-    for commit in commits:
-        tree_process = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(project_root),
-                "ls-tree",
-                "-r",
-                "-z",
-                "--name-only",
-                commit,
-            ],
-            check=True,
-            capture_output=True,
-        )
-        tree_paths = {
-            item.decode("utf-8").replace("\\", "/")
-            for item in tree_process.stdout.split(b"\0")
-            if item
-        }
-        if tree_paths != public_paths:
-            raise ReleaseVerificationError(
-                f"reachable history tree {commit} differs from public allowlist"
-            )
-        identity_process = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(project_root),
-                "show",
-                "-s",
-                "--format=%an%x00%ae%x00%cn%x00%ce",
-                commit,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        identity = tuple(identity_process.stdout.strip().split("\0"))
-        _assert_equal("public commit identity", identity, expected_identity)
-    return len(commits)
-
-
 def _verify_locked_ruff(project_root: Path) -> str:
     project = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
     lock = tomllib.loads((project_root / "uv.lock").read_text(encoding="utf-8"))
@@ -947,6 +877,30 @@ def verify_release(project_root: Path) -> dict[str, Any]:
     samples_verified = _verify_source_data(root, manifest["source_data"])
 
     public_paths = _load_public_file_list(root / manifest["publication"]["allowlist"])
+    history_config = manifest["publication"]["history"]
+    _assert_equal(
+        "publication history ref namespaces",
+        history_config["refs"],
+        ["heads", "tags", "remotes"],
+    )
+    legacy_public_paths = set(history_config["legacy_public_paths"])
+    historical_binary_hashes = set(history_config["reviewed_binary_sha256"])
+    current_binary_hashes = set(
+        manifest["publication"]["reviewed_binaries"].values()
+    )
+    _assert_equal(
+        "current reviewed binaries included in history",
+        current_binary_hashes <= historical_binary_hashes,
+        True,
+    )
+    public_issues = scan_public_files(root, public_paths)
+    if public_issues:
+        raise ReleaseVerificationError(f"public privacy/secret issues: {public_issues}")
+    reviewed_binary_count = _verify_reviewed_binaries(
+        root,
+        public_paths,
+        manifest["publication"]["reviewed_binaries"],
+    )
     missing_exclusions = sorted(
         set(SENSITIVE_PUBLIC_PATHS) - set(manifest["publication"]["excluded"])
     )
@@ -967,23 +921,16 @@ def verify_release(project_root: Path) -> dict[str, Any]:
             set(public_paths),
         )
         tracking_status = "exact_public_allowlist"
-        history_commits = _verify_reachable_git_history(
+        history_commits = _verify_publishable_git_history(
             root,
             set(public_paths),
-            max_commits=int(manifest["publication"]["history"]["max_commits"]),
+            legacy_public_paths=legacy_public_paths,
+            reviewed_binary_hashes=historical_binary_hashes,
         )
     else:
         archive_extras = _source_archive_extra_files(root, public_paths)
         _assert_equal("source archive extra files", archive_extras, [])
         archive_extra_count = len(archive_extras)
-    public_issues = scan_public_files(root, public_paths)
-    if public_issues:
-        raise ReleaseVerificationError(f"public privacy/secret issues: {public_issues}")
-    reviewed_binary_count = _verify_reviewed_binaries(
-        root,
-        public_paths,
-        manifest["publication"]["reviewed_binaries"],
-    )
 
     workflow_path = root / ".github" / "workflows" / "ci.yml"
     action_issues = scan_action_pins(workflow_path, ".github/workflows/ci.yml")
@@ -1050,5 +997,6 @@ def verify_release(project_root: Path) -> dict[str, Any]:
             "archive_extra_files": archive_extra_count,
             "reviewed_binaries": reviewed_binary_count,
             "history_commits": history_commits,
+            "history_ref_namespaces": history_config["refs"],
         },
     }

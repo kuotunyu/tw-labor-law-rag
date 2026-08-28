@@ -2,9 +2,15 @@
 
 ## Authoritative public set
 
-[`release/public-files.txt`](../../release/public-files.txt) is the authoritative 94-file public set. `scripts/verify_release.py` checks that every allowlisted file exists, is sorted/deduplicated, and passes the privacy/secret patterns. In this public Git repository, the tracked set must equal that allowlist exactly and `manifest.json:publication.tracked_excluded` must be empty. Every reachable commit tree is checked against the same set. In a GitHub-generated source archive without `.git` metadata, the verifier rejects non-allowlisted files except conventional generated install/test/build paths and reports the Git-only check as `not_applicable_no_git_metadata` instead of pretending it ran.
+[`release/public-files.txt`](../../release/public-files.txt) is the authoritative 96-file current public set. `scripts/verify_release.py` checks that every allowlisted file exists, is sorted/deduplicated, and passes the privacy/secret patterns. In this public Git repository, the tracked set must equal that allowlist exactly and `manifest.json:publication.tracked_excluded` must be empty. In a GitHub-generated source archive without `.git` metadata, the verifier rejects non-allowlisted files except conventional generated install/test/build paths and reports the Git-only check as `not_applicable_no_git_metadata` instead of pretending it ran.
 
-The allowlist includes source, tests, CI/configuration, lockfile, package metadata, public documentation, privacy-reduced official evidence, and the two attributed OGDL samples. Internal `docs/superpowers/` records and `.claude/launch.json` are absent from both the public tree and every reachable public Git object.
+The allowlist includes source, tests, CI/configuration, lockfile, package metadata, public documentation, privacy-reduced official evidence, and the two attributed OGDL samples. Internal `docs/superpowers/` records and `.claude/launch.json` are absent from both the current public tree and every publishable historical tree.
+
+## Publishable Git history
+
+Publishable commits are the deduplicated commits reachable from `refs/heads/*`, `refs/tags/*`, and `refs/remotes/*`. Every file in every such commit must belong to the current allowlist or the explicit append-only `publication.history.legacy_public_paths` list. Historical text is scanned with the same redacted privacy rules as the current tree, and every historical binary must match an append-only SHA-256 in `publication.history.reviewed_binary_sha256`. Older additive commits may omit files that were introduced later.
+
+Local `refs/archive/*` refs are recovery evidence outside the publication graph and are not opened or counted by the verifier. This exclusion is namespace-specific: a normal branch whose short name is `archive/foo` is still `refs/heads/archive/foo` and is fully audited. Preserving a local recovery ref does not publish it, and the verifier performs no fetch or push.
 
 ## Official trace schemas
 
@@ -41,10 +47,10 @@ The full 15-instrument corpus is therefore outside the public set. The two files
 The verifier performs three complementary checks:
 
 1. Exact JSON field allowlists for both official traces and their nested objects.
-2. A publication scan for private filesystem paths, private-key blocks, known GitHub/Google/OpenAI/Anthropic token forms, non-placeholder key assignments, provider payload fields, personal identifiers, missing files, non-UTF-8 public text, and forbidden local paths.
+2. Current-tree and publishable-history scans for private filesystem paths, private-key blocks, known GitHub/Google/OpenAI/Anthropic token forms, non-placeholder key assignments, provider payload fields, personal identifiers, missing files, non-UTF-8 public text, forbidden local paths, and unreviewed historical binaries.
 3. Existing official-artifact tests that reject local paths and secret-like fields and recompute all arithmetic summaries.
 
-Scanner findings contain only repository-relative path, category, and location. Matched values are never copied into the report. `.env.example` may contain blank or obvious placeholder variables; non-placeholder assignments fail. Binary files cannot be meaningfully regex-scanned, so every allowlisted binary must instead match a manually reviewed SHA-256 recorded in `release/manifest.json`; an unreviewed or changed binary fails closed.
+Scanner findings contain only repository-relative path, category, location, and—when historical—the commit ID. Matched values are never copied into the report. `.env.example` may contain blank or obvious placeholder variables; non-placeholder assignments fail. Binary files cannot be meaningfully regex-scanned, so every current allowlisted binary must match its path-specific reviewed SHA-256 and every historical binary must match the append-only digest set in `release/manifest.json`; an unreviewed or changed binary fails closed.
 
 ## Current audit result
 

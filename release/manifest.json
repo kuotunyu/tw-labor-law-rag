@@ -94,7 +94,15 @@
     "allowlist": "release/public-files.txt",
     "tracked_excluded": [],
     "history": {
-      "max_commits": 1
+      "refs": [
+        "heads",
+        "tags",
+        "remotes"
+      ],
+      "legacy_public_paths": [],
+      "reviewed_binary_sha256": [
+        "ee95af1a9a8b92d2e1b8521da48e0a56fcc7447982122193bcc251ef95b86ecb"
+      ]
     },
     "reviewed_binaries": {
       "docs/screenshot-demo.png": "ee95af1a9a8b92d2e1b8521da48e0a56fcc7447982122193bcc251ef95b86ecb"

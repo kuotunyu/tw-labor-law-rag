@@ -134,6 +134,27 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
+    expected_history = len(
+        {
+            line
+            for line in run_git(
+                PROJECT_ROOT,
+                "rev-list",
+                "--branches",
+                "--tags",
+                "--remotes",
+            )
+            .stdout.decode("ascii")
+            .splitlines()
+            if line
+        }
+    )
+    assert report["publication"]["history_commits"] == expected_history
+    assert report["publication"]["history_ref_namespaces"] == [
+        "heads",
+        "tags",
+        "remotes",
+    ]
 
 
 def test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions():
@@ -145,7 +166,9 @@ def test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions():
     assert manifest["release_type"] == "public_source_only_portfolio_release"
     assert manifest["publication"]["tracked_excluded"] == []
     assert tracked == public_paths()
-    assert len(tracked) == 94
+    assert len(tracked) == 96
+    assert "docs/release/RELEASE_EVOLUTION_DESIGN.md" in tracked
+    assert "docs/release/RELEASE_EVOLUTION_IMPLEMENTATION_PLAN.md" in tracked
     forbidden_prefixes = (
         ".claude/",
         ".worktrees/",

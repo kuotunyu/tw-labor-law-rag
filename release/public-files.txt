@@ -16,6 +16,8 @@ docker-compose.yml
 docs/release/CLAIM_MATRIX.md
 docs/release/OGDL_ATTRIBUTION.md
 docs/release/PUBLICATION_BOUNDARY.md
+docs/release/RELEASE_EVOLUTION_DESIGN.md
+docs/release/RELEASE_EVOLUTION_IMPLEMENTATION_PLAN.md
 docs/release/REVIEWER_GUIDE.md
 docs/screenshot-demo.png
 eval/_bootstrap.py
