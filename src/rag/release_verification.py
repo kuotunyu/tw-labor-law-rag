@@ -777,12 +777,39 @@ def _verify_source_data(project_root: Path, source_data: Mapping[str, Any]) -> i
     return len(samples)
 
 
+def _verify_release_version_contract(
+    project_root: Path,
+    manifest: dict[str, Any],
+) -> dict[str, str]:
+    project = tomllib.loads(
+        (project_root / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    package_version = project["project"]["version"]
+    release_version = manifest["release_version"]
+    formal_evidence_version = manifest["formal_evidence_version"]
+    _assert_equal("package release version", f"v{package_version}", release_version)
+    _assert_equal("formal evidence version", formal_evidence_version, "v0.1.0")
+    _assert_equal("release version", release_version, "v0.2.0")
+    readme = (project_root / "README.md").read_text(encoding="utf-8")
+    readme_en = (project_root / "README.en.md").read_text(encoding="utf-8")
+    if f"`{release_version}` source-only reliability release" not in readme:
+        raise ReleaseVerificationError("README release wording mismatch")
+    if f"`{release_version}` source-only reliability release" not in readme_en:
+        raise ReleaseVerificationError("README.en release wording mismatch")
+    return {
+        "version": release_version,
+        "package_version": package_version,
+        "formal_evidence_version": formal_evidence_version,
+    }
+
+
 def verify_release(project_root: Path) -> dict[str, Any]:
     """Verify all committed release evidence and return a deterministic summary."""
 
     root = project_root.resolve()
     manifest = _read_json(root / "release" / "manifest.json")
     _assert_equal("release schema", manifest.get("schema_version"), "1.0")
+    release_contract = _verify_release_version_contract(root, manifest)
     _assert_equal(
         "release base commit",
         manifest.get("base_commit"),
@@ -946,6 +973,7 @@ def verify_release(project_root: Path) -> dict[str, Any]:
     primary = ablation_metrics["structure/hybrid+rerank"]
     return {
         "status": "pass",
+        "release": release_contract,
         "dataset": {
             "questions": len(dataset),
             "answerable": len(answerable),

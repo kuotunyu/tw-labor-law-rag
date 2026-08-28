@@ -85,4 +85,4 @@ Private raw runs are preserved locally and excluded from the public allowlist. P
 
 ## Scope
 
-This is the `v0.1.0` source-only portfolio release. It is an evidence-backed software portfolio artifact, not legal advice and not a production legal service. The complete corpus, model weights, indexes, provider artifacts, and a hosted deployment are outside the publication scope.
+This is the `v0.2.0` source-only reliability release. Its formal model-quality metrics retain the unchanged `v0.1.0` formal evidence baseline; this release hardens publishable-history auditing, corpus-download integrity, and the Ollama thinking boundary without claiming a newly executed provider benchmark. It is an evidence-backed software portfolio artifact, not legal advice and not a production legal service. The complete corpus, model weights, indexes, provider artifacts, and a hosted deployment are outside the publication scope.

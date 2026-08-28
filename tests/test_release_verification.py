@@ -83,10 +83,66 @@ def git_tracked_paths() -> set[str]:
     }
 
 
+def write_version_contract_fixture(
+    root: Path,
+    *,
+    package_version: str = "0.2.0",
+    release_version: str = "v0.2.0",
+    evidence_version: str = "v0.1.0",
+) -> dict:
+    (root / "pyproject.toml").write_text(
+        f'[project]\nname = "labor-rag"\nversion = "{package_version}"\n',
+        encoding="utf-8",
+    )
+    (root / "README.md").write_text(
+        f"這是 `{release_version}` source-only reliability release。",
+        encoding="utf-8",
+    )
+    (root / "README.en.md").write_text(
+        f"This is the `{release_version}` source-only reliability release.",
+        encoding="utf-8",
+    )
+    return {
+        "release_version": release_version,
+        "formal_evidence_version": evidence_version,
+    }
+
+
+def test_release_version_contract_is_explicit_and_consistent(tmp_path):
+    module = release_module()
+    manifest = write_version_contract_fixture(tmp_path)
+
+    assert module._verify_release_version_contract(tmp_path, manifest) == {
+        "version": "v0.2.0",
+        "package_version": "0.2.0",
+        "formal_evidence_version": "v0.1.0",
+    }
+
+    manifest["release_version"] = "v0.3.0"
+    with pytest.raises(module.ReleaseVerificationError, match="package release version"):
+        module._verify_release_version_contract(tmp_path, manifest)
+
+
+def test_release_version_contract_rejects_changed_formal_evidence_baseline(tmp_path):
+    module = release_module()
+    manifest = write_version_contract_fixture(
+        tmp_path,
+        evidence_version="v0.2.0",
+    )
+
+    with pytest.raises(module.ReleaseVerificationError, match="formal evidence version"):
+        module._verify_release_version_contract(tmp_path, manifest)
+
+
 def test_release_verifier_recomputes_committed_evidence():
     report = release_module().verify_release(PROJECT_ROOT)
 
     assert report["status"] == "pass"
+    assert report["release"] == {
+        "version": "v0.2.0",
+        "package_version": "0.2.0",
+        "formal_evidence_version": "v0.1.0",
+    }
     assert report["dataset"] == {
         "questions": 40,
         "answerable": 30,

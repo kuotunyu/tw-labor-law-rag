@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "labor-rag"
-version = "0.1.0"
+version = "0.2.0"
 description = "繁體中文 Hybrid RAG 知識問答系統 — 以台灣勞動法規為知識庫"
 readme = "README.md"
 license = "MIT"

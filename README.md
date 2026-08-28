@@ -139,4 +139,4 @@ Repository **有散布兩份小型 OGDL 命令樣本**供 loader/chunking smoke 
 
 ## 公開範圍
 
-這是 `v0.1.0` source-only portfolio release。它是 evidence-backed software portfolio artifact,不是法律意見,也不是 production legal service。完整 corpus、模型、索引、provider artifacts 與 hosted deployment 均不在發布範圍。
+這是 `v0.2.0` source-only reliability release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版新增 release-history、下載完整性與 Ollama thinking 邊界的可靠性強化，不代表重新執行 provider benchmark。它是 evidence-backed software portfolio artifact,不是法律意見,也不是 production legal service。完整 corpus、模型、索引、provider artifacts 與 hosted deployment 均不在發布範圍。
