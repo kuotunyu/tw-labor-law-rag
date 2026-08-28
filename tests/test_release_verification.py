@@ -182,6 +182,7 @@ def test_release_verifier_recomputes_committed_evidence():
         "all_pinned": True,
         "lint": True,
         "tag_trigger": "v*",
+        "full_history_checkout": True,
     }
     assert report["tooling"]["ruff"]
     expected_tracking = (
@@ -198,6 +199,7 @@ def test_release_verifier_recomputes_committed_evidence():
                 "rev-list",
                 "--branches",
                 "--tags",
+                "--exclude=pull/*",
                 "--remotes",
             )
             .stdout.decode("ascii")
@@ -273,6 +275,23 @@ def test_ruff_is_locked_and_ci_enforces_publication_gates():
     assert re.search(r"(?m)^\s+pull_request:\s*$", workflow)
 
 
+def test_ci_contract_rejects_shallow_history_checkout(tmp_path):
+    workflow = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    workflow_path = tmp_path / "ci.yml"
+    workflow_path.write_text(
+        workflow.replace("          fetch-depth: 0\n", ""),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="full Git history",
+    ):
+        release_module()._verify_ci_publication_contract(workflow_path)
+
+
 def test_readme_first_screen_links_english_and_ci():
     first_screen = "\n".join(
         (PROJECT_ROOT / "README.md").read_text(encoding="utf-8").splitlines()[:12]
@@ -329,6 +348,26 @@ def test_publishable_commit_ids_include_and_deduplicate_tags_and_remotes(tmp_pat
         public_commit,
         release_commit,
     }
+
+
+def test_publishable_commit_ids_ignore_synthetic_pull_merge_remote(tmp_path):
+    init_public_repo(tmp_path)
+    public_commit = commit_file(tmp_path, "README.md", b"public", "public")
+    synthetic_merge = commit_file(
+        tmp_path,
+        "PR_MERGE.md",
+        b"ephemeral merge",
+        "synthetic pull merge",
+    )
+    run_git(tmp_path, "reset", "--hard", public_commit)
+    run_git(
+        tmp_path,
+        "update-ref",
+        "refs/remotes/pull/1/merge",
+        synthetic_merge,
+    )
+
+    assert release_module()._publishable_commit_ids(tmp_path) == [public_commit]
 
 
 def test_publishable_commit_ids_reject_empty_ref_set(tmp_path):

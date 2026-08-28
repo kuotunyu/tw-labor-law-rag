@@ -14,7 +14,7 @@
 
 ### Release evidence boundary
 
-`uv run python scripts/verify_release.py` 不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,會核對 40 題資料集、8×40 ablation grid、Hit@5/MRR、0.03 score/stage 契約、設定一致性、OGDL samples、official trace schema、完整 publication inventory、secret/privacy scan、人工審閱 binary hashes 與 GitHub Action pins。Git 歷史稽核涵蓋 heads、tags、remotes 的所有可公開 commits；本機 `refs/archive/*` recovery evidence 會保留但不屬 publication graph。0.03 reranker threshold 只在正式集的 30 題可答/10 題不可答範圍內有量測支持,不是通用 answerability classifier;一筆正式集外的口語敘事問法曾以 0.0146 被第一層誤拒,目前證據只能確認此失敗邊界存在,不能估計發生率。詳見 [EVAL_REPORT.md](EVAL_REPORT.md) 案例 7。
+`uv run python scripts/verify_release.py` 不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,會核對 40 題資料集、8×40 ablation grid、Hit@5/MRR、0.03 score/stage 契約、設定一致性、OGDL samples、official trace schema、完整 publication inventory、secret/privacy scan、人工審閱 binary hashes 與 GitHub Action pins。Git 歷史稽核涵蓋 heads、tags、remotes 的所有可公開 commits；GitHub Actions 暫時產生、不可發布的 `refs/remotes/pull/*` 合成 merge refs 除外，本機 `refs/archive/*` recovery evidence 也會保留在 publication graph 之外。0.03 reranker threshold 只在正式集的 30 題可答/10 題不可答範圍內有量測支持,不是通用 answerability classifier;一筆正式集外的口語敘事問法曾以 0.0146 被第一層誤拒,目前證據只能確認此失敗邊界存在,不能估計發生率。詳見 [EVAL_REPORT.md](EVAL_REPORT.md) 案例 7。
 
 ## Upcoming v0.3 雙模型 runtime（v0.2.0 之後、尚未發布）
 

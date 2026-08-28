@@ -65,7 +65,7 @@ uv run python -W error::UserWarning -c "import sys; sys.path.insert(0, 'src'); i
 uv run python -W error::UserWarning scripts/ask.py --help
 ```
 
-The package test builds both sdist and wheel and verifies that the runtime legal-term dictionary is included. The release verifier checks the canonical dataset identity, 8×40 trace grid, metrics, the 0.03 score/stage contract, configuration agreement, two source-data snapshots, strict official-trace schemas, the complete publication inventory, privacy/secret patterns, manually reviewed binary hashes, and immutable GitHub Action pins. Its Git-history audit covers every publishable commit reachable from heads, tags, and remotes; local `refs/archive/*` recovery evidence is preserved outside the publication graph.
+The package test builds both sdist and wheel and verifies that the runtime legal-term dictionary is included. The release verifier checks the canonical dataset identity, 8×40 trace grid, metrics, the 0.03 score/stage contract, configuration agreement, two source-data snapshots, strict official-trace schemas, the complete publication inventory, privacy/secret patterns, manually reviewed binary hashes, and immutable GitHub Action pins. Its Git-history audit covers every publishable commit reachable from heads, tags, and remotes; GitHub Actions' ephemeral, non-publishable `refs/remotes/pull/*` merge refs and local `refs/archive/*` recovery evidence remain outside the publication graph.
 
 For the full procedure and expected results, see [docs/release/REVIEWER_GUIDE.md](docs/release/REVIEWER_GUIDE.md). The mapping from each material claim to config, trace, result, and test is in [docs/release/CLAIM_MATRIX.md](docs/release/CLAIM_MATRIX.md).
 

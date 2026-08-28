@@ -44,7 +44,7 @@ The release verifier should exit zero and report:
 - OGDL source samples verified: 2
 - GitHub Action references: 2, both full commit SHAs
 - publication inventory: exactly 96 tracked files, empty `tracked_excluded`, 0 unexpected archive files, 1 current reviewed binary hash
-- public Git history: all commits reachable from heads/tags/remotes pass identity and historical path/content/binary scanning; local `refs/archive/*` recovery refs are excluded
+- public Git history: all commits reachable from heads/tags/ordinary remotes pass identity and historical path/content/binary scanning; ephemeral `refs/remotes/pull/*` merge refs and local `refs/archive/*` recovery refs are excluded
 - locked Ruff dependency and CI lint/tag gates: verified
 - official trace issues: 0
 - public scan issues: 0
@@ -55,15 +55,15 @@ Provider evidence values are re-aggregated historical verdicts, not regenerated 
 
 ```powershell
 git branch --show-current
-git rev-list --branches --tags --remotes --count
+git rev-list --branches --tags --exclude=pull/* --remotes --count
 git remote get-url origin
 git config user.name
 git config user.email
-git log --format="%H %an <%ae> %cn <%ce> %s" --branches --tags --remotes
+git log --format="%H %an <%ae> %cn <%ce> %s" --branches --tags --exclude=pull/* --remotes
 git ls-files
 ```
 
-The branch under review must be an intended publishable branch, `origin` is `https://github.com/kuotunyu/tw-labor-law-rag.git`, and every commit reachable from heads/tags/remotes must use `kuotunyu <61350295+kuotunyu@users.noreply.github.com>` for both author and committer. The verifier reports the audited namespaces and deduplicated commit count; local `refs/archive/*` recovery refs are preserved but are outside that publication graph.
+The branch under review must be an intended publishable branch, `origin` is `https://github.com/kuotunyu/tw-labor-law-rag.git`, and every commit reachable from heads/tags/ordinary remotes must use `kuotunyu <61350295+kuotunyu@users.noreply.github.com>` for both author and committer. The verifier reports the audited namespaces and deduplicated commit count; ephemeral `refs/remotes/pull/*` synthetic merge refs and local `refs/archive/*` recovery refs are outside that publication graph.
 
 ## Interpretation
 
