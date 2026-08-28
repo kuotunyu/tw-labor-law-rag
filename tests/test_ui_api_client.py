@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from ui.api_client import fetch_models, submit_query
+from ui.api_client import actual_generation_metadata, fetch_models, submit_query
 
 
 def test_fetch_models_returns_discovery_payload():
@@ -28,6 +28,18 @@ def test_fetch_models_returns_discovery_payload():
     assert [item["provider"] for item in payload["providers"]] == ["gemini", "openai"]
 
 
+@pytest.mark.parametrize("malformed_payload", [[], None, "not-a-catalog"])
+def test_fetch_models_rejects_non_object_json_payloads(malformed_payload):
+    """Catches discovery JSON that would crash the UI's catalog parsing."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/models"
+        return httpx.Response(200, json=malformed_payload)
+
+    with pytest.raises(ValueError, match="invalid model discovery payload"):
+        fetch_models("http://api", transport=httpx.MockTransport(handler))
+
+
 def test_submit_query_includes_selected_provider():
     """Catches dropping the provider selected from API discovery."""
 
@@ -44,6 +56,32 @@ def test_submit_query_includes_selected_provider():
     )
 
     assert response == {"answer": "ok"}
+
+
+def test_actual_generation_metadata_keeps_stale_catalog_fallback_response():
+    """Catches hiding the actual fallback route when cached choices are stale."""
+    response = {
+        "requested_provider": "gemini",
+        "provider": "openai",
+        "model": "gpt-5.6-luna-new",
+        "fallback_used": True,
+    }
+
+    assert actual_generation_metadata(response) == ("openai", "gpt-5.6-luna-new")
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"provider": None, "model": "gpt-5.6-luna"},
+        {"provider": "openai", "model": ""},
+        {"provider": "openai", "model": 1},
+    ],
+)
+def test_actual_generation_metadata_requires_non_empty_text(response):
+    """Catches rendering incomplete or non-text route metadata."""
+
+    assert actual_generation_metadata(response) is None
 
 
 @pytest.mark.parametrize(

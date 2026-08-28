@@ -11,7 +11,7 @@ import os
 
 import httpx
 import streamlit as st
-from api_client import fetch_models, submit_query
+from api_client import actual_generation_metadata, fetch_models, submit_query
 from refusal_labels import refusal_stage_label
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
@@ -57,14 +57,6 @@ def provider_label(provider: str) -> str:
     return f"{provider}（{provider_models[provider]}）"
 
 
-def response_provider_label(payload: dict) -> str | None:
-    provider = payload.get("provider")
-    model = payload.get("model")
-    if provider in provider_models and model == provider_models[provider]:
-        return f"{provider}（{model}）"
-    return None
-
-
 def render_generation_status(payload: dict) -> None:
     requested_provider = payload.get("requested_provider")
 
@@ -73,9 +65,10 @@ def render_generation_status(payload: dict) -> None:
     if not payload.get("generation_called", True):
         st.info("此題在檢索階段拒答，未呼叫生成模型。")
         return
-    actual_model = response_provider_label(payload)
-    if actual_model:
-        st.caption(f"實際作答模型：{actual_model}")
+    actual_metadata = actual_generation_metadata(payload)
+    if actual_metadata:
+        provider, model = actual_metadata
+        st.caption(f"實際作答模型：{provider}（{model}）")
     if payload.get("fallback_used"):
         st.warning("原模型暫時無法使用，已切換備援模型。")
 
@@ -116,7 +109,12 @@ def render_sources(sources: list[dict]) -> None:
 
 
 def render_debug(payload: dict) -> None:
-    actual_model = response_provider_label(payload) or "未呼叫生成模型"
+    actual_metadata = actual_generation_metadata(payload)
+    actual_model = (
+        f"{actual_metadata[0]}（{actual_metadata[1]}）"
+        if actual_metadata
+        else "未呼叫生成模型"
+    )
     with st.expander("檢索細節（debug）"):
         st.json(
             {
