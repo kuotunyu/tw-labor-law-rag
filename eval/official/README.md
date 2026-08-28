@@ -12,7 +12,11 @@
 - `reliability_results.json`：60 題可靠性壓力集的 Hit@5、MRR、延遲、拒答門檻掃描，以及既有 40 題正式集 guard 結果。
 - `reliability_trace.jsonl`：60 筆只含 qid、answerable、rank、top score、threshold decision 與 latency 的隱私精簡 trace；不含問題文字、檢索內容或模型輸出。
 
-所有 JSON 都只保留設定白名單,不含 prompt、完整生成答案、judge 理由、provider response、request ID、token usage、API key、服務 URL、使用者名稱、個人識別資訊或本機路徑。
+Gemini／OpenAI 的正式 cross-check 尚未執行，`release/manifest.json` 明確標為
+`pending_credentials`。因此本目錄目前刻意沒有 `provider_crosscheck_results.json` 或
+`provider_crosscheck_trace.jsonl`；pending 狀態若出現任一檔案，release verifier 會失敗，避免未驗證資料被誤認為正式證據。
+
+目前已發布的 JSON 都只保留設定白名單,不含 prompt、完整生成答案、judge 理由、provider response、request ID、token usage、API key、服務 URL、使用者名稱、個人識別資訊或本機路徑。
 每份結果內含公開評估集的 SHA-256，可確認題目版本一致。
 
 Retrieval、answerability、refusal、citation 與 ablation summaries 可由 committed traces 完整離線重算。Faithfulness/relevancy 只可從 trace 中留下的 numeric verdicts 再聚合;缺少的 provider output 與 judge reasoning 是刻意的 privacy/publication boundary,所以這兩項應標為 **archived provider evidence**,不得描述為只靠公開資料即可重生的評分。
@@ -37,7 +41,7 @@ uv run python scripts/verify_release.py
 uv run pytest tests/test_official_artifacts.py tests/test_release_verification.py -q
 ```
 
-這條路徑不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,並會核對 canonical dataset hash、40/30/10 組成、8×40 grid、全部彙總算術、strict trace fields 與 privacy/secret patterns。
+這條路徑不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,並會核對 canonical dataset hash、40/30/10 組成、60 題壓力集、8×40 grid、全部彙總算術、15 部／884 條 snapshot、provider pending contract、strict trace fields 與 privacy/secret patterns。
 
 ## 從 retained private raw runs 重新匯出
 

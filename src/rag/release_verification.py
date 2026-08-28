@@ -1083,7 +1083,7 @@ def _verify_release_version_contract(
     formal_evidence_version = manifest["formal_evidence_version"]
     _assert_equal("package release version", f"v{package_version}", release_version)
     _assert_equal("formal evidence version", formal_evidence_version, "v0.1.0")
-    _assert_equal("release version", release_version, "v0.3.0")
+    _assert_equal("release version", release_version, "v0.3.1")
     readme = (project_root / "README.md").read_text(encoding="utf-8")
     readme_en = (project_root / "README.en.md").read_text(encoding="utf-8")
     release_phrase = f"`{release_version}` source-only runtime and deployment release"
@@ -1095,6 +1095,32 @@ def _verify_release_version_contract(
         "version": release_version,
         "package_version": package_version,
         "formal_evidence_version": formal_evidence_version,
+    }
+
+
+def _verify_provider_crosscheck_contract(
+    project_root: Path,
+    contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    expected = {
+        "status": "pending_credentials",
+        "authorized_cap_usd_per_provider": "5.00",
+        "required_providers": ["gemini", "openai"],
+        "results_path": "eval/official/provider_crosscheck_results.json",
+        "trace_path": "eval/official/provider_crosscheck_trace.jsonl",
+    }
+    _assert_equal("provider cross-check pending contract", contract, expected)
+    for artifact_key in ("results_path", "trace_path"):
+        if (project_root / contract[artifact_key]).exists():
+            raise ReleaseVerificationError(
+                "pending provider cross-check must not publish unverified artifacts"
+            )
+    return {
+        "status": contract["status"],
+        "authorized_cap_usd_per_provider": contract[
+            "authorized_cap_usd_per_provider"
+        ],
+        "required_providers": contract["required_providers"],
     }
 
 
@@ -1219,6 +1245,11 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         runtime_config=runtime_config,
         snapshot_contract=manifest["source_data"]["full_snapshot"],
     )
+    provider_crosscheck_contract = manifest["evidence"]["provider_crosscheck"]
+    provider_crosscheck_summary = _verify_provider_crosscheck_contract(
+        root,
+        provider_crosscheck_contract,
+    )
 
     public_paths = _load_public_file_list(root / manifest["publication"]["allowlist"])
     history_config = manifest["publication"]["history"]
@@ -1321,6 +1352,7 @@ def verify_release(project_root: Path) -> dict[str, Any]:
             "avg_faithfulness": e2e_metrics["avg_faithfulness"],
             "avg_relevancy": e2e_metrics["avg_relevancy"],
         },
+        "provider_crosscheck": provider_crosscheck_summary,
         "privacy": {
             "official_trace_issues": len(trace_issues),
             "public_scan_issues": len(public_issues),
