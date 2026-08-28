@@ -23,6 +23,7 @@ from typing import Any
 
 from rag.config import Settings
 from rag.evaluation import canonical_text_sha256, compute_e2e_metrics
+from rag.reliability import PUBLIC_TRACE_FIELDS, compute_reliability_metrics
 
 ABLATION_FIELDS = frozenset(
     {
@@ -51,6 +52,7 @@ E2E_FIELDS = frozenset(
 )
 JUDGE_FIELDS = frozenset({"faithfulness", "relevancy"})
 CITED_SOURCE_FIELDS = frozenset({"article", "doc"})
+RELIABILITY_FIELDS = frozenset(PUBLIC_TRACE_FIELDS)
 
 RUNTIME_CONFIG_FIELDS = (
     "embedding_model",
@@ -310,6 +312,8 @@ def scan_trace_rows(
         expected = ABLATION_FIELDS
     elif artifact_type == "e2e":
         expected = E2E_FIELDS
+    elif artifact_type == "reliability":
+        expected = RELIABILITY_FIELDS
     else:
         raise ValueError(f"unknown trace artifact type: {artifact_type!r}")
 
@@ -901,6 +905,172 @@ def _verify_full_corpus_snapshot(
     }
 
 
+def _verify_reliability_evidence(
+    project_root: Path,
+    contract: Mapping[str, Any],
+    result: Mapping[str, Any],
+    trace_rows: Sequence[Mapping[str, Any]],
+    *,
+    formal_dataset_sha: str,
+    runtime_config: Mapping[str, Any],
+    snapshot_contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    dataset_contract = contract["dataset"]
+    dataset_path = project_root / dataset_contract["path"]
+    dataset_rows = _read_jsonl(dataset_path)
+    dataset_by_qid = {row["qid"]: row for row in dataset_rows}
+    _assert_equal("reliability unique qids", len(dataset_by_qid), len(dataset_rows))
+    dataset_sha = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
+    _assert_equal("reliability dataset SHA-256", dataset_sha, dataset_contract["sha256"])
+    _assert_equal("reliability questions", len(dataset_rows), dataset_contract["questions"])
+    _assert_equal(
+        "reliability answerable",
+        sum(bool(row["answerable"]) for row in dataset_rows),
+        dataset_contract["answerable"],
+    )
+    _assert_equal(
+        "reliability unanswerable",
+        sum(not bool(row["answerable"]) for row in dataset_rows),
+        dataset_contract["unanswerable"],
+    )
+
+    _assert_equal("reliability trace rows", len(trace_rows), len(dataset_rows))
+    _assert_equal(
+        "reliability trace qids",
+        {row["qid"] for row in trace_rows},
+        set(dataset_by_qid),
+    )
+    production_threshold = float(contract["production_threshold"])
+    for row in trace_rows:
+        qid = row["qid"]
+        _assert_equal(
+            f"reliability {qid} answerable",
+            row["answerable"],
+            dataset_by_qid[qid]["answerable"],
+        )
+        _assert_equal(
+            f"reliability {qid} threshold decision",
+            row["threshold_refused"],
+            float(row["top_score"]) < production_threshold,
+        )
+    try:
+        metrics = compute_reliability_metrics(trace_rows, contract["threshold_candidates"])
+    except ValueError as exc:
+        raise ReleaseVerificationError(f"invalid reliability trace: {exc}") from exc
+
+    _assert_equal("reliability schema", result["schema_version"], "1.0")
+    try:
+        run_date = date.fromisoformat(result["run_date"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ReleaseVerificationError("reliability run date is not ISO YYYY-MM-DD") from exc
+    if run_date > date.today():
+        raise ReleaseVerificationError("reliability run date is in the future")
+    _assert_equal(
+        "reliability result dataset",
+        result["dataset"],
+        {"path": dataset_contract["path"], "sha256": dataset_sha},
+    )
+    _assert_equal(
+        "reliability formal guard dataset",
+        result["formal_guard_dataset"],
+        {"path": "eval/dataset/eval_set.jsonl", "sha256": formal_dataset_sha},
+    )
+    _assert_equal(
+        "reliability corpus snapshot",
+        result["corpus_snapshot"],
+        {
+            "path": snapshot_contract["path"],
+            "snapshot_date": snapshot_contract["snapshot_date"],
+            "laws": snapshot_contract["laws"],
+            "articles": snapshot_contract["articles"],
+        },
+    )
+    defaults = Settings(_env_file=None)
+    _assert_equal(
+        "reliability configuration",
+        result["configuration"],
+        {
+            "chunking": runtime_config["chunking_strategy"],
+            "retrieval": runtime_config["retrieval_mode"],
+            "reranker": runtime_config["use_reranker"],
+            "top_k_retrieve": runtime_config["top_k_retrieve"],
+            "top_k_final": runtime_config["top_k_final"],
+            "embedding_model": runtime_config["embedding_model"],
+            "embedding_revision": defaults.embedding_model_revision,
+            "reranker_model": runtime_config["reranker_model"],
+            "reranker_revision": defaults.reranker_model_revision,
+        },
+    )
+    _assert_equal(
+        "reliability production threshold",
+        result["production_threshold"],
+        contract["production_threshold"],
+    )
+    _assert_equal(
+        "reliability threshold candidates",
+        result["threshold_candidates"],
+        contract["threshold_candidates"],
+    )
+    _compare_tree("reliability stress metrics", metrics, result["stress_metrics"])
+
+    production_key = str(production_threshold)
+    production = metrics["threshold_sweep"][production_key]
+    expected_stress = contract["stress"]
+    _assert_close("reliability stress hit@5", metrics["hit_at_5"], expected_stress["hit_at_5"])
+    _assert_close(
+        "reliability stress MRR@10", metrics["mrr_at_10"], expected_stress["mrr_at_10"]
+    )
+    _assert_equal(
+        "reliability stress direct false refusals",
+        production["direct_false_refusals"],
+        expected_stress["direct_false_refusals"],
+    )
+    _assert_close(
+        "reliability stress direct unanswerable coverage",
+        production["direct_unanswerable_coverage"],
+        expected_stress["direct_unanswerable_coverage"],
+    )
+
+    formal_metrics = result["formal_guard_metrics"]
+    expected_formal = contract["formal_guard"]
+    _assert_close(
+        "reliability formal hit@5", formal_metrics["hit_at_5"], expected_formal["hit_at_5"]
+    )
+    _assert_close(
+        "reliability formal MRR@10",
+        formal_metrics["mrr_at_10"],
+        expected_formal["mrr_at_10"],
+    )
+    formal_production = formal_metrics["threshold_sweep"][production_key]
+    _assert_equal(
+        "reliability formal direct false refusals",
+        formal_production["direct_false_refusals"],
+        expected_formal["direct_false_refusals"],
+    )
+    _assert_close(
+        "reliability formal direct unanswerable coverage",
+        formal_production["direct_unanswerable_coverage"],
+        expected_formal["direct_unanswerable_coverage"],
+    )
+    _assert_equal(
+        "reliability decision",
+        result["decision"],
+        {
+            "pareto_better_candidates": [],
+            "outcome": contract["decision"],
+            "automatic_config_change": False,
+        },
+    )
+    return {
+        "questions": metrics["questions"],
+        "hit_at_5": metrics["hit_at_5"],
+        "mrr_at_10": metrics["mrr_at_10"],
+        "direct_false_refusals": production["direct_false_refusals"],
+        "direct_unanswerable_coverage": production["direct_unanswerable_coverage"],
+        "decision": contract["decision"],
+    }
+
+
 def _verify_release_version_contract(
     project_root: Path,
     manifest: dict[str, Any],
@@ -970,6 +1140,8 @@ def verify_release(project_root: Path) -> dict[str, Any]:
     official_dir = root / "eval" / "official"
     ablation_result = _read_json(official_dir / "ablation_results.json")
     e2e_result = _read_json(official_dir / "e2e_results.json")
+    reliability_contract = manifest["evidence"]["reliability"]
+    reliability_result = _read_json(root / reliability_contract["results_path"])
     for label, result in (("ablation", ablation_result), ("e2e", e2e_result)):
         _assert_equal(f"{label} dataset SHA", result["dataset"]["sha256"], dataset_sha)
         _assert_equal(f"{label} dataset questions", result["dataset"]["n_questions"], len(dataset))
@@ -979,9 +1151,16 @@ def verify_release(project_root: Path) -> dict[str, Any]:
     e2e_path = official_dir / "e2e_trace.jsonl"
     ablation_rows = _read_jsonl(ablation_path)
     e2e_rows = _read_jsonl(e2e_path)
+    reliability_rows = _read_jsonl(root / reliability_contract["trace_path"])
     trace_issues = scan_trace_rows(
         ablation_rows, "ablation", "eval/official/ablation_trace.jsonl"
-    ) + scan_trace_rows(e2e_rows, "e2e", "eval/official/e2e_trace.jsonl")
+    ) + scan_trace_rows(
+        e2e_rows, "e2e", "eval/official/e2e_trace.jsonl"
+    ) + scan_trace_rows(
+        reliability_rows,
+        "reliability",
+        reliability_contract["trace_path"],
+    )
     if trace_issues:
         raise ReleaseVerificationError(f"official trace privacy/schema issues: {trace_issues}")
     _verify_e2e_threshold_contract(
@@ -1030,6 +1209,15 @@ def verify_release(project_root: Path) -> dict[str, Any]:
     full_snapshot = _verify_full_corpus_snapshot(
         root,
         manifest["source_data"]["full_snapshot"],
+    )
+    reliability_summary = _verify_reliability_evidence(
+        root,
+        reliability_contract,
+        reliability_result,
+        reliability_rows,
+        formal_dataset_sha=dataset_sha,
+        runtime_config=runtime_config,
+        snapshot_contract=manifest["source_data"]["full_snapshot"],
     )
 
     public_paths = _load_public_file_list(root / manifest["publication"]["allowlist"])
@@ -1117,6 +1305,7 @@ def verify_release(project_root: Path) -> dict[str, Any]:
             "hit_at_5": primary["hit_at_5"],
             "mrr_at_10": primary["mrr_at_10"],
         },
+        "reliability": reliability_summary,
         "e2e": {
             "answered": e2e_metrics["n_answered"],
             "refused": sum(1 for row in e2e_rows if row["refused"]),

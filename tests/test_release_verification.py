@@ -156,6 +156,14 @@ def test_release_verifier_recomputes_committed_evidence():
     assert report["primary_retrieval"]["mrr_at_10"] == pytest.approx(
         0.9055555555555554
     )
+    assert report["reliability"] == {
+        "questions": 60,
+        "hit_at_5": pytest.approx(0.95),
+        "mrr_at_10": pytest.approx(0.9083333333333334),
+        "direct_false_refusals": 1,
+        "direct_unanswerable_coverage": pytest.approx(0.85),
+        "decision": "retain_0.03",
+    }
     assert report["e2e"]["answered"] == 29
     assert report["e2e"]["refused"] == 11
     assert report["e2e"]["generation_calls"] == 31
@@ -905,6 +913,29 @@ def test_trace_schema_fails_closed_on_provider_fields():
             "path": "trace.jsonl",
             "category": "unexpected_trace_field",
             "location": "row 1 field provider_response",
+        }
+    ]
+
+
+def test_reliability_trace_schema_fails_closed_on_content_fields():
+    module = release_module()
+    row = {
+        "qid": "stress-001",
+        "answerable": True,
+        "rank": 1,
+        "top_score": 0.9,
+        "threshold_refused": False,
+        "elapsed_ms": 1.0,
+        "question": "private",
+    }
+
+    issues = module.scan_trace_rows([row], "reliability", "trace.jsonl")
+
+    assert issues == [
+        {
+            "path": "trace.jsonl",
+            "category": "unexpected_trace_field",
+            "location": "row 1 field question",
         }
     ]
 
