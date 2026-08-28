@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -56,6 +57,16 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     collection_name: str = "labor_laws"
 
+    # ── Deployment / public BYOK ─────────────────────
+    deployment_mode: Literal["standard", "public_byok"] = "standard"
+    qdrant_api_key: SecretStr = SecretStr("")
+    session_signing_secret: SecretStr = SecretStr("")
+    byok_session_query_limit: int = Field(default=20, ge=1, le=1000)
+    byok_session_ttl_seconds: int = Field(default=86400, ge=60, le=604800)
+    byok_max_concurrency: int = Field(default=2, ge=1, le=32)
+    byok_request_timeout_seconds: float = Field(default=60.0, gt=0, le=300)
+    byok_max_question_chars: int = Field(default=2000, ge=1, le=10000)
+
     # ── Retrieval pipeline ───────────────────────────
     retrieval_mode: Literal["vector", "bm25", "hybrid"] = "hybrid"
     use_reranker: bool = True
@@ -78,6 +89,10 @@ class Settings(BaseSettings):
     # ── Paths ────────────────────────────────────────
     data_dir: Path = PROJECT_ROOT / "data"
     storage_dir: Path = PROJECT_ROOT / "storage"
+
+    @property
+    def public_byok_enabled(self) -> bool:
+        return self.deployment_mode == "public_byok"
 
     def generation_model_for(self, provider: str) -> str:
         if provider not in DEFAULT_GENERATION_MODELS:

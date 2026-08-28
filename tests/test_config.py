@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from rag.config import DEFAULT_GENERATION_MODELS, PUBLIC_LLM_PROVIDERS, Settings
 
@@ -65,3 +66,36 @@ def test_legacy_generation_model_only_overrides_environment_default():
 def test_generation_model_for_rejects_unknown_provider():
     with pytest.raises(ValueError, match="unknown LLM provider"):
         Settings(_env_file=None).generation_model_for("bedrock")
+
+
+def test_public_byok_settings_are_explicit_and_bounded():
+    settings = Settings(
+        _env_file=None,
+        deployment_mode="public_byok",
+        qdrant_api_key="read-only-secret",
+        session_signing_secret="session-secret",
+    )
+
+    assert settings.public_byok_enabled is True
+    assert settings.qdrant_api_key.get_secret_value() == "read-only-secret"
+    assert settings.session_signing_secret.get_secret_value() == "session-secret"
+    assert settings.byok_session_query_limit == 20
+    assert settings.byok_session_ttl_seconds == 86400
+    assert settings.byok_max_concurrency == 2
+    assert settings.byok_request_timeout_seconds == 60.0
+    assert settings.byok_max_question_chars == 2000
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("byok_session_query_limit", 0),
+        ("byok_session_ttl_seconds", 0),
+        ("byok_max_concurrency", 0),
+        ("byok_request_timeout_seconds", 0),
+        ("byok_max_question_chars", 0),
+    ],
+)
+def test_public_byok_limits_reject_non_positive_values(field, value):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, **{field: value})
