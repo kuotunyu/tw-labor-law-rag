@@ -427,4 +427,3 @@ panels remain backward compatible until Qdrant is rebuilt.
 
 Resolve and verify the exact worktree path before removal. Preserve all unrelated historical
 worktrees. Confirm canonical HEAD equals `origin/main` and status is clean.
-

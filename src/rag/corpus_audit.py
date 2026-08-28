@@ -165,4 +165,3 @@ def compare_snapshots(
                     }
                 )
     return changes
-
