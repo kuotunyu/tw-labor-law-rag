@@ -11,7 +11,12 @@ import os
 
 import httpx
 import streamlit as st
-from api_client import actual_generation_metadata, fetch_models, submit_query
+from api_client import (
+    actual_generation_metadata,
+    fetch_models,
+    requested_provider_for_display,
+    submit_query,
+)
 from refusal_labels import refusal_stage_label
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
@@ -58,10 +63,12 @@ def provider_label(provider: str) -> str:
 
 
 def render_generation_status(payload: dict) -> None:
-    requested_provider = payload.get("requested_provider")
+    requested_provider = requested_provider_for_display(payload)
 
     if requested_provider in provider_models:
         st.caption(f"指定模型：{provider_label(requested_provider)}")
+    elif requested_provider:
+        st.caption(f"指定模型：{requested_provider}")
     if not payload.get("generation_called", True):
         st.info("此題在檢索階段拒答，未呼叫生成模型。")
         return

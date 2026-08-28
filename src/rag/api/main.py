@@ -23,7 +23,11 @@ from rag.generation.llm import (
     ProviderPolicyError,
     build_llm,
 )
-from rag.generation.router import RoutedLLM, build_routed_llm
+from rag.generation.router import (
+    ProviderRouteOperationalError,
+    RoutedLLM,
+    build_routed_llm,
+)
 from rag.indexing.embedder import BGEM3Embedder
 from rag.indexing.vector_store import VectorStore
 from rag.retrieval.reranker import Reranker
@@ -189,10 +193,17 @@ class ModelsResponse(BaseModel):
 @app.get("/health")
 def health():
     settings = state.settings
+    default_provider, available_providers = state.resolve_provider_catalog()
     info = {
-        "status": "ok",
-        "llm_provider": settings.llm_provider,
-        "generation_model": settings.resolved_generation_model,
+        "status": "ok" if available_providers else "degraded",
+        "default_provider": default_provider,
+        "available_providers": list(available_providers),
+        "llm_provider": default_provider,
+        "generation_model": (
+            settings.generation_model_for(default_provider)
+            if default_provider is not None
+            else None
+        ),
         "qdrant_mode": settings.qdrant_mode,
     }
     for strategy in ("structure", "fixed"):
@@ -241,7 +252,14 @@ def query(req: QueryRequest) -> QueryResponse:
         answerer = state.get_answerer(strategy, mode, use_reranker, provider)
         result = answerer.answer(req.question)
     except ProviderOperationalError as exc:
-        raise HTTPException(status_code=502, detail="generation_unavailable") from exc
+        status_code = (
+            502
+            if isinstance(exc, ProviderRouteOperationalError) and exc.fallback_attempted
+            else 503
+        )
+        raise HTTPException(
+            status_code=status_code, detail="generation_unavailable"
+        ) from exc
     except ProviderPolicyError as exc:
         raise HTTPException(status_code=422, detail="generation_rejected") from exc
 

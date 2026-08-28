@@ -4,7 +4,11 @@ import pytest
 
 from rag.config import Settings
 from rag.generation.llm import LLMOutput, ProviderOperationalError, ProviderPolicyError
-from rag.generation.router import RoutedLLM, build_routed_llm
+from rag.generation.router import (
+    ProviderRouteOperationalError,
+    RoutedLLM,
+    build_routed_llm,
+)
 
 
 class FakeAdapter:
@@ -106,12 +110,55 @@ def test_dual_operational_failure_makes_exactly_two_calls():
         "openai", "openai-test", error=ProviderOperationalError("openai", "http_429")
     )
 
-    with pytest.raises(ProviderOperationalError) as exc_info:
+    with pytest.raises(ProviderRouteOperationalError) as exc_info:
         RoutedLLM(primary, fallback).generate("system", "user")
 
-    assert exc_info.value.provider == "openai"
+    assert isinstance(exc_info.value, ProviderOperationalError)
+    assert exc_info.value.attempted_providers == ("gemini", "openai")
+    assert exc_info.value.fallback_attempted is True
     assert len(primary.calls) == 1
     assert len(fallback.calls) == 1
+
+
+def test_primary_only_operational_failure_has_safe_immutable_route_context():
+    """Catches losing route-attempt context or retaining raw provider details."""
+    secret = "sdk-message-with-private-value"
+    primary = FakeAdapter(
+        "gemini", "gemini-test", error=ProviderOperationalError("gemini", secret)
+    )
+
+    with pytest.raises(ProviderRouteOperationalError) as exc_info:
+        RoutedLLM(primary).generate("system", "user")
+
+    error = exc_info.value
+    assert isinstance(error, ProviderOperationalError)
+    assert error.attempted_providers == ("gemini",)
+    assert error.fallback_attempted is False
+    assert secret not in str(error)
+    assert secret not in repr(error)
+    with pytest.raises(AttributeError):
+        error.attempted_providers = ("openai",)
+    with pytest.raises(AttributeError):
+        error.provider = "openai"
+    with pytest.raises(AttributeError):
+        error.reason_code = "http_429"
+
+
+@pytest.mark.parametrize(
+    "fallback_error",
+    [ProviderPolicyError("openai"), ValueError("programming bug")],
+)
+def test_fallback_policy_and_programming_errors_remain_unwrapped(fallback_error):
+    """Catches route context masking non-operational fallback failures."""
+    primary = FakeAdapter(
+        "gemini", "gemini-test", error=ProviderOperationalError("gemini", "http_503")
+    )
+    fallback = FakeAdapter("openai", "openai-test", error=fallback_error)
+
+    with pytest.raises(type(fallback_error)) as exc_info:
+        RoutedLLM(primary, fallback).generate("system", "user")
+
+    assert exc_info.value is fallback_error
 
 
 def test_openai_primary_uses_gemini_as_the_single_fallback():

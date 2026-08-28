@@ -13,6 +13,33 @@ from rag.generation.llm import (
 )
 
 
+class ProviderRouteOperationalError(ProviderOperationalError):
+    """Sanitized operational failure with immutable public route context."""
+
+    _IMMUTABLE_FIELDS = {"provider", "reason_code", "_attempted_providers"}
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name in self._IMMUTABLE_FIELDS and hasattr(self, name):
+            raise AttributeError(f"{name} is read-only")
+        super().__setattr__(name, value)
+
+    def __init__(self, attempted_providers: tuple[str, ...]):
+        if not attempted_providers or any(
+            provider not in PUBLIC_LLM_PROVIDERS for provider in attempted_providers
+        ):
+            raise ValueError("attempted providers must use the public provider catalog")
+        super().__init__(attempted_providers[-1], "route_operational_failure")
+        self._attempted_providers = tuple(attempted_providers)
+
+    @property
+    def attempted_providers(self) -> tuple[str, ...]:
+        return self._attempted_providers
+
+    @property
+    def fallback_attempted(self) -> bool:
+        return len(self._attempted_providers) > 1
+
+
 class RoutedLLM:
     """Use a primary adapter, recovering once through an operational fallback."""
 
@@ -32,8 +59,13 @@ class RoutedLLM:
             return self.primary.generate(system, user, temperature, max_tokens)
         except ProviderOperationalError:
             if self.fallback is None:
-                raise
-            output = self.fallback.generate(system, user, temperature, max_tokens)
+                raise ProviderRouteOperationalError((self.primary.provider,)) from None
+            try:
+                output = self.fallback.generate(system, user, temperature, max_tokens)
+            except ProviderOperationalError:
+                raise ProviderRouteOperationalError(
+                    (self.primary.provider, self.fallback.provider)
+                ) from None
             return replace(
                 output,
                 fallback_used=True,

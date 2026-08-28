@@ -10,10 +10,13 @@ import json
 import time
 from pathlib import Path
 
+from rag.generation.llm import ProviderOperationalError
 from rag.retrieval.pipeline import RetrievalPipeline
 
 
 def is_rate_limit(exc: Exception) -> bool:
+    if isinstance(exc, ProviderOperationalError) and exc.reason_code == "http_429":
+        return True
     text = str(exc)
     return "429" in text or "RESOURCE_EXHAUSTED" in text or "rate limit" in text.lower()
 

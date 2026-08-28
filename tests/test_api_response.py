@@ -9,6 +9,7 @@ from rag.api import main as api_main
 from rag.api.main import QueryResponse
 from rag.config import Settings
 from rag.generation.llm import LLMOutput, ProviderOperationalError, ProviderPolicyError
+from rag.generation.router import build_routed_llm
 
 
 class FakeAdapter:
@@ -185,6 +186,47 @@ def test_models_never_exposes_server_secrets(monkeypatch):
 
     assert "gemini-top-secret" not in response_text
     assert "openai-top-secret" not in response_text
+
+
+def test_health_uses_the_same_effective_catalog_as_models(monkeypatch):
+    """Catches health reporting the configured default when only another route is ready."""
+    settings = configured_settings(llm_provider="gemini", providers=("openai",))
+    monkeypatch.setattr(api_main.state, "settings", settings, raising=False)
+    monkeypatch.setattr(
+        api_main.state,
+        "store",
+        SimpleNamespace(count=lambda _collection: 0),
+        raising=False,
+    )
+
+    health = api_main.health()
+    catalog = api_main.models()
+
+    assert health["status"] == "ok"
+    assert health["default_provider"] == catalog["default_provider"] == "openai"
+    assert health["available_providers"] == ["openai"]
+    assert health["llm_provider"] == "openai"
+    assert health["generation_model"] == "gpt-5.6-luna"
+
+
+def test_health_is_degraded_without_a_public_generator(monkeypatch):
+    """Catches health declaring an unconfigured Gemini route ready."""
+    settings = configured_settings(llm_provider="gemini", providers=())
+    monkeypatch.setattr(api_main.state, "settings", settings, raising=False)
+    monkeypatch.setattr(
+        api_main.state,
+        "store",
+        SimpleNamespace(count=lambda _collection: 0),
+        raising=False,
+    )
+
+    health = api_main.health()
+
+    assert health["status"] == "degraded"
+    assert health["default_provider"] is None
+    assert health["available_providers"] == []
+    assert health["llm_provider"] is None
+    assert health["generation_model"] is None
 
 
 def test_same_provider_reuses_answerer_and_routed_llm(monkeypatch):
@@ -388,7 +430,7 @@ def test_query_sanitizes_operational_provider_failure(monkeypatch):
     with pytest.raises(HTTPException) as exc_info:
         api_main.query(api_main.QueryRequest(question="問題"))
 
-    assert exc_info.value.status_code == 502
+    assert exc_info.value.status_code == 503
     assert exc_info.value.detail == "generation_unavailable"
     assert secret not in str(exc_info.value.detail)
 
@@ -414,7 +456,7 @@ def test_query_sanitizes_policy_provider_failure(monkeypatch):
 @pytest.mark.parametrize(
     ("error", "status_code", "detail"),
     [
-        (ProviderOperationalError("gemini", "sdk-secret"), 502, "generation_unavailable"),
+        (ProviderOperationalError("gemini", "sdk-secret"), 503, "generation_unavailable"),
         (ProviderPolicyError("gemini", "sdk-secret"), 422, "generation_rejected"),
     ],
 )
@@ -448,3 +490,56 @@ def test_query_does_not_mislabel_programming_errors_as_provider_failures(monkeyp
 
     with pytest.raises(ValueError, match="programming bug"):
         api_main.query(api_main.QueryRequest(question="問題"))
+
+
+def _route_failure_answerer(settings, *, fallback_error=None):
+    adapters = {
+        "gemini": FakeAdapter("gemini"),
+        "openai": FakeAdapter("openai"),
+    }
+    adapters["gemini"].generate = lambda *_args: (_ for _ in ()).throw(
+        ProviderOperationalError("gemini", "http_503")
+    )
+    if fallback_error is not None:
+        adapters["openai"].generate = lambda *_args: (_ for _ in ()).throw(
+            fallback_error
+        )
+    routed = build_routed_llm(settings, "gemini", adapters=adapters)
+    return SimpleNamespace(answer=lambda _question: routed.generate("system", "user"))
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        configured_settings(llm_fallback_enabled=False),
+        configured_settings(key_values={"openai": "   "}),
+    ],
+)
+def test_query_primary_only_operational_failure_is_503(monkeypatch, settings):
+    """Catches disabled or blank-key routes being reported as a bad gateway."""
+    answerer = _route_failure_answerer(settings)
+    monkeypatch.setattr(api_main.state, "settings", settings, raising=False)
+    monkeypatch.setattr(api_main.state, "get_answerer", lambda *_args: answerer)
+
+    with pytest.raises(HTTPException) as exc_info:
+        api_main.query(api_main.QueryRequest(question="問題", provider="gemini"))
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == "generation_unavailable"
+
+
+def test_query_dual_operational_failure_is_502(monkeypatch):
+    """Catches an attempted and failed fallback being reported as primary-only."""
+    settings = configured_settings()
+    answerer = _route_failure_answerer(
+        settings,
+        fallback_error=ProviderOperationalError("openai", "http_429"),
+    )
+    monkeypatch.setattr(api_main.state, "settings", settings, raising=False)
+    monkeypatch.setattr(api_main.state, "get_answerer", lambda *_args: answerer)
+
+    with pytest.raises(HTTPException) as exc_info:
+        api_main.query(api_main.QueryRequest(question="問題", provider="gemini"))
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail == "generation_unavailable"
