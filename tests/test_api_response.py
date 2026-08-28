@@ -896,6 +896,7 @@ def test_byok_session_quota_and_concurrency_map_to_429(monkeypatch):
         ("http_429", 429, "provider_rate_limited"),
         ("timeout", 504, "provider_timeout"),
         ("http_504", 504, "provider_timeout"),
+        ("http_400", 502, "generation_unavailable"),
         ("http_503", 502, "generation_unavailable"),
     ],
 )

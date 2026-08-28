@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from rag.api.byok import (
@@ -7,6 +9,8 @@ from rag.api.byok import (
     InvalidDemoSession,
     SessionQuotaExceeded,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_signed_session_allows_exact_limit_and_rejects_tampering():
@@ -90,3 +94,17 @@ def test_concurrency_gate_rejects_instead_of_queueing():
 
     with gate.acquire():
         pass
+
+
+def test_hugging_face_runbook_requires_zero_cost_cpu_and_forbids_paid_fallback():
+    runbook = (PROJECT_ROOT / "docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "`cpu-basic`" in runbook
+    assert "US$0" in runbook
+    assert "CPU 驗收失敗時保持 private/paused，禁止自動改用任何付費硬體。" in runbook
+    assert "持久 storage" in runbook
+    assert "replica" in runbook
+    assert "`t4-small`" not in runbook
+    assert "3600 秒" not in runbook

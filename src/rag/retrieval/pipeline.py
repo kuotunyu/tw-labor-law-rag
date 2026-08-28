@@ -13,6 +13,25 @@ from rag.models import RetrievedChunk
 from rag.retrieval.reranker import Reranker
 from rag.retrieval.retriever import Retriever
 
+_EMPLOYER_CUES = ("老闆", "主管", "雇主")
+_OFF_HOURS_CUES = ("假日", "休假日", "休息日", "例假", "下班後", "非上班時間")
+_MESSAGE_CUES = ("群組傳訊", "群組訊息", "傳訊", "回訊", "line群組", "line訊息")
+_OFF_HOURS_LEGAL_TERMS = "雇主 休息日 例假 工作時間 延長工作時間 出勤 加班"
+
+
+def _retrieval_query(query: str) -> str:
+    """Bridge one observed colloquial gap without spending a provider call.
+
+    Expansion is deliberately gated on employer, off-hours, and messaging
+    cues occurring together.  The original question remains intact for the
+    answer-generation layer; only retrieval and reranking see the legal terms.
+    """
+    folded = query.casefold()
+    cue_groups = (_EMPLOYER_CUES, _OFF_HOURS_CUES, _MESSAGE_CUES)
+    if all(any(cue in folded for cue in cues) for cues in cue_groups):
+        return f"{query} {_OFF_HOURS_LEGAL_TERMS}"
+    return query
+
 
 @dataclass
 class RetrievalResult:
@@ -35,9 +54,10 @@ class RetrievalPipeline:
         self.top_k_final = top_k_final
 
     def run(self, query: str) -> RetrievalResult:
-        candidates = self.retriever.retrieve(query, top_k=self.top_k_retrieve)
+        search_query = _retrieval_query(query)
+        candidates = self.retriever.retrieve(search_query, top_k=self.top_k_retrieve)
         if self.reranker is not None:
-            hits = self.reranker.rerank(query, candidates, top_k=self.top_k_final)
+            hits = self.reranker.rerank(search_query, candidates, top_k=self.top_k_final)
         else:
             hits = candidates[: self.top_k_final]
         top_score = hits[0].score if hits else 0.0

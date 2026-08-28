@@ -44,7 +44,7 @@ class ProviderPolicyError(RuntimeError):
         self.reason_code = reason_code
 
 
-_OPERATIONAL_STATUS_CODES = {401, 403, 404, 408, 409, 429, 500, 502, 503, 504}
+_OPERATIONAL_STATUS_CODES = {400, 401, 403, 404, 408, 409, 429, 500, 502, 503, 504}
 _OPERATIONAL_CLASS_TOKENS = (
     "connection",
     "timeout",
@@ -56,6 +56,12 @@ _OPERATIONAL_CLASS_TOKENS = (
     "serviceunavailable",
 )
 _POLICY_TOKENS = ("safety", "policy", "content_filter", "blocked")
+_INVALID_API_KEY_TOKENS = (
+    "api key not valid",
+    "api key expired",
+    "api_key_invalid",
+    "invalid api key",
+)
 
 
 def _normalized_provider_error(provider: str, exc: Exception) -> RuntimeError:
@@ -72,6 +78,12 @@ def _normalized_provider_error(provider: str, exc: Exception) -> RuntimeError:
         numeric_status = int(status)
     except (TypeError, ValueError):
         numeric_status = None
+    if (
+        provider == "gemini"
+        and numeric_status == 400
+        and any(token in message for token in _INVALID_API_KEY_TOKENS)
+    ):
+        return ProviderOperationalError(provider, "http_401")
     if numeric_status in _OPERATIONAL_STATUS_CODES:
         return ProviderOperationalError(provider, f"http_{numeric_status}")
     if "timeout" in class_name:
@@ -118,6 +130,18 @@ def _gemini_response_is_policy_blocked(response, types) -> bool:
         if any(rating.blocked for rating in (candidate.safety_ratings or [])):
             return True
     return False
+
+
+def _gemini_thinking_config(model: str, types):
+    """Select the thinking control supported by each Gemini model family."""
+    model_id = model.removeprefix("models/")
+    if model_id.startswith("gemini-3"):
+        return types.ThinkingConfig(
+            thinking_level=types.ThinkingLevel.MINIMAL,
+        )
+    if model_id.startswith("gemini-2.5") and "flash" in model_id:
+        return types.ThinkingConfig(thinking_budget=0)
+    return None
 
 
 class LLMAdapter(Protocol):
@@ -244,11 +268,9 @@ class GeminiAdapter:
     ) -> LLMOutput:
         from google.genai import errors, types
 
-        # RAG synthesis over supplied context doesn't need multi-step reasoning, so
-        # turn thinking off on flash models (budget=0 is supported there) to spend
-        # the whole token budget on the visible answer. gemini-2.5-pro requires a
-        # non-zero thinking budget (would error on 0), so it's left at the default.
-        thinking_config = types.ThinkingConfig(thinking_budget=0) if "flash" in self.model else None
+        # Gemini 3 uses relative thinking levels and cannot be fully disabled;
+        # Gemini 2.5 Flash uses the earlier numeric-budget contract.
+        thinking_config = _gemini_thinking_config(self.model, types)
 
         try:
             resp = self.client.models.generate_content(

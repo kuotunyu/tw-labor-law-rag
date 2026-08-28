@@ -1,3 +1,5 @@
+import pytest
+
 from rag.models import RetrievedChunk
 from rag.retrieval.pipeline import RetrievalPipeline
 
@@ -55,3 +57,73 @@ def test_pipeline_passes_top_k_retrieve_to_retriever():
     pipeline = RetrievalPipeline(RecordingRetriever(), reranker=None, top_k_retrieve=20, top_k_final=5)
     pipeline.run("query")
     assert calls == [20]
+
+
+def test_pipeline_expands_off_hours_employer_messages_for_legal_retrieval():
+    calls = []
+
+    class RecordingRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(("retrieve", query))
+            return [hit("labor-law")]
+
+    class RecordingReranker:
+        def rerank(self, query, candidates, top_k):
+            calls.append(("rerank", query))
+            return candidates[:top_k]
+
+    question = "主管在休假日用群組傳訊息要求我處理工作，這算加班嗎？"
+    expected = f"{question} 雇主 休息日 例假 工作時間 延長工作時間 出勤 加班"
+    pipeline = RetrievalPipeline(
+        RecordingRetriever(),
+        reranker=RecordingReranker(),
+        top_k_retrieve=20,
+        top_k_final=5,
+    )
+
+    pipeline.run(question)
+
+    assert calls == [("retrieve", expected), ("rerank", expected)]
+
+
+def test_pipeline_keeps_unrelated_queries_unchanged():
+    calls = []
+
+    class RecordingRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(query)
+            return []
+
+    question = "量子力學和相對論有什麼不同？"
+    pipeline = RetrievalPipeline(
+        RecordingRetriever(), reranker=None, top_k_retrieve=20, top_k_final=5
+    )
+
+    pipeline.run(question)
+
+    assert calls == [question]
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "老闆假日請大家參加聚餐。",
+        "假日群組傳訊息討論朋友聚餐。",
+        "老闆在群組傳訊息公布午餐地點。",
+    ],
+)
+def test_pipeline_requires_all_three_off_hours_message_cue_groups(question):
+    calls = []
+
+    class RecordingRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(query)
+            return []
+
+    pipeline = RetrievalPipeline(
+        RecordingRetriever(), reranker=None, top_k_retrieve=20, top_k_final=5
+    )
+
+    pipeline.run(question)
+
+    assert calls == [question]

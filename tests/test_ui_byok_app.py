@@ -93,10 +93,32 @@ def test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history(monkeypat
         app = AppTest.from_file(app_path, default_timeout=10).run()
 
         assert not app.exception
+        assert len(app.segmented_control) == 1
+        assert app.segmented_control[0].label == "回答模型"
+        assert app.segmented_control[0].options == [
+            "Gemini · gemini-3.5-flash-lite",
+            "OpenAI · gpt-5.6-luna",
+        ]
+        assert app.segmented_control[0].value == "gemini"
+        assert all(widget.label != "回答模型" for widget in app.sidebar.selectbox)
+        assert any(
+            element.value == "🔐 開始安全問答" for element in app.subheader
+        )
         assert app.chat_input[0].disabled is True
         assert requests == [{"path": "/session"}]
 
-        visitor_key = "visitor-secret-key"
+        app.text_input[0].set_value("gemini-visitor-secret-key").run()
+        assert app.chat_input[0].disabled is False
+        assert any(
+            element.value == "API Key 已填入，可以開始問答。"
+            for element in app.success
+        )
+
+        app.segmented_control[0].set_value("openai").run()
+        assert app.text_input[0].value == ""
+        assert app.chat_input[0].disabled is True
+
+        visitor_key = "openai-visitor-secret-key"
         app.text_input[0].set_value(visitor_key).run()
         assert app.chat_input[0].disabled is False
 
@@ -105,6 +127,7 @@ def test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history(monkeypat
         query_request = next(item for item in requests if item["path"] == "/query")
         assert query_request["provider_key"] == visitor_key
         assert query_request["demo_session"] == "signed-session"
+        assert query_request["payload"]["provider"] == "openai"
         assert visitor_key not in repr(query_request["payload"])
         assert visitor_key not in repr(app.session_state["history"])
         rendered = "\n".join(
@@ -119,6 +142,7 @@ def test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history(monkeypat
         )
         clear_button.click().run()
         assert app.text_input[0].value == ""
+        assert app.chat_input[0].disabled is True
     finally:
         server.shutdown()
         server.server_close()
