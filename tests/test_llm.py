@@ -35,13 +35,13 @@ def test_build_llm_anthropic():
 def test_build_llm_openai():
     llm = build_llm(settings_for("openai"))
     assert isinstance(llm, OpenAIAdapter)
-    assert llm.model == "gpt-5.1"
+    assert llm.model == "gpt-5.6-luna"
 
 
 def test_build_llm_gemini():
     llm = build_llm(settings_for("gemini"))
     assert isinstance(llm, GeminiAdapter)
-    assert llm.model == "gemini-2.5-pro"
+    assert llm.model == "gemini-3.5-flash-lite"
 
 
 def test_build_llm_ollama():
