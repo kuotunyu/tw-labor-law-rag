@@ -49,6 +49,27 @@
 - logs 或 repository 若出現秘密值、私人 corpus、絕對路徑或本機 BM25 檔案，驗收立即失敗。
 - 所有硬體操作前後都讀回 requested/current hardware；任何非 `cpu-basic` 狀態都立即 pause，且不繼續測試。
 
+## 訪客 API Key 啟用介面
+
+採用主內容區的「開始安全問答」啟用卡片，不再把回答模型與 API Key 藏在過長側欄底部。側欄只保留較進階的檢索設定；一般訪客從頁首往下閱讀時，會先完成模型與 Key 設定，再進入問題輸入區。
+
+卡片包含以下元件：
+
+- Gemini／OpenAI 水平分段選擇器，選項同時顯示實際模型名稱。
+- 單一密碼遮罩輸入欄，placeholder 依目前 provider 明確說明應貼入哪一種 Key。
+- 「已填入，可開始問答」或「尚未輸入」狀態訊息；不得在尚未呼叫 provider 前宣稱 Key 已驗證成功。
+- 顯眼的「清除 API Key」按鈕。切換 provider 時也必須清除原 Key，避免把 Gemini Key 誤送給 OpenAI 或反向誤送。
+- 三項短版安全說明：Key 僅存在目前瀏覽器工作階段、不寫入檔案或聊天紀錄、模型費用由 Key 持有人承擔。
+- 工作階段查詢上限與建立失敗訊息，放在卡片內而不是側欄最底部。
+
+Key 只保存在單一 Streamlit session-state 欄位，送出問題時才透過現有 `X-Provider-Api-Key` header 傳給同容器 API。Key 不進入 query JSON、聊天 history、rendered copy、logs 或快取。清除按鈕、provider 切換及瀏覽器工作階段重建都會移除該欄位內容。
+
+問題輸入框在尚未選好 provider、未填 Key或展示工作階段無效時維持 disabled。卡片會直接告訴使用者缺少哪一步，而不是只留下灰色且無說明的問題欄。provider 拒絕 Key、限流或 timeout 時仍沿用現有的去敏感化錯誤訊息，不顯示上游 response body。
+
+視覺採取沉穩、可信任的法律工具風格，沿用現有淺色介面與內容寬度，不引入外部字型、JavaScript 或圖片依賴。桌面版讓模型選擇與 Key 輸入保持清楚層級；窄螢幕由 Streamlit 原生元件自動堆疊，所有控制項保留文字標籤、鍵盤操作與足夠點擊範圍。
+
+自動化驗收必須覆蓋：未輸入 Key 時不能提問、Key 已填入時可送出、Key 不出現在 payload/history/rendered copy、清除按鈕歸零、切換 provider 立即歸零、卡片安全說明與模型名稱正確。完成後以桌面與窄螢幕各檢查一次，再部署至 private `cpu-basic` Space 驗收；不得因介面變更增加硬體、storage 或 replica。
+
 ## 驗收與發布
 
 Private Space 依序驗證：
