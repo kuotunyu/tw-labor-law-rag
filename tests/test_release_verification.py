@@ -5,6 +5,7 @@ import re
 import subprocess
 import tarfile
 import tomllib
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -149,6 +150,25 @@ def test_pending_provider_crosscheck_contract_is_explicit(tmp_path):
         "authorized_cap_usd_per_provider": "5.00",
         "required_providers": ["gemini", "openai"],
     }
+
+
+def test_reliability_run_date_accepts_latest_global_civil_date():
+    module = release_module()
+
+    assert module._verify_evidence_run_date(
+        "2026-08-29",
+        latest_valid_date=date(2026, 8, 29),
+    ) == date(2026, 8, 29)
+
+
+def test_reliability_run_date_rejects_date_beyond_global_civil_limit():
+    module = release_module()
+
+    with pytest.raises(module.ReleaseVerificationError, match="run date is in the future"):
+        module._verify_evidence_run_date(
+            "2026-08-30",
+            latest_valid_date=date(2026, 8, 29),
+        )
 
 
 @pytest.mark.parametrize(
