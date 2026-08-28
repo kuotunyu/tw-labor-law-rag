@@ -8,7 +8,7 @@ The allowlist includes source, tests, CI/configuration, lockfile, package metada
 
 ## Publishable Git history
 
-Publishable commits are the deduplicated commits reachable from `refs/heads/*`, `refs/tags/*`, and `refs/remotes/*`. Every file in every such commit must belong to the current allowlist or the explicit append-only `publication.history.legacy_public_paths` list. Historical text is scanned with the same redacted privacy rules as the current tree, and every historical binary must match an append-only SHA-256 in `publication.history.reviewed_binary_sha256`. Older additive commits may omit files that were introduced later.
+Publishable commits are the deduplicated commits reachable from `refs/heads/*`, `refs/tags/*`, and ordinary `refs/remotes/*`. GitHub Actions' ephemeral `refs/remotes/pull/*` synthetic merge refs are excluded because they are test harness state, not remotely publishable branches; ordinary origin remote-tracking refs remain included. Every file in every publishable commit must belong to the current allowlist or the explicit append-only `publication.history.legacy_public_paths` list. Historical text is scanned with the same redacted privacy rules as the current tree, and every historical binary must match an append-only SHA-256 in `publication.history.reviewed_binary_sha256`. Older additive commits may omit files that were introduced later.
 
 Local `refs/archive/*` refs are recovery evidence outside the publication graph and are not opened or counted by the verifier. This exclusion is namespace-specific: a normal branch whose short name is `archive/foo` is still `refs/heads/archive/foo` and is fully audited. Preserving a local recovery ref does not publish it, and the verifier performs no fetch or push.
 

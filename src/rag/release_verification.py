@@ -405,6 +405,7 @@ def _publishable_commit_ids(project_root: Path) -> list[str]:
                 "rev-list",
                 "--branches",
                 "--tags",
+                "--exclude=pull/*",
                 "--remotes",
             ],
             check=True,

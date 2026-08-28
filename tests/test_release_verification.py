@@ -198,6 +198,7 @@ def test_release_verifier_recomputes_committed_evidence():
                 "rev-list",
                 "--branches",
                 "--tags",
+                "--exclude=pull/*",
                 "--remotes",
             )
             .stdout.decode("ascii")
@@ -329,6 +330,26 @@ def test_publishable_commit_ids_include_and_deduplicate_tags_and_remotes(tmp_pat
         public_commit,
         release_commit,
     }
+
+
+def test_publishable_commit_ids_ignore_synthetic_pull_merge_remote(tmp_path):
+    init_public_repo(tmp_path)
+    public_commit = commit_file(tmp_path, "README.md", b"public", "public")
+    synthetic_merge = commit_file(
+        tmp_path,
+        "PR_MERGE.md",
+        b"ephemeral merge",
+        "synthetic pull merge",
+    )
+    run_git(tmp_path, "reset", "--hard", public_commit)
+    run_git(
+        tmp_path,
+        "update-ref",
+        "refs/remotes/pull/1/merge",
+        synthetic_merge,
+    )
+
+    assert release_module()._publishable_commit_ids(tmp_path) == [public_commit]
 
 
 def test_publishable_commit_ids_reject_empty_ref_set(tmp_path):
