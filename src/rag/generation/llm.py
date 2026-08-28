@@ -7,6 +7,7 @@ answer-assembly logic that calls it.
 
 from __future__ import annotations
 
+import re
 from typing import Protocol
 
 from rag.config import Settings
@@ -131,6 +132,21 @@ class GeminiAdapter:
         return resp.text or ""
 
 
+_COMPLETE_THINK_BLOCK = re.compile(r"<think>.*?</think>", flags=re.DOTALL)
+
+
+def sanitize_ollama_content(text: str) -> str:
+    """Remove leaked Qwen-style thinking markup from user-visible content."""
+    cleaned = _COMPLETE_THINK_BLOCK.sub("", text)
+    unclosed = cleaned.find("<think>")
+    if unclosed != -1:
+        cleaned = cleaned[:unclosed]
+    orphan = cleaned.find("</think>")
+    if orphan != -1:
+        cleaned = cleaned[orphan + len("</think>") :]
+    return cleaned.lstrip()
+
+
 class OllamaAdapter:
     def __init__(self, base_url: str, model: str):
         self.base_url = base_url.rstrip("/")
@@ -150,12 +166,14 @@ class OllamaAdapter:
                     {"role": "user", "content": user},
                 ],
                 "stream": False,
+                "think": False,
                 "options": {"temperature": temperature, "num_predict": max_tokens},
             },
             timeout=180.0,
         )
         resp.raise_for_status()
-        return resp.json()["message"]["content"]
+        content = resp.json()["message"]["content"]
+        return sanitize_ollama_content(content)
 
 
 def build_llm(settings: Settings, *, provider: str | None = None, model: str | None = None) -> LLMAdapter:

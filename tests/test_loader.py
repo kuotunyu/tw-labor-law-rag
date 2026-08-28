@@ -1,8 +1,11 @@
+import io
+import zipfile
 from pathlib import Path
 
 import pytest
 
 from rag.ingestion.loader import load_corpus, load_file, load_law_json, load_markdown
+from scripts import download_corpus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SAMPLE_DIR = PROJECT_ROOT / "data" / "sample"
@@ -52,3 +55,123 @@ def test_load_file_rejects_unknown_suffix(tmp_path):
     weird.write_text("hi", encoding="utf-8")
     with pytest.raises(ValueError):
         load_file(weird)
+
+
+def make_dump_zip(xml: str | None, *, member: str = "laws.xml") -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        if xml is None:
+            zf.writestr("README.txt", "not a corpus")
+        else:
+            zf.writestr(member, xml)
+    return buffer.getvalue()
+
+
+def make_crc_corrupt_dump_zip() -> bytes:
+    xml = "<laws><法規 /></laws>"
+    corrupt_member = b"corrupt member payload"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_STORED) as zf:
+        zf.writestr("laws.xml", xml)
+        zf.writestr("corrupt.bin", corrupt_member)
+    payload = bytearray(buffer.getvalue())
+    content_start = payload.index(corrupt_member)
+    payload[content_start] ^= 1
+    return bytes(payload)
+
+
+class FakeStreamResponse:
+    def __init__(self, payload: bytes):
+        self.payload = payload
+        self.headers = {"content-length": str(len(payload))}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def iter_bytes(self, chunk_size: int):
+        yield self.payload
+
+
+def test_validate_dump_zip_accepts_law_xml(tmp_path):
+    path = tmp_path / "valid.zip"
+    path.write_bytes(
+        make_dump_zip(
+            "<法規資料><法規><法規名稱>勞動基準法</法規名稱></法規></法規資料>"
+        )
+    )
+
+    assert download_corpus.validate_dump_zip(path) == "laws.xml"
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (b"not a zip", "ZIP"),
+        (make_crc_corrupt_dump_zip(), "CRC"),
+        (make_dump_zip(None), "XML"),
+        (make_dump_zip("<法規資料></法規資料>"), "法規"),
+        (make_dump_zip("<法規資料>"), "XML"),
+        (make_dump_zip("<法規資料><法規 /></法規資料"), "XML"),
+    ],
+)
+def test_validate_dump_zip_rejects_invalid_archives(tmp_path, payload, message):
+    path = tmp_path / "invalid.zip"
+    path.write_bytes(payload)
+
+    with pytest.raises(download_corpus.CorpusArchiveError, match=message):
+        download_corpus.validate_dump_zip(path)
+
+
+def test_download_dump_skips_http_only_for_valid_cache(tmp_path, monkeypatch):
+    payload = make_dump_zip("<法規資料><法規 /></法規資料>")
+    path = tmp_path / "chlaw_acts.zip"
+    path.write_bytes(payload)
+    monkeypatch.setattr(download_corpus, "RAW_DIR", tmp_path)
+
+    def unexpected_stream(*args, **kwargs):
+        raise AssertionError("HTTP must not run for a valid cache")
+
+    monkeypatch.setattr(download_corpus.httpx, "stream", unexpected_stream)
+
+    assert download_corpus.download_dump("acts", "https://example.test") == path
+
+
+def test_download_dump_replaces_invalid_cache_with_valid_download(tmp_path, monkeypatch):
+    replacement = make_dump_zip("<法規資料><法規 /></法規資料>")
+    path = tmp_path / "chlaw_acts.zip"
+    path.write_bytes(b"invalid cache")
+    monkeypatch.setattr(download_corpus, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(
+        download_corpus.httpx,
+        "stream",
+        lambda *args, **kwargs: FakeStreamResponse(replacement),
+    )
+
+    assert download_corpus.download_dump("acts", "https://example.test") == path
+    assert path.read_bytes() == replacement
+
+
+def test_download_dump_never_overwrites_valid_cache_with_invalid_force_download(
+    tmp_path, monkeypatch
+):
+    original = make_dump_zip("<法規資料><法規 /></法規資料>")
+    path = tmp_path / "chlaw_acts.zip"
+    path.write_bytes(original)
+    monkeypatch.setattr(download_corpus, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(
+        download_corpus.httpx,
+        "stream",
+        lambda *args, **kwargs: FakeStreamResponse(b"not a zip"),
+    )
+
+    with pytest.raises(download_corpus.CorpusArchiveError):
+        download_corpus.download_dump("acts", "https://example.test", force=True)
+
+    assert path.read_bytes() == original
+    assert not (tmp_path / "chlaw_acts.part").exists()

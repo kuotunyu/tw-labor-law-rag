@@ -75,30 +75,80 @@ def normalize_name(name: str) -> str:
     return re.sub(r"[（(][^（）()]*[）)]\s*$", "", name.strip())
 
 
+class CorpusArchiveError(RuntimeError):
+    """The downloaded corpus archive is unsafe or structurally unusable."""
+
+
+def validate_dump_zip(zip_path: Path) -> str:
+    """Return the selected XML member after validating a corpus ZIP."""
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            corrupt_member = zf.testzip()
+            if corrupt_member is not None:
+                raise CorpusArchiveError(f"ZIP CRC failure: {corrupt_member}")
+            xml_members = [
+                name
+                for name in zf.namelist()
+                if name.lower().endswith(".xml") and zf.getinfo(name).file_size > 0
+            ]
+            if not xml_members:
+                raise CorpusArchiveError("ZIP contains no non-empty XML member")
+            member = max(xml_members, key=lambda name: zf.getinfo(name).file_size)
+            contains_law = False
+            try:
+                with zf.open(member) as source:
+                    for _event, elem in ET.iterparse(source, events=("end",)):
+                        if elem.tag.strip() == "法規":
+                            contains_law = True
+                        elem.clear()
+            except ET.ParseError as exc:
+                raise CorpusArchiveError(f"XML parse failure: {exc}") from exc
+            if contains_law:
+                return member
+    except CorpusArchiveError:
+        raise
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise CorpusArchiveError(f"invalid ZIP archive: {exc}") from exc
+    raise CorpusArchiveError("XML contains no 法規 element")
+
+
 def download_dump(dump_id: str, url: str, force: bool = False) -> Path:
     zip_path = RAW_DIR / f"chlaw_{dump_id}.zip"
     if zip_path.exists() and not force:
-        print(f"[skip] {dump_id} dump already downloaded: {zip_path}", flush=True)
-        return zip_path
+        try:
+            validate_dump_zip(zip_path)
+        except CorpusArchiveError as exc:
+            print(
+                f"[warn] invalid cached {dump_id} dump; re-downloading: {exc}",
+                flush=True,
+            )
+        else:
+            print(f"[skip] {dump_id} dump already downloaded: {zip_path}", flush=True)
+            return zip_path
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     print(f"[download] {dump_id}: {url}", flush=True)
     tmp_path = zip_path.with_suffix(".part")
-    with httpx.stream("GET", url, timeout=180.0, follow_redirects=True) as resp:
-        resp.raise_for_status()
-        total = int(resp.headers.get("content-length", 0))
-        done = 0
-        next_report = 0
-        with open(tmp_path, "wb") as f:
-            for chunk in resp.iter_bytes(chunk_size=1 << 20):
-                f.write(chunk)
-                done += len(chunk)
-                if done >= next_report:
-                    mb = done / (1 << 20)
-                    pct = f" ({done / total:.0%})" if total else ""
-                    print(f"  ... {mb:.0f} MB{pct}", flush=True)
-                    next_report += 20 << 20
-    tmp_path.replace(zip_path)
+    try:
+        with httpx.stream("GET", url, timeout=180.0, follow_redirects=True) as resp:
+            resp.raise_for_status()
+            total = int(resp.headers.get("content-length", 0))
+            done = 0
+            next_report = 0
+            with open(tmp_path, "wb") as f:
+                for chunk in resp.iter_bytes(chunk_size=1 << 20):
+                    f.write(chunk)
+                    done += len(chunk)
+                    if done >= next_report:
+                        mb = done / (1 << 20)
+                        pct = f" ({done / total:.0%})" if total else ""
+                        print(f"  ... {mb:.0f} MB{pct}", flush=True)
+                        next_report += 20 << 20
+        validate_dump_zip(tmp_path)
+        tmp_path.replace(zip_path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
     print(f"[ok] saved {zip_path} ({zip_path.stat().st_size / (1 << 20):.1f} MB)", flush=True)
     return zip_path
 

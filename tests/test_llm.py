@@ -5,6 +5,7 @@ the network, and we never call that here.
 
 import pytest
 
+import rag.generation.llm as llm_module
 from rag.config import Settings
 from rag.generation.llm import (
     AnthropicAdapter,
@@ -63,3 +64,70 @@ def test_build_llm_provider_override_ignores_settings_provider():
 def test_build_llm_unknown_provider_raises():
     with pytest.raises(ValueError):
         build_llm(settings_for("anthropic"), provider="bedrock")
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("正常答案", "正常答案"),
+        ("<think>private reasoning</think>\n正常答案", "正常答案"),
+        ("前言<think>unfinished reasoning", "前言"),
+        ("private reasoning</think>\n正常答案", "正常答案"),
+        ("<think>one</think><think>two</think>正常答案", "正常答案"),
+    ],
+)
+def test_sanitize_ollama_content(raw, expected):
+    assert llm_module.sanitize_ollama_content(raw) == expected
+
+
+def test_ollama_generate_disables_thinking_and_sanitizes_content(monkeypatch):
+    captured = {}
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "model": "qwen3:8b",
+                "created_at": "2026-08-28T00:00:00Z",
+                "message": {
+                    "role": "assistant",
+                    "content": "<think>private</think>\n可見答案",
+                    "thinking": "",
+                },
+                "done": True,
+            }
+
+    def fake_post(url, *, json, timeout):
+        captured.update(url=url, payload=json, timeout=timeout)
+        return Response()
+
+    monkeypatch.setattr("httpx.post", fake_post)
+    adapter = OllamaAdapter("http://localhost:11434/", "qwen3:8b")
+
+    assert adapter.generate("system", "user") == "可見答案"
+    assert captured["url"] == "http://localhost:11434/api/chat"
+    assert captured["payload"]["think"] is False
+    assert captured["payload"]["stream"] is False
+
+
+def test_ollama_generate_keeps_malformed_response_visible(monkeypatch):
+    class Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "model": "qwen3:8b",
+                "created_at": "2026-08-28T00:00:00Z",
+                "message": {},
+                "done": True,
+            }
+
+    monkeypatch.setattr("httpx.post", lambda *args, **kwargs: Response())
+
+    with pytest.raises(KeyError):
+        OllamaAdapter("http://localhost:11434", "qwen3:8b").generate(
+            "system", "user"
+        )

@@ -37,9 +37,24 @@ def test_dataset_schema(name):
 
 def test_mini_eval_composition():
     rows = load_dataset("mini_eval.jsonl")
-    assert len(rows) == 10
+    assert len(rows) == 15
     unanswerable = [r for r in rows if not r["answerable"]]
     assert len(unanswerable) == 2
+
+    additions = {
+        r["qid"]: r for r in rows if r["qid"] in {f"mini-{i}" for i in range(11, 16)}
+    }
+    assert {
+        qid: [(src["doc"], src["article"]) for src in row["sources"]]
+        for qid, row in additions.items()
+    } == {
+        "mini-11": [("勞動基準法", "第 32 條")],
+        "mini-12": [("勞動基準法", "第 36 條")],
+        "mini-13": [("勞動基準法", "第 54 條")],
+        "mini-14": [("性別平等工作法", "第 13 條")],
+        "mini-15": [("性別平等工作法", "第 32-1 條")],
+    }
+    assert all(row["answerable"] for row in additions.values())
 
 
 def test_eval_set_composition():
