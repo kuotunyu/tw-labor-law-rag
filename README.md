@@ -1,3 +1,8 @@
+---
+title: Taiwan Labor Law RAG
+sdk: docker
+app_port: 7860
+---
 # 繁體中文 Hybrid RAG 知識問答系統
 
 [English](README.en.md) ｜ [繁體中文](README.md)
@@ -25,6 +30,12 @@
 Streamlit 側邊欄的「回答模型」只顯示 API `/models` 回傳的已設定 Gemini/OpenAI；送出問題時會將選擇的 provider 一併傳給 `/query`。回應中 `requested_provider` 保留指定 provider，`provider` 與 `model` 是實際生成結果的 metadata，`fallback_used`/`fallback_from` 說明是否改走備援，`generation_called=false` 表示在檢索層已拒答。UI 會分開顯示指定與實際作答模型，並在改走備援時警示。Live provider smoke test 需要伺服器端本機 secrets，不屬公開 offline CI。
 
 `v0.1.0` 的正式指標仍是歷史結果，由 `release/manifest.json` 所列 generator 與 judge 模型產生；上述尚未發布 runtime 沒有重跑、取代或重新審計這些數值。
+
+### 公開 BYOK Docker Space（部署分支，尚未公開）
+
+公開作品集模式採 BYOK（Bring Your Own Key）：訪客選擇 Gemini `gemini-3.5-flash-lite` 或 OpenAI `gpt-5.6-luna`，並在遮罩欄位輸入自己的專用 API Key。Key 只存在目前 Streamlit 工作階段、送往同容器 loopback FastAPI 的單次內部 header，以及該次請求建立的 provider client；不寫入檔案、聊天紀錄、共用設定或跨請求快取。公開 Space 不設定站長的 `GEMINI_API_KEY`／`OPENAI_API_KEY`，也不做跨 provider fallback，因此訪客不會消耗站長的模型 token 額度。
+
+Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.pkl` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，並先在 private Space 完成 Key 隔離、log scan 與唯讀權限驗收，取得最終確認後才公開。完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
 
 ## 架構
 

@@ -1,3 +1,8 @@
+---
+title: Taiwan Labor Law RAG
+sdk: docker
+app_port: 7860
+---
 # Traditional Chinese Hybrid RAG for Taiwan Labor Law
 
 [繁體中文](README.md) | [English](README.en.md)
@@ -23,6 +28,12 @@ The primary `structure-aware / hybrid + reranker` configuration was evaluated on
 The retrieval, answerability, refusal, citation, configuration, and ablation arithmetic is recomputed by `scripts/verify_release.py`. Faithfulness and relevancy are different: their committed numeric verdicts can be re-aggregated, but the public evidence intentionally excludes complete generated answers, judge reasons, and provider responses. The underlying provider judgments therefore cannot be regenerated or independently re-judged from this repository.
 
 The 0.03 reranker gate is calibrated only against this formal 30-answerable/10-unanswerable set. It is not a universal answerability classifier. A real-use question outside the formal set, written as a long colloquial narrative with the English word “deadline,” scored 0.0146 and was directly false-refused even though the correct article remained in the candidates. This demonstrates a query-style boundary; the available evidence does not estimate its prevalence.
+
+## Public BYOK Docker Space (deployment branch, not public yet)
+
+The portfolio deployment uses BYOK (Bring Your Own Key). A visitor selects Gemini `gemini-3.5-flash-lite` or OpenAI `gpt-5.6-luna` and enters a dedicated key in a masked field. The key exists only in the current Streamlit session, one loopback request header, and one request-scoped provider client. It is never written to files, chat history, shared settings, or cross-request caches. The public Space has no owner `GEMINI_API_KEY` or `OPENAI_API_KEY` and performs no cross-provider fallback, so visitors cannot spend the owner's model-token balance.
+
+The Space receives a collection-scoped read-only Qdrant key. A temporary write/manage key is revoked immediately after the two collections are built locally. Startup scrolls payloads read-only and rebuilds the structure/fixed BM25 indexes in memory; private `data/raw/` and `storage/bm25_*.pkl` artifacts are not shipped. Defaults are 20 queries per demo session, two concurrent queries globally, and a 60-second provider timeout. The Space remains private until key-isolation, log-scan, and read-only acceptance checks pass and the owner gives the final visibility approval. See the [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md).
 
 ## Upcoming v0.3 dual-model runtime (unreleased, post-v0.2.0)
 

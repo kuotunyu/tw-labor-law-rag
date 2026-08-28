@@ -20,6 +20,9 @@ COPY ui ./ui
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app/src" \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    API_URL="http://127.0.0.1:8000"
 
-EXPOSE 8000 8501
+EXPOSE 7860
+
+CMD ["python", "scripts/run_space.py"]
