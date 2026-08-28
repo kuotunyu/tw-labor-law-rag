@@ -188,7 +188,10 @@ Replace the one-release ceiling:
   "publication": {
     "history": {
       "refs": ["heads", "tags", "remotes"],
-      "legacy_public_paths": []
+      "legacy_public_paths": [],
+      "reviewed_binary_sha256": [
+        "ee95af1a9a8b92d2e1b8521da48e0a56fcc7447982122193bcc251ef95b86ecb"
+      ]
     }
   }
 }
@@ -196,7 +199,11 @@ Replace the one-release ceiling:
 
 The manifest records the selected namespaces for documentation and verifier
 consistency. It no longer contains `max_commits`; safety comes from validating
-every selected commit, not from limiting their number.
+every selected commit, not from limiting their number. The existing
+`publication.reviewed_binaries` mapping remains the exact path-to-hash contract
+for the current tree. `history.reviewed_binary_sha256` is the append-only set of
+binary digests permitted anywhere in publishable history and must contain every
+current reviewed-binary digest.
 
 ### Release documentation
 
