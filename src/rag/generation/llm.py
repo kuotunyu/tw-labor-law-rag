@@ -99,8 +99,10 @@ def _gemini_response_is_policy_blocked(response, types) -> bool:
         types.FinishReason.BLOCKLIST,
         types.FinishReason.PROHIBITED_CONTENT,
         types.FinishReason.SPII,
+        types.FinishReason.RECITATION,
         types.FinishReason.IMAGE_SAFETY,
         types.FinishReason.IMAGE_PROHIBITED_CONTENT,
+        types.FinishReason.IMAGE_RECITATION,
     }
     prompt_feedback = getattr(response, "prompt_feedback", None)
     if prompt_feedback is not None:

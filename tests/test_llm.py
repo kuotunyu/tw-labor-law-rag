@@ -133,6 +133,14 @@ def test_openai_structured_refusal_is_policy_error(monkeypatch):
             id="candidate-safety-finish",
         ),
         pytest.param(
+            "candidate_recitation_finish_reason",
+            id="candidate-recitation-finish",
+        ),
+        pytest.param(
+            "candidate_image_recitation_finish_reason",
+            id="candidate-image-recitation-finish",
+        ),
+        pytest.param(
             "candidate_safety_rating",
             id="candidate-safety-rating",
         ),
@@ -151,6 +159,14 @@ def test_gemini_structured_safety_block_is_policy_error(monkeypatch, response):
     elif response == "candidate_finish_reason":
         provider_response = types.GenerateContentResponse(
             candidates=[types.Candidate(finish_reason=types.FinishReason.SAFETY)]
+        )
+    elif response == "candidate_recitation_finish_reason":
+        provider_response = types.GenerateContentResponse(
+            candidates=[types.Candidate(finish_reason=types.FinishReason.RECITATION)]
+        )
+    elif response == "candidate_image_recitation_finish_reason":
+        provider_response = types.GenerateContentResponse(
+            candidates=[types.Candidate(finish_reason=types.FinishReason.IMAGE_RECITATION)]
         )
     else:
         provider_response = types.GenerateContentResponse(
