@@ -23,7 +23,11 @@ from typing import Any
 
 from rag.config import Settings
 from rag.evaluation import canonical_text_sha256, compute_e2e_metrics
-from rag.reliability import PUBLIC_TRACE_FIELDS, compute_reliability_metrics
+from rag.reliability import (
+    PUBLIC_TRACE_FIELDS,
+    compute_reliability_metrics,
+    pareto_better_thresholds,
+)
 
 ABLATION_FIELDS = frozenset(
     {
@@ -910,7 +914,9 @@ def _verify_reliability_evidence(
     contract: Mapping[str, Any],
     result: Mapping[str, Any],
     trace_rows: Sequence[Mapping[str, Any]],
+    formal_trace_rows: Sequence[Mapping[str, Any]],
     *,
+    formal_dataset_rows: Sequence[Mapping[str, Any]],
     formal_dataset_sha: str,
     runtime_config: Mapping[str, Any],
     snapshot_contract: Mapping[str, Any],
@@ -1031,7 +1037,48 @@ def _verify_reliability_evidence(
         expected_stress["direct_unanswerable_coverage"],
     )
 
-    formal_metrics = result["formal_guard_metrics"]
+    formal_dataset_by_qid = {row["qid"]: row for row in formal_dataset_rows}
+    _assert_equal(
+        "reliability formal guard unique qids",
+        len(formal_dataset_by_qid),
+        len(formal_dataset_rows),
+    )
+    _assert_equal(
+        "reliability formal guard trace rows",
+        len(formal_trace_rows),
+        len(formal_dataset_rows),
+    )
+    _assert_equal(
+        "reliability formal guard trace qids",
+        {row["qid"] for row in formal_trace_rows},
+        set(formal_dataset_by_qid),
+    )
+    for row in formal_trace_rows:
+        qid = row["qid"]
+        _assert_equal(
+            f"reliability formal guard {qid} answerable",
+            row["answerable"],
+            formal_dataset_by_qid[qid]["answerable"],
+        )
+        _assert_equal(
+            f"reliability formal guard {qid} threshold decision",
+            row["threshold_refused"],
+            float(row["top_score"]) < production_threshold,
+        )
+    try:
+        formal_metrics = compute_reliability_metrics(
+            formal_trace_rows,
+            contract["threshold_candidates"],
+        )
+    except ValueError as exc:
+        raise ReleaseVerificationError(
+            f"invalid reliability formal guard trace: {exc}"
+        ) from exc
+    _compare_tree(
+        "reliability formal guard metrics",
+        formal_metrics,
+        result["formal_guard_metrics"],
+    )
     expected_formal = contract["formal_guard"]
     _assert_close(
         "reliability formal hit@5", formal_metrics["hit_at_5"], expected_formal["hit_at_5"]
@@ -1052,12 +1099,22 @@ def _verify_reliability_evidence(
         formal_production["direct_unanswerable_coverage"],
         expected_formal["direct_unanswerable_coverage"],
     )
+    try:
+        pareto_candidates = pareto_better_thresholds(
+            metrics,
+            formal_metrics,
+            production=production_threshold,
+        )
+    except ValueError as exc:
+        raise ReleaseVerificationError(f"invalid reliability decision: {exc}") from exc
+    outcome = "retain_0.03" if not pareto_candidates else "manual_review_required"
+    _assert_equal("reliability decision contract", contract["decision"], outcome)
     _assert_equal(
         "reliability decision",
         result["decision"],
         {
-            "pareto_better_candidates": [],
-            "outcome": contract["decision"],
+            "pareto_better_candidates": pareto_candidates,
+            "outcome": outcome,
             "automatic_config_change": False,
         },
     )
@@ -1178,6 +1235,9 @@ def verify_release(project_root: Path) -> dict[str, Any]:
     ablation_rows = _read_jsonl(ablation_path)
     e2e_rows = _read_jsonl(e2e_path)
     reliability_rows = _read_jsonl(root / reliability_contract["trace_path"])
+    reliability_formal_rows = _read_jsonl(
+        root / reliability_contract["formal_trace_path"]
+    )
     trace_issues = scan_trace_rows(
         ablation_rows, "ablation", "eval/official/ablation_trace.jsonl"
     ) + scan_trace_rows(
@@ -1186,6 +1246,10 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         reliability_rows,
         "reliability",
         reliability_contract["trace_path"],
+    ) + scan_trace_rows(
+        reliability_formal_rows,
+        "reliability",
+        reliability_contract["formal_trace_path"],
     )
     if trace_issues:
         raise ReleaseVerificationError(f"official trace privacy/schema issues: {trace_issues}")
@@ -1241,6 +1305,8 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         reliability_contract,
         reliability_result,
         reliability_rows,
+        reliability_formal_rows,
+        formal_dataset_rows=dataset,
         formal_dataset_sha=dataset_sha,
         runtime_config=runtime_config,
         snapshot_contract=manifest["source_data"]["full_snapshot"],

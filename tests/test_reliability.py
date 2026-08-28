@@ -1,6 +1,10 @@
 import pytest
 
-from rag.reliability import compute_reliability_metrics, privacy_reduced_trace
+from rag.reliability import (
+    compute_reliability_metrics,
+    pareto_better_thresholds,
+    privacy_reduced_trace,
+)
 
 
 def trace(qid, answerable, *, rank, score, elapsed_ms=10.0):
@@ -70,3 +74,30 @@ def test_privacy_reduced_trace_has_exact_public_fields():
 def test_reliability_metrics_fail_closed_on_invalid_input(rows, thresholds, message):
     with pytest.raises(ValueError, match=message):
         compute_reliability_metrics(rows, thresholds)
+
+
+def test_pareto_decision_is_recomputed_from_both_sweeps() -> None:
+    stress = compute_reliability_metrics(
+        [
+            trace("a", True, rank=1, score=0.05),
+            trace("u", False, rank=None, score=0.035),
+        ],
+        [0.0, 0.03, 0.04],
+    )
+    formal = compute_reliability_metrics(
+        [
+            trace("a", True, rank=1, score=0.05),
+            trace("u", False, rank=None, score=0.035),
+        ],
+        [0.0, 0.03, 0.04],
+    )
+
+    assert pareto_better_thresholds(stress, formal, production=0.03) == [0.04]
+
+
+def test_pareto_decision_rejects_mismatched_threshold_sweeps() -> None:
+    stress = {"threshold_sweep": {"0.03": {}, "0.04": {}}}
+    formal = {"threshold_sweep": {"0.03": {}}}
+
+    with pytest.raises(ValueError, match="same thresholds"):
+        pareto_better_thresholds(stress, formal, production=0.03)

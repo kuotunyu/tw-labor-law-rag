@@ -24,11 +24,11 @@ The 40-row end-to-end trace permits exactly:
 
 Nested `judge` objects permit only `faithfulness` and `relevancy`. Nested citations permit only `doc` and `article`. Unknown fields fail closed.
 
-The 60-row reliability trace permits exactly:
+The 60-row stress trace and 40-row formal-guard reliability trace each permit exactly:
 
 `qid`, `answerable`, `rank`, `top_score`, `threshold_refused`, `elapsed_ms`.
 
-The provider cross-check is currently `pending_credentials`, so neither of its official result/trace files may exist. If credentials are supplied later, only the reducer's content-free allowlist may be exported after both providers complete the initial safety batch; the release contract must then be deliberately revised and re-verified rather than silently replacing the pending state.
+The provider cross-check is currently `pending_credentials`, so neither of its official result/trace files may exist. If credentials are supplied later, only the reducer's content-free allowlist may be exported after both providers complete the initial safety batch; raw output must remain inside ignored `eval/runs/`, and the release contract must then be deliberately revised and re-verified rather than silently replacing the pending state.
 
 The official result files also record the model identifiers needed to interpret historical evidence. Model identifiers such as `openai/gpt-5.1` are evaluation provenance; request IDs, headers, endpoints, token usage, credentials, or provider response payloads are not retained.
 

@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 import math
+import time
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
+
+from rag.provider_budget import BudgetLedger
+
+AUTHORIZED_MAX_INPUT_TOKENS = 20_000
+AUTHORIZED_MAX_OUTPUT_TOKENS = 1_024
+MESSAGE_ENVELOPE_TOKEN_ALLOWANCE = 1_024
 
 PUBLIC_PROVIDER_TRACE_FIELDS = (
     "qid",
@@ -23,6 +31,102 @@ PUBLIC_PROVIDER_TRACE_FIELDS = (
     "citation_verdict",
     "elapsed_ms",
 )
+
+
+class BudgetSafetyError(RuntimeError):
+    """Sanitized stop signal for preflight or post-response budget violations."""
+
+    def __init__(self, reason_code: str) -> None:
+        self.reason_code = reason_code
+        super().__init__(reason_code)
+
+
+def validate_request_maxima(
+    max_input_tokens: object,
+    max_output_tokens: object,
+) -> tuple[int, int]:
+    """Keep every request inside the reviewed pricing/context envelope."""
+    for value, label, authorized in (
+        (max_input_tokens, "input", AUTHORIZED_MAX_INPUT_TOKENS),
+        (max_output_tokens, "output", AUTHORIZED_MAX_OUTPUT_TOKENS),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{label} maximum must be a positive integer")
+        if value > authorized:
+            raise ValueError(f"{label} maximum exceeds the authorized {label} maximum")
+    return max_input_tokens, max_output_tokens
+
+
+def conservative_input_token_bound(*texts: str) -> int:
+    """Bound chat input by UTF-8 bytes plus a large message-envelope allowance."""
+    if not texts or any(not isinstance(text, str) for text in texts):
+        raise ValueError("prompt texts must be strings")
+    return (
+        sum(len(text.encode("utf-8")) for text in texts)
+        + MESSAGE_ENVELOPE_TOKEN_ALLOWANCE
+    )
+
+
+def generate_with_budget(
+    adapter: Any,
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    ledger: BudgetLedger,
+    max_input_tokens: int,
+    max_output_tokens: int,
+) -> tuple[Any, Decimal, float]:
+    """Preflight the complete prompt before making exactly one paid request."""
+    input_maximum, output_maximum = validate_request_maxima(
+        max_input_tokens,
+        max_output_tokens,
+    )
+    prompt_bound = conservative_input_token_bound(system_prompt, user_prompt)
+    if prompt_bound > input_maximum:
+        raise BudgetSafetyError("prompt_exceeds_conservative_maximum")
+    if not ledger.can_start(
+        max_input_tokens=prompt_bound,
+        max_output_tokens=output_maximum,
+    ):
+        raise BudgetSafetyError("conservative_budget_preflight")
+
+    started = time.perf_counter()
+    generation = adapter.generate(
+        system_prompt,
+        user_prompt,
+        temperature=0.0,
+        max_tokens=output_maximum,
+    )
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    if generation.input_tokens is None or generation.output_tokens is None:
+        raise BudgetSafetyError("missing_usage_metadata")
+    if (
+        generation.input_tokens > prompt_bound
+        or generation.output_tokens > output_maximum
+    ):
+        raise BudgetSafetyError("usage_exceeded_conservative_maximum")
+    charge = ledger.record_usage(
+        input_tokens=generation.input_tokens,
+        output_tokens=generation.output_tokens,
+    )
+    return generation, charge, elapsed_ms
+
+
+def resolve_private_run_dir(
+    requested: Path | None,
+    runs_root: Path,
+    default_name: str,
+) -> Path:
+    """Resolve a raw-output directory strictly below the ignored runs root."""
+    root = runs_root.resolve()
+    candidate = (requested if requested is not None else root / default_name).resolve()
+    try:
+        relative = candidate.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("work directory must remain inside eval/runs") from exc
+    if not relative.parts:
+        raise ValueError("work directory must be a child directory inside eval/runs")
+    return candidate
 
 
 def select_crosscheck_rows(

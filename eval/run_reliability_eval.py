@@ -27,6 +27,7 @@ from rag.ingestion.chunkers import get_chunker  # noqa: E402
 from rag.ingestion.loader import load_corpus  # noqa: E402
 from rag.reliability import (  # noqa: E402
     compute_reliability_metrics,
+    pareto_better_thresholds,
     privacy_reduced_trace,
 )
 from rag.retrieval.reranker import Reranker  # noqa: E402
@@ -178,35 +179,6 @@ def _run_rows(pipeline, dataset_rows: list[dict]) -> list[dict]:
     return traces
 
 
-def _pareto_candidates(stress: dict, formal: dict, production: float) -> list[float]:
-    production_key = str(production)
-    baseline_stress = stress["threshold_sweep"][production_key]
-    baseline_formal = formal["threshold_sweep"][production_key]
-    candidates = []
-    for threshold in THRESHOLDS:
-        if threshold == production:
-            continue
-        key = str(threshold)
-        candidate_stress = stress["threshold_sweep"][key]
-        candidate_formal = formal["threshold_sweep"][key]
-        no_worse = (
-            candidate_stress["direct_false_refusal_rate"]
-            <= baseline_stress["direct_false_refusal_rate"]
-            and candidate_stress["direct_unanswerable_coverage"]
-            >= baseline_stress["direct_unanswerable_coverage"]
-            and candidate_formal["direct_false_refusal_rate"]
-            <= baseline_formal["direct_false_refusal_rate"]
-            and candidate_formal["direct_unanswerable_coverage"]
-            >= baseline_formal["direct_unanswerable_coverage"]
-        )
-        strictly_better = (
-            candidate_stress != baseline_stress or candidate_formal != baseline_formal
-        )
-        if no_worse and strictly_better:
-            candidates.append(threshold)
-    return candidates
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, default=DEFAULT_STRESS_DATASET)
@@ -266,7 +238,11 @@ def main() -> int:
         public_trace = [
             privacy_reduced_trace(row, threshold=production_threshold) for row in stress_raw
         ]
-        candidates = _pareto_candidates(stress_metrics, formal_metrics, production_threshold)
+        candidates = pareto_better_thresholds(
+            stress_metrics,
+            formal_metrics,
+            production=production_threshold,
+        )
         results = {
             "schema_version": "1.0",
             "run_date": date.today().isoformat(),
@@ -309,6 +285,13 @@ def main() -> int:
         if args.export_official:
             _write_json(OFFICIAL_DIR / "reliability_results.json", results)
             _write_jsonl(OFFICIAL_DIR / "reliability_trace.jsonl", public_trace)
+            _write_jsonl(
+                OFFICIAL_DIR / "reliability_formal_trace.jsonl",
+                [
+                    privacy_reduced_trace(row, threshold=production_threshold)
+                    for row in formal_raw
+                ],
+            )
         print(json.dumps(results, ensure_ascii=False, indent=2), flush=True)
         print(f"[done] raw artifacts: {run_dir}", flush=True)
     finally:

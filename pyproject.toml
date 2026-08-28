@@ -17,9 +17,9 @@ dependencies = [
     "numpy>=1.26",
     "torch>=2.6",
     "flagembedding>=1.3.4",
-    # FlagEmbedding's reranker code path breaks under transformers 5.x
-    # (XLMRobertaTokenizer loses `prepare_for_model`); pin to the 4.x line.
-    "transformers>=4.44.2,<5.0",
+    # >=5.5 fixes model-config RCE advisories. FlagEmbedding 1.4 still calls the
+    # removed tokenizer API; rag.retrieval.reranker supplies a narrow shim.
+    "transformers>=5.5.0,<6.0",
     "qdrant-client>=1.12",
     "pypdf>=6.15.0",
     "defusedxml>=0.7.1",

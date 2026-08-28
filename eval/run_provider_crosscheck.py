@@ -12,7 +12,6 @@ import argparse
 import hashlib
 import json
 import sys
-import time
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -43,9 +42,13 @@ from rag.generation.prompts import (  # noqa: E402
 )
 from rag.provider_budget import BudgetLedger  # noqa: E402
 from rag.provider_crosscheck import (  # noqa: E402
+    BudgetSafetyError,
     compute_provider_metrics,
+    generate_with_budget,
     privacy_reduced_provider_trace,
+    resolve_private_run_dir,
     select_crosscheck_rows,
+    validate_request_maxima,
 )
 from rag.retrieval.reranker import Reranker  # noqa: E402
 
@@ -166,6 +169,10 @@ def main() -> int:
     parser.add_argument("--export-official", action="store_true")
     args = parser.parse_args()
 
+    max_input_tokens, max_output_tokens = validate_request_maxima(
+        args.max_input_tokens,
+        args.max_output_tokens,
+    )
     credentials = _credential_settings(args.env_file)
     caps = {
         "gemini": args.gemini_cap_usd,
@@ -182,8 +189,8 @@ def main() -> int:
     }
     for ledger in ledgers.values():
         ledger.can_start(
-            max_input_tokens=args.max_input_tokens,
-            max_output_tokens=args.max_output_tokens,
+            max_input_tokens=max_input_tokens,
+            max_output_tokens=max_output_tokens,
         )
 
     dataset = lib.load_dataset(args.dataset)
@@ -196,10 +203,11 @@ def main() -> int:
     )
     selected = [*initial, *expansion]
 
-    run_dir = (
-        args.work_dir
-        or RUNS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}-provider-crosscheck"
-    ).resolve()
+    run_dir = resolve_private_run_dir(
+        args.work_dir,
+        RUNS_DIR,
+        f"{datetime.now():%Y%m%d-%H%M%S}-provider-crosscheck",
+    )
     if run_dir.exists() and any(run_dir.iterdir()):
         raise FileExistsError(f"work directory must be absent or empty: {run_dir}")
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -268,24 +276,25 @@ def main() -> int:
                     continue
                 ledger = ledgers[provider]
                 for row in rows:
-                    if not ledger.can_start(
-                        max_input_tokens=args.max_input_tokens,
-                        max_output_tokens=args.max_output_tokens,
-                    ):
+                    retrieval = retrieval_by_qid[row["qid"]]
+                    try:
+                        generation, charge, elapsed_ms = generate_with_budget(
+                            adapter,
+                            system_prompt=SYSTEM_PROMPT,
+                            user_prompt=build_user_prompt(
+                                row["question"],
+                                retrieval.hits,
+                            ),
+                            ledger=ledger,
+                            max_input_tokens=max_input_tokens,
+                            max_output_tokens=max_output_tokens,
+                        )
+                    except BudgetSafetyError as exc:
                         statuses[provider] = {
                             "status": "stopped",
-                            "reason": "conservative_budget_preflight",
+                            "reason": exc.reason_code,
                         }
                         break
-                    retrieval = retrieval_by_qid[row["qid"]]
-                    started = time.perf_counter()
-                    try:
-                        generation = adapter.generate(
-                            SYSTEM_PROMPT,
-                            build_user_prompt(row["question"], retrieval.hits),
-                            temperature=0.0,
-                            max_tokens=args.max_output_tokens,
-                        )
                     except ProviderPolicyError:
                         statuses[provider] = {
                             "status": "stopped",
@@ -298,29 +307,6 @@ def main() -> int:
                             "reason": exc.reason_code,
                         }
                         break
-                    elapsed_ms = (time.perf_counter() - started) * 1000
-                    if (
-                        generation.input_tokens is None
-                        or generation.output_tokens is None
-                    ):
-                        statuses[provider] = {
-                            "status": "stopped",
-                            "reason": "missing_usage_metadata",
-                        }
-                        break
-                    if (
-                        generation.input_tokens > args.max_input_tokens
-                        or generation.output_tokens > args.max_output_tokens
-                    ):
-                        statuses[provider] = {
-                            "status": "stopped",
-                            "reason": "usage_exceeded_conservative_maximum",
-                        }
-                        break
-                    charge = ledger.record_usage(
-                        input_tokens=generation.input_tokens,
-                        output_tokens=generation.output_tokens,
-                    )
                     raw = _raw_result(
                         row=row,
                         provider=provider,
@@ -375,8 +361,8 @@ def main() -> int:
             },
             "authorization": {
                 "per_provider_cap_usd": AUTHORIZED_CAP_USD,
-                "max_input_tokens_per_request": args.max_input_tokens,
-                "max_output_tokens_per_request": args.max_output_tokens,
+                "max_input_tokens_per_request": max_input_tokens,
+                "max_output_tokens_per_request": max_output_tokens,
             },
             "pricing": {
                 provider: {

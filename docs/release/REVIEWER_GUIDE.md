@@ -49,6 +49,7 @@ The release verifier should exit zero and report:
 - publication inventory: exact match to `release/public-files.txt`, empty `tracked_excluded`, 0 unexpected archive files, and only manifest-reviewed binary hashes
 - public Git history: all commits reachable from heads/tags/ordinary remotes pass identity and historical path/content/binary scanning; ephemeral `refs/remotes/pull/*` merge refs and local `refs/archive/*` recovery refs are excluded
 - locked Ruff dependency and CI lint/tag gates: verified
+- dependency audit: no known PyPI vulnerabilities; custom CUDA `torch` wheel is reported separately because it is not present on PyPI
 - official trace issues: 0
 - public scan issues: 0
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 import tempfile
 from collections.abc import Callable, Sequence
 from datetime import date
@@ -97,14 +98,7 @@ def _write_snapshot(path: Path, snapshot: dict) -> None:
     temporary.replace(path)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--write", type=Path, metavar="PATH")
-    mode.add_argument("--check", type=Path, metavar="PATH", default=DEFAULT_SNAPSHOT)
-    parser.add_argument("--snapshot-date", default=date.today().isoformat())
-    args = parser.parse_args(argv)
-
+def _run(args: argparse.Namespace) -> int:
     live = build_live_snapshot(snapshot_date=args.snapshot_date)
     if args.write is not None:
         target = _resolve_project_path(args.write)
@@ -125,6 +119,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     print(json.dumps({"status": "current", "changes": []}, ensure_ascii=False, indent=2))
     return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--write", type=Path, metavar="PATH")
+    mode.add_argument("--check", type=Path, metavar="PATH", default=DEFAULT_SNAPSHOT)
+    parser.add_argument("--snapshot-date", default=date.today().isoformat())
+    args = parser.parse_args(argv)
+
+    try:
+        return _run(args)
+    except (httpx.HTTPError, OSError, ValueError, KeyError) as exc:
+        print(
+            json.dumps(
+                {"status": "invalid_source", "error_type": type(exc).__name__}
+            ),
+            file=sys.stderr,
+        )
+        return 2
 
 
 if __name__ == "__main__":

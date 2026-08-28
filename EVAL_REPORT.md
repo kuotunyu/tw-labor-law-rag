@@ -51,7 +51,7 @@
 
 門檻 sweep 為 0、0.005、0.01、0.02、0.03、0.04、0.05、0.1。沒有候選能在 stress 與 formal guard 的直接誤拒率及不可答攔截率上同時全面不劣、且至少改善一項，因此結果是 `retain_0.03`，沒有自動改 production config。壓力集的 1/40 直接誤拒確認舊有口語問法風險是真實邊界，但 60 題仍不足以估計自然流量發生率。
 
-Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 的執行器使用 Decimal 成本、每次呼叫前的保守 token 上限與每家 US$5 硬帽；缺失或負 token usage、非正價格、超過授權額度與未知 maxima 都會停止。本機沒有本專案專用 provider 金鑰，因此正式 cross-check 狀態為 `pending_credentials`；沒有使用其他專案 `.env`，也沒有產生可誤認為真實呼叫的 placeholder 結果。
+Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 的執行器使用 Decimal 成本、每家 US$5 硬帽，並在每次呼叫前對實際 system + user prompt 做 UTF-8 byte 保守 token 上界；request maxima 固定不超過 20,000 input／1,024 output tokens。缺失或負 token usage、非正價格、prompt／usage 超界、逃出 ignored `eval/runs/` 的 raw run 路徑與未知 maxima 都會在 fail-closed 路徑停止。本機沒有本專案專用 provider 金鑰，因此正式 cross-check 狀態為 `pending_credentials`；沒有使用其他專案 `.env`，也沒有產生可誤認為真實呼叫的 placeholder 結果。
 
 ### 發現 1:每一級管線都有量化貢獻
 

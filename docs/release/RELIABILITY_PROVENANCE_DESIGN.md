@@ -123,12 +123,13 @@ For this authorized run, caps are `gemini=5.00` and `openai=5.00` US dollars.
 
 The wrapper:
 
-- limits question count and output tokens before the first request;
+- validates fixed maxima of at most 20,000 input and 1,024 output tokens before the first request;
+- bounds the actual system + user prompt conservatively from UTF-8 bytes plus a 1,024-token message envelope before every request;
 - records provider/model, request count, input/output token usage when returned, estimated
   cost, and remaining cap;
 - stops before the next request when its conservative maximum could exceed the cap;
 - never prints or persists API keys;
-- keeps raw answers and judge reasons in ignored `eval/runs/`;
+- keeps raw answers and judge reasons strictly beneath ignored `eval/runs/`; an arbitrary output path outside it is rejected before provider I/O;
 - exports only aggregate and privacy-reduced verdict evidence.
 
 If credentials are not available, all offline work still completes and the provider phase is
