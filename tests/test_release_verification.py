@@ -335,6 +335,21 @@ def test_parse_git_archive_rejects_duplicate_paths():
         release_module()._parse_git_archive(payload, commit="d" * 40)
 
 
+def test_parse_git_archive_rejects_duplicate_directory_paths():
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w") as archive:
+        for _ in range(2):
+            info = tarfile.TarInfo(name="docs/")
+            info.type = tarfile.DIRTYPE
+            archive.addfile(info)
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="duplicate Git archive path",
+    ):
+        release_module()._parse_git_archive(buffer.getvalue(), commit="e" * 40)
+
+
 def test_git_archive_entries_read_committed_tree(tmp_path):
     init_public_repo(tmp_path)
     commit = commit_file(tmp_path, "docs/README.md", b"public", "public")

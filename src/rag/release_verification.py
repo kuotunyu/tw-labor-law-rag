@@ -443,23 +443,23 @@ def _parse_git_archive(data: bytes, *, commit: str) -> list[PublicEntry]:
                     raise ReleaseVerificationError(
                         f"unsafe Git archive path in commit {commit}"
                     )
+                if candidate in seen:
+                    raise ReleaseVerificationError(
+                        f"duplicate Git archive path in commit {commit}: {candidate}"
+                    )
+                seen.add(candidate)
                 if member.isdir():
                     continue
                 if not member.isfile():
                     raise ReleaseVerificationError(
                         f"unsupported Git archive entry in commit {commit}: {raw}"
                     )
-                if raw in seen:
-                    raise ReleaseVerificationError(
-                        f"duplicate Git archive path in commit {commit}: {raw}"
-                    )
                 handle = archive.extractfile(member)
                 if handle is None:
                     raise ReleaseVerificationError(
                         f"unreadable Git archive entry in commit {commit}: {raw}"
                     )
-                seen.add(raw)
-                entries.append(PublicEntry(path=raw, data=handle.read()))
+                entries.append(PublicEntry(path=candidate, data=handle.read()))
     except (tarfile.TarError, OSError) as exc:
         raise ReleaseVerificationError(
             f"failed to parse Git archive for commit {commit}"
