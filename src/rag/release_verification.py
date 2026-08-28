@@ -591,7 +591,19 @@ def _verify_ci_publication_contract(workflow_path: Path) -> dict[str, Any]:
         raise ReleaseVerificationError('CI tag trigger is not tags: ["v*"]')
     if not re.search(r"(?m)^\s+pull_request:\s*$", workflow):
         raise ReleaseVerificationError("CI pull_request trigger is missing")
-    return {"lint": True, "tag_trigger": "v*"}
+    checkout_with_full_history = re.search(
+        r"(?m)^[ \t]+- uses: actions/checkout@[0-9a-fA-F]{40}[^\n]*\n"
+        r"[ \t]+with:\n(?:[ \t]+[^\n]*\n)*?"
+        r"[ \t]+fetch-depth:\s*0[ \t]*$",
+        workflow,
+    )
+    if checkout_with_full_history is None:
+        raise ReleaseVerificationError("CI checkout does not fetch full Git history")
+    return {
+        "lint": True,
+        "tag_trigger": "v*",
+        "full_history_checkout": True,
+    }
 
 
 def _is_generated_source_archive_file(relative_path: str) -> bool:

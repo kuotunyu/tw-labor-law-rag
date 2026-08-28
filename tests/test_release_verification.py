@@ -182,6 +182,7 @@ def test_release_verifier_recomputes_committed_evidence():
         "all_pinned": True,
         "lint": True,
         "tag_trigger": "v*",
+        "full_history_checkout": True,
     }
     assert report["tooling"]["ruff"]
     expected_tracking = (
@@ -272,6 +273,23 @@ def test_ruff_is_locked_and_ci_enforces_publication_gates():
     assert re.search(r"(?m)^\s+branches:\s*\[main\]\s*$", workflow)
     assert re.search(r'(?m)^\s+tags:\s*\["v\*"\]\s*$', workflow)
     assert re.search(r"(?m)^\s+pull_request:\s*$", workflow)
+
+
+def test_ci_contract_rejects_shallow_history_checkout(tmp_path):
+    workflow = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    workflow_path = tmp_path / "ci.yml"
+    workflow_path.write_text(
+        workflow.replace("          fetch-depth: 0\n", ""),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="full Git history",
+    ):
+        release_module()._verify_ci_publication_contract(workflow_path)
 
 
 def test_readme_first_screen_links_english_and_ci():
