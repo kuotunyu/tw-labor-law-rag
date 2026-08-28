@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml uv.lock* ./
 # Not installed as a package (see pyproject.toml [tool.uv] package = false);
 # src/ is put on PYTHONPATH instead, same as local dev.
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-cache
 
 COPY src ./src
 COPY scripts ./scripts

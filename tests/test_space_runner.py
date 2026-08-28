@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -140,3 +141,9 @@ def test_space_commands_bind_only_streamlit_to_public_port():
         "--server.headless",
         "true",
     ]
+
+
+def test_docker_build_does_not_retain_uv_download_cache():
+    dockerfile = (Path(__file__).parents[1] / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "uv sync --frozen --no-dev --no-cache" in dockerfile
