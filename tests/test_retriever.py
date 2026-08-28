@@ -1,7 +1,8 @@
 import pytest
 
+from rag.config import Settings
 from rag.models import RetrievedChunk
-from rag.retrieval.retriever import HybridRetriever, build_retriever
+from rag.retrieval.retriever import HybridRetriever, bm25_path_for, build_retriever
 
 
 def hit(chunk_id, score=1.0):
@@ -26,6 +27,12 @@ def test_hybrid_fuses_vector_and_bm25():
     fused = hybrid.retrieve("query", top_k=10)
     assert fused[0].payload["chunk_id"] == "b"  # ranked in both lists
     assert {h.payload["chunk_id"] for h in fused} == {"a", "b", "c", "d"}
+
+
+def test_bm25_artifact_uses_safe_json_extension(tmp_path):
+    settings = Settings(_env_file=None, storage_dir=tmp_path)
+
+    assert bm25_path_for(settings, "structure") == tmp_path / "bm25_structure.json"
 
 
 def test_hybrid_respects_top_k():

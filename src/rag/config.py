@@ -18,6 +18,8 @@ DEFAULT_GENERATION_MODELS = {
     "ollama": "qwen3:8b",
 }
 PUBLIC_LLM_PROVIDERS = ("gemini", "openai")
+DEFAULT_EMBEDDING_MODEL_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
+DEFAULT_RERANKER_MODEL_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
 DEFAULT_JUDGE_MODELS = {
     "anthropic": "claude-haiku-4-5-20251001",
     "openai": "gpt-5-mini",
@@ -48,7 +50,9 @@ class Settings(BaseSettings):
 
     # ── Embedding / Reranker ─────────────────────────
     embedding_model: str = "BAAI/bge-m3"
+    embedding_model_revision: str = DEFAULT_EMBEDDING_MODEL_REVISION
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
+    reranker_model_revision: str = DEFAULT_RERANKER_MODEL_REVISION
     device: str = "auto"  # auto | cuda | cpu
 
     # ── Qdrant ───────────────────────────────────────
@@ -64,6 +68,7 @@ class Settings(BaseSettings):
     session_signing_secret: SecretStr = SecretStr("")
     byok_session_query_limit: int = Field(default=20, ge=1, le=1000)
     byok_session_ttl_seconds: int = Field(default=86400, ge=60, le=604800)
+    byok_max_tracked_sessions: int = Field(default=1000, ge=1, le=100000)
     byok_max_concurrency: int = Field(default=2, ge=1, le=32)
     byok_request_timeout_seconds: float = Field(default=60.0, gt=0, le=300)
     byok_max_question_chars: int = Field(default=2000, ge=1, le=10000)

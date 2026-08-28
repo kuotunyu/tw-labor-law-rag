@@ -254,15 +254,21 @@ def test_ruff_is_locked_and_ci_enforces_publication_gates():
     )
 
     dev_requirements = project["dependency-groups"]["dev"]
-    assert any(re.match(r"^ruff(?:\W|$)", requirement) for requirement in dev_requirements)
-    assert any(
-        package["name"] == "ruff" and package.get("version")
-        for package in lock["package"]
-    )
+    for tool in ("bandit", "pip-audit", "ruff"):
+        assert any(
+            re.match(rf"^{re.escape(tool)}(?:\W|$)", requirement)
+            for requirement in dev_requirements
+        )
+        assert any(
+            package["name"] == tool and package.get("version")
+            for package in lock["package"]
+        )
     required_commands = [
         "uv lock --check",
         "uv sync --locked",
         "uv run ruff check .",
+        "uv run bandit -r src scripts -ll",
+        "uv run pip-audit --local",
         "uv run python scripts/verify_release.py",
         "uv run pytest",
         "uv build",

@@ -19,12 +19,13 @@ import argparse
 import json
 import re
 import sys
-import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 from typing import Iterator
 
 import httpx
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 # Windows consoles default to a locale code page (e.g. cp950); force UTF-8 output.
 sys.stdout.reconfigure(encoding="utf-8")
@@ -101,6 +102,8 @@ def validate_dump_zip(zip_path: Path) -> str:
                         if elem.tag.strip() == "法規":
                             contains_law = True
                         elem.clear()
+            except DefusedXmlException as exc:
+                raise CorpusArchiveError(f"unsafe XML: {exc}") from exc
             except ET.ParseError as exc:
                 raise CorpusArchiveError(f"XML parse failure: {exc}") from exc
             if contains_law:

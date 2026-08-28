@@ -699,6 +699,27 @@ def test_session_endpoint_issues_token_only_in_byok_mode(monkeypatch):
     assert exc_info.value.detail == "byok_not_enabled"
 
 
+def test_session_endpoint_maps_capacity_to_429(monkeypatch):
+    settings = byok_settings(byok_max_tracked_sessions=1)
+    manager = ByokSessionManager(
+        secret="session-secret",
+        query_limit=20,
+        ttl_seconds=60,
+        max_tracked_sessions=1,
+        clock=lambda: 1_000.0,
+        token_factory=lambda: "fixed-session",
+    )
+    monkeypatch.setattr(api_main.state, "settings", settings, raising=False)
+    monkeypatch.setattr(api_main.state, "byok_sessions", manager, raising=False)
+    api_main.create_session()
+
+    with pytest.raises(HTTPException) as exc_info:
+        api_main.create_session()
+
+    assert exc_info.value.status_code == 429
+    assert exc_info.value.detail == "session_capacity_exceeded"
+
+
 def test_configure_runtime_builds_each_bm25_index_once_from_qdrant():
     payloads = {
         "labor_laws_structure": [

@@ -1,7 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from rag.config import DEFAULT_GENERATION_MODELS, PUBLIC_LLM_PROVIDERS, Settings
+from rag.config import (
+    DEFAULT_EMBEDDING_MODEL_REVISION,
+    DEFAULT_GENERATION_MODELS,
+    DEFAULT_RERANKER_MODEL_REVISION,
+    PUBLIC_LLM_PROVIDERS,
+    Settings,
+)
 
 
 def test_defaults():
@@ -12,6 +18,8 @@ def test_defaults():
     assert s.llm_temperature == 0.0
     assert s.top_k_retrieve == 20
     assert s.top_k_final == 5
+    assert s.embedding_model_revision == DEFAULT_EMBEDDING_MODEL_REVISION
+    assert s.reranker_model_revision == DEFAULT_RERANKER_MODEL_REVISION
 
 
 def test_env_override(monkeypatch):
@@ -82,6 +90,7 @@ def test_public_byok_settings_are_explicit_and_bounded():
     assert settings.session_signing_secret.get_secret_value() == "session-secret"
     assert settings.byok_session_query_limit == 20
     assert settings.byok_session_ttl_seconds == 86400
+    assert settings.byok_max_tracked_sessions == 1000
     assert settings.byok_max_concurrency == 2
     assert settings.byok_request_timeout_seconds == 60.0
     assert settings.byok_max_question_chars == 2000
@@ -92,6 +101,7 @@ def test_public_byok_settings_are_explicit_and_bounded():
     [
         ("byok_session_query_limit", 0),
         ("byok_session_ttl_seconds", 0),
+        ("byok_max_tracked_sessions", 0),
         ("byok_max_concurrency", 0),
         ("byok_request_timeout_seconds", 0),
         ("byok_max_question_chars", 0),

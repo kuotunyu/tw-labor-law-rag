@@ -7,6 +7,7 @@ from rag.api.byok import (
     ByokSessionManager,
     DemoBusy,
     InvalidDemoSession,
+    SessionCapacityExceeded,
     SessionQuotaExceeded,
 )
 
@@ -82,6 +83,28 @@ def test_invalid_session_errors_do_not_retain_token_text():
 
     assert secret_token not in str(exc_info.value)
     assert secret_token not in repr(exc_info.value)
+
+
+def test_session_capacity_recovers_after_expired_state_is_cleaned():
+    now = [1_000.0]
+    session_ids = iter(["first-session", "replacement-session"])
+    manager = ByokSessionManager(
+        secret="session-secret",
+        query_limit=20,
+        ttl_seconds=60,
+        max_tracked_sessions=1,
+        clock=lambda: now[0],
+        token_factory=lambda: next(session_ids),
+    )
+    manager.issue()
+
+    with pytest.raises(SessionCapacityExceeded):
+        manager.issue()
+
+    now[0] = 1_061.0
+    replacement = manager.issue()
+    assert replacement.startswith("replacement-session.")
+    assert manager.tracked_sessions == 1
 
 
 def test_concurrency_gate_rejects_instead_of_queueing():
