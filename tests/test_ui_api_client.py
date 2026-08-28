@@ -4,8 +4,10 @@ import httpx
 import pytest
 
 from ui.api_client import (
+    ApiRequestError,
     actual_generation_metadata,
     fetch_models,
+    fetch_session,
     requested_provider_for_display,
     submit_query,
 )
@@ -24,6 +26,8 @@ def test_fetch_models_returns_discovery_payload():
                     {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
                     {"provider": "openai", "model": "gpt-5.6-luna"},
                 ],
+                "requires_api_key": True,
+                "session_query_limit": 20,
             },
         )
 
@@ -31,6 +35,8 @@ def test_fetch_models_returns_discovery_payload():
 
     assert payload["default_provider"] == "gemini"
     assert [item["provider"] for item in payload["providers"]] == ["gemini", "openai"]
+    assert payload["requires_api_key"] is True
+    assert payload["session_query_limit"] == 20
 
 
 @pytest.mark.parametrize("malformed_payload", [[], None, "not-a-catalog"])
@@ -147,6 +153,104 @@ def test_submit_query_includes_selected_provider():
     )
 
     assert response == {"answer": "ok"}
+
+
+@pytest.mark.parametrize(
+    "malformed_payload",
+    [
+        {
+            "default_provider": "gemini",
+            "providers": [{"provider": "gemini", "model": "gemini-test"}],
+            "requires_api_key": "yes",
+        },
+        {
+            "default_provider": "gemini",
+            "providers": [{"provider": "gemini", "model": "gemini-test"}],
+            "requires_api_key": True,
+            "session_query_limit": None,
+        },
+        {
+            "default_provider": "gemini",
+            "providers": [{"provider": "gemini", "model": "gemini-test"}],
+            "requires_api_key": True,
+            "session_query_limit": 0,
+        },
+    ],
+)
+def test_fetch_models_rejects_malformed_byok_metadata(malformed_payload):
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=malformed_payload)
+
+    with pytest.raises(ValueError, match="invalid model discovery payload"):
+        fetch_models("http://api", transport=httpx.MockTransport(handler))
+
+
+def test_fetch_session_validates_opaque_token_and_positive_limit():
+    responses = iter(
+        [
+            {"token": "signed-session", "query_limit": 20},
+            {"token": "", "query_limit": 20},
+            {"token": "signed-session", "query_limit": 0},
+        ]
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/session"
+        return httpx.Response(200, json=next(responses))
+
+    transport = httpx.MockTransport(handler)
+    assert fetch_session("http://api", transport=transport) == {
+        "token": "signed-session",
+        "query_limit": 20,
+    }
+    with pytest.raises(ValueError, match="invalid session payload"):
+        fetch_session("http://api", transport=transport)
+    with pytest.raises(ValueError, match="invalid session payload"):
+        fetch_session("http://api", transport=transport)
+
+
+def test_submit_query_sends_visitor_key_only_in_internal_header():
+    visitor_key = "visitor-secret-key"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert request.headers["X-Provider-Api-Key"] == visitor_key
+        assert request.headers["X-Demo-Session"] == "signed-session"
+        assert visitor_key not in repr(payload)
+        return httpx.Response(200, json={"answer": "ok"})
+
+    response = submit_query(
+        "http://api",
+        {"question": "問題", "provider": "gemini"},
+        api_key=visitor_key,
+        session_token="signed-session",
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert response == {"answer": "ok"}
+
+
+def test_secret_bearing_failure_raises_status_only_error():
+    visitor_key = "visitor-secret-key"
+    private_body = "provider-private-response-body"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, text=private_body, request=request)
+
+    with pytest.raises(ApiRequestError) as exc_info:
+        submit_query(
+            "http://api",
+            {"question": "問題", "provider": "gemini"},
+            api_key=visitor_key,
+            session_token="signed-session",
+            transport=httpx.MockTransport(handler),
+        )
+
+    assert exc_info.value.status_code == 401
+    evidence = repr(exc_info.value)
+    assert visitor_key not in evidence
+    assert private_body not in evidence
 
 
 def test_actual_generation_metadata_keeps_stale_catalog_fallback_response():

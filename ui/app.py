@@ -11,13 +11,16 @@ import os
 
 import httpx
 import streamlit as st
-from api_client import (
+
+from ui.api_client import (
+    ApiRequestError,
     actual_generation_metadata,
     fetch_models,
+    fetch_session,
     requested_provider_for_display,
     submit_query,
 )
-from refusal_labels import refusal_stage_label
+from ui.refusal_labels import refusal_stage_label
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
 
@@ -56,10 +59,36 @@ available_providers = list(provider_models)
 default_provider = model_catalog.get("default_provider")
 if default_provider not in provider_models:
     default_provider = available_providers[0] if available_providers else None
+requires_api_key = model_catalog.get("requires_api_key") is True
+
+if requires_api_key and "demo_session" not in st.session_state:
+    try:
+        session = fetch_session(API_URL)
+    except (httpx.HTTPError, ValueError, TypeError):
+        st.session_state.demo_session = None
+        st.session_state.demo_query_limit = None
+    else:
+        st.session_state.demo_session = session["token"]
+        st.session_state.demo_query_limit = session["query_limit"]
 
 
 def provider_label(provider: str) -> str:
     return f"{provider}（{provider_models[provider]}）"
+
+
+def clear_provider_key(provider: str) -> None:
+    st.session_state[f"provider_key_{provider}"] = ""
+
+
+def byok_error_message(status_code: int) -> str:
+    return {
+        400: "輸入內容不符合公開展示的限制，請縮短問題或檢查設定。",
+        401: "API Key 或展示工作階段無效，請確認 Key 後再試。",
+        429: "目前已達展示額度或同時使用上限，請稍後再試。",
+        502: "模型服務目前無法完成回答，請稍後再試。",
+        503: "檢索服務尚未就緒，請稍後再試。",
+        504: "模型回應超時，請稍後再試。",
+    }.get(status_code, "目前無法取得回答，請稍後再試。")
 
 
 def render_generation_status(payload: dict) -> None:
@@ -101,6 +130,30 @@ with st.sidebar:
     else:
         selected_provider = None
         st.warning("目前沒有可用的回答模型，請稍後再試。")
+
+    visitor_key = None
+    if requires_api_key and selected_provider is not None:
+        st.divider()
+        st.subheader("你的 API Key")
+        st.caption(
+            "此公開 Demo 不使用站長的模型額度。Key 只保留在目前的 Streamlit "
+            "工作階段，會傳到容器內 API，但不會寫入檔案、聊天紀錄或快取。"
+        )
+        visitor_key = st.text_input(
+            f"{selected_provider} API Key",
+            type="password",
+            key=f"provider_key_{selected_provider}",
+        )
+        st.button(
+            "清除 API Key",
+            on_click=clear_provider_key,
+            args=(selected_provider,),
+        )
+        query_limit = st.session_state.get("demo_query_limit")
+        if query_limit:
+            st.caption(f"每個展示工作階段最多 {query_limit} 次查詢。")
+        if not st.session_state.get("demo_session"):
+            st.warning("目前無法建立展示工作階段，請稍後重新整理頁面。")
 
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -155,7 +208,18 @@ for msg in st.session_state.history:
             render_generation_status(msg["payload"])
             render_debug(msg["payload"])
 
-question = st.chat_input("輸入你的勞動法規問題...", disabled=selected_provider is None)
+byok_ready = bool(
+    not requires_api_key
+    or (
+        isinstance(visitor_key, str)
+        and visitor_key.strip()
+        and st.session_state.get("demo_session")
+    )
+)
+question = st.chat_input(
+    "輸入你的勞動法規問題...",
+    disabled=selected_provider is None or not byok_ready,
+)
 if question:
     st.session_state.history.append({"role": "user", "content": question})
     with st.chat_message("user"):
@@ -173,7 +237,16 @@ if question:
                         "use_reranker": use_reranker,
                         "provider": selected_provider,
                     },
+                    api_key=visitor_key if requires_api_key else None,
+                    session_token=(
+                        st.session_state.get("demo_session")
+                        if requires_api_key
+                        else None
+                    ),
                 )
+            except ApiRequestError as exc:
+                st.error(byok_error_message(exc.status_code))
+                st.stop()
             except (httpx.HTTPError, ValueError, TypeError):
                 st.error("目前無法取得回答，請稍後再試。")
                 st.stop()

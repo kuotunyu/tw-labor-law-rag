@@ -6,6 +6,15 @@ import httpx
 
 _PUBLIC_PROVIDERS = {"gemini", "openai"}
 _DISCOVERY_ERROR = "invalid model discovery payload"
+_SESSION_ERROR = "invalid session payload"
+
+
+class ApiRequestError(RuntimeError):
+    """Status-only error that cannot retain a secret-bearing httpx request."""
+
+    def __init__(self, status_code: int):
+        super().__init__("API request failed")
+        self.status_code = status_code
 
 
 def _validate_model_catalog(payload: object) -> dict:
@@ -42,7 +51,28 @@ def _validate_model_catalog(payload: object) -> dict:
         )
     ):
         raise ValueError(_DISCOVERY_ERROR)
-    return {"default_provider": default_provider, "providers": providers}
+    result = {"default_provider": default_provider, "providers": providers}
+    has_byok_flag = "requires_api_key" in payload
+    has_query_limit = "session_query_limit" in payload
+    if has_byok_flag or has_query_limit:
+        requires_api_key = payload.get("requires_api_key")
+        query_limit = payload.get("session_query_limit")
+        if not isinstance(requires_api_key, bool):
+            raise ValueError(_DISCOVERY_ERROR)
+        if requires_api_key:
+            if (
+                not isinstance(query_limit, int)
+                or isinstance(query_limit, bool)
+                or query_limit < 1
+            ):
+                raise ValueError(_DISCOVERY_ERROR)
+        elif query_limit is not None:
+            raise ValueError(_DISCOVERY_ERROR)
+        result.update(
+            requires_api_key=requires_api_key,
+            session_query_limit=query_limit,
+        )
+    return result
 
 
 def actual_generation_metadata(payload: dict) -> tuple[str, str] | None:
@@ -81,11 +111,53 @@ def fetch_models(
     return _validate_model_catalog(payload)
 
 
+def fetch_session(
+    api_url: str, transport: httpx.BaseTransport | None = None
+) -> dict:
+    """Create one opaque, bounded demo session for a BYOK browser session."""
+    with httpx.Client(transport=transport, timeout=5.0) as client:
+        response = client.post(f"{api_url.rstrip('/')}/session")
+        response.raise_for_status()
+        try:
+            payload = response.json()
+        except ValueError:
+            raise ValueError(_SESSION_ERROR) from None
+    if not isinstance(payload, dict):
+        raise ValueError(_SESSION_ERROR)
+    token = payload.get("token")
+    query_limit = payload.get("query_limit")
+    if (
+        not isinstance(token, str)
+        or not token.strip()
+        or not isinstance(query_limit, int)
+        or isinstance(query_limit, bool)
+        or query_limit < 1
+    ):
+        raise ValueError(_SESSION_ERROR)
+    return {"token": token, "query_limit": query_limit}
+
+
 def submit_query(
-    api_url: str, payload: dict, transport: httpx.BaseTransport | None = None
+    api_url: str,
+    payload: dict,
+    *,
+    api_key: str | None = None,
+    session_token: str | None = None,
+    transport: httpx.BaseTransport | None = None,
 ) -> dict:
     """Submit one UI query payload and return the API response."""
+    headers = {}
+    if api_key is not None:
+        headers["X-Provider-Api-Key"] = api_key
+    if session_token is not None:
+        headers["X-Demo-Session"] = session_token
     with httpx.Client(transport=transport, timeout=120.0) as client:
-        response = client.post(f"{api_url.rstrip('/')}/query", json=payload)
+        response = client.post(
+            f"{api_url.rstrip('/')}/query",
+            json=payload,
+            headers=headers,
+        )
+        if headers and not response.is_success:
+            raise ApiRequestError(response.status_code)
         response.raise_for_status()
         return response.json()

@@ -1,0 +1,125 @@
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from threading import Thread
+
+from streamlit.testing.v1 import AppTest
+
+
+def test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history(monkeypatch):
+    requests = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, _format, *_args):
+            return
+
+        def _send_json(self, payload):
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            assert self.path == "/models"
+            self._send_json(
+                {
+                    "default_provider": "gemini",
+                    "providers": [
+                        {
+                            "provider": "gemini",
+                            "model": "gemini-3.5-flash-lite",
+                        },
+                        {"provider": "openai", "model": "gpt-5.6-luna"},
+                    ],
+                    "requires_api_key": True,
+                    "session_query_limit": 20,
+                }
+            )
+
+        def do_POST(self):
+            if self.path == "/session":
+                requests.append({"path": self.path})
+                self._send_json({"token": "signed-session", "query_limit": 20})
+                return
+            assert self.path == "/query"
+            content_length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(content_length))
+            requests.append(
+                {
+                    "path": self.path,
+                    "provider_key": self.headers.get("X-Provider-Api-Key"),
+                    "demo_session": self.headers.get("X-Demo-Session"),
+                    "payload": payload,
+                }
+            )
+            self._send_json(
+                {
+                    "answer": "依勞動基準法規定計算。[1]",
+                    "refused": False,
+                    "sources": [
+                        {
+                            "index": 1,
+                            "doc": "勞動基準法",
+                            "article": "第 24 條",
+                            "content": "延長工作時間之工資應依法加給。",
+                        }
+                    ],
+                    "retrieval_hits": [
+                        {"citation": "勞動基準法 第 24 條", "score": 0.9}
+                    ],
+                    "strategy": payload["strategy"],
+                    "mode": payload["mode"],
+                    "use_reranker": payload["use_reranker"],
+                    "provider": payload["provider"],
+                    "model": "gemini-3.5-flash-lite",
+                    "refusal_stage": None,
+                    "generation_called": True,
+                    "requested_provider": payload["provider"],
+                    "fallback_used": False,
+                    "fallback_from": None,
+                }
+            )
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    api_url = f"http://127.0.0.1:{server.server_port}"
+    monkeypatch.setenv("API_URL", api_url)
+
+    try:
+        app_path = Path(__file__).parents[1] / "ui" / "app.py"
+        app = AppTest.from_file(app_path, default_timeout=10).run()
+
+        assert not app.exception
+        assert app.chat_input[0].disabled is True
+        assert requests == [{"path": "/session"}]
+
+        visitor_key = "visitor-secret-key"
+        app.text_input[0].set_value(visitor_key).run()
+        assert app.chat_input[0].disabled is False
+
+        app.chat_input[0].set_value("加班費如何計算？").run()
+
+        query_request = next(item for item in requests if item["path"] == "/query")
+        assert query_request["provider_key"] == visitor_key
+        assert query_request["demo_session"] == "signed-session"
+        assert visitor_key not in repr(query_request["payload"])
+        assert visitor_key not in repr(app.session_state["history"])
+        rendered = "\n".join(
+            str(element.value)
+            for collection in (app.markdown, app.caption, app.info, app.warning)
+            for element in collection
+        )
+        assert visitor_key not in rendered
+
+        clear_button = next(
+            button for button in app.button if button.label == "清除 API Key"
+        )
+        clear_button.click().run()
+        assert app.text_input[0].value == ""
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
