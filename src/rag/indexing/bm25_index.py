@@ -25,7 +25,18 @@ class BM25Index:
     def build(cls, chunks_path: Path) -> "BM25Index":
         with open(chunks_path, encoding="utf-8") as f:
             payloads = [json.loads(line) for line in f if line.strip()]
-        tokenized_corpus = [tokenize(p["text"]) for p in payloads]
+        return cls.from_payloads(payloads)
+
+    @classmethod
+    def from_payloads(cls, payloads: list[dict]) -> "BM25Index":
+        if not payloads or any(
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("text"), str)
+            or not payload["text"].strip()
+            for payload in payloads
+        ):
+            raise ValueError("BM25 requires valid non-empty text payloads")
+        tokenized_corpus = [tokenize(payload["text"]) for payload in payloads]
         return cls(payloads, BM25Okapi(tokenized_corpus))
 
     def save(self, path: Path) -> None:

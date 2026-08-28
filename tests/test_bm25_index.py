@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from rag.indexing.bm25_index import BM25Index
 
 
@@ -54,3 +56,22 @@ def test_save_and_load_roundtrip(tmp_path):
     hits_before = index.search("婚假", top_k=2)
     hits_after = loaded.search("婚假", top_k=2)
     assert [h.payload["chunk_id"] for h in hits_before] == [h.payload["chunk_id"] for h in hits_after]
+
+
+def test_build_from_payloads_keeps_payloads_and_searches_text():
+    payloads = [
+        {"chunk_id": "a", "text": "勞工每日正常工作時間不得超過八小時"},
+        {"chunk_id": "b", "text": "勞工退休金條例"},
+        {"chunk_id": "c", "text": "職業安全衛生設施規則"},
+    ]
+
+    index = BM25Index.from_payloads(payloads)
+
+    assert len(index) == 3
+    assert index.search("工作時間", top_k=1)[0].payload["chunk_id"] == "a"
+
+
+@pytest.mark.parametrize("payloads", [[], [{}], [{"text": ""}], [{"text": 7}]])
+def test_build_from_payloads_rejects_empty_or_invalid_payloads(payloads):
+    with pytest.raises(ValueError, match="valid non-empty text payloads"):
+        BM25Index.from_payloads(payloads)
