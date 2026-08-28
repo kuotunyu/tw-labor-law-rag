@@ -37,13 +37,16 @@ The release verifier should exit zero and report:
 - canonical dataset SHA-256: `760e33eaa0821001d37ff974bc037043d019fc670b8f3621b6e713030274ca07`
 - ablation: 8 configurations, 320 rows
 - primary retrieval: Hit@5 `0.9666666666666667`, MRR@10 `0.9055555555555554`
+- reliability stress: 60 questions, Hit@5 `0.95`, MRR@10 `0.9083333333333334`, 1 direct false refusal, 0.85 direct unanswerable coverage, decision `retain_0.03`
 - end-to-end: 29 answered, 11 refused, 31 generation calls recorded
 - refusal stages: 9 threshold, 2 LLM, 0 no-hits
 - threshold score/stage contract: true for all 40 rows at gate `0.03`
 - provider evidence: 29 archived numeric verdicts; faithfulness `4.896551724137931`, relevancy `5.0`
+- provider cross-check: `pending_credentials`, authorized ceiling US$5.00 per provider, required providers Gemini and OpenAI; no official provider cross-check artifacts may exist while pending
 - OGDL source samples verified: 2
+- full corpus snapshot: 2026-08-29, 15 laws, 884 non-deleted articles
 - GitHub Action references: 2, both full commit SHAs
-- publication inventory: exactly 108 tracked files, empty `tracked_excluded`, 0 unexpected archive files, 1 current reviewed binary hash
+- publication inventory: exact match to `release/public-files.txt`, empty `tracked_excluded`, 0 unexpected archive files, and only manifest-reviewed binary hashes
 - public Git history: all commits reachable from heads/tags/ordinary remotes pass identity and historical path/content/binary scanning; ephemeral `refs/remotes/pull/*` merge refs and local `refs/archive/*` recovery refs are excluded
 - locked Ruff dependency and CI lint/tag gates: verified
 - official trace issues: 0

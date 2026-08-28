@@ -3,6 +3,7 @@
 > 評估日期:2026-07-06 ｜ 語料版本:全國法規資料庫 2026-07 dump(15 部勞動法規、884 條文)
 > 生成模型:gpt-5.1(temperature=0, reasoning_effort=low)｜ Judge:gpt-5-mini(不支援自訂 temperature,已由 adapter 自動降級)
 > 公開 evidence 驗證:`uv run python scripts/verify_release.py` 可離線重算 committed retrieval/refusal/arithmetic summaries。`eval/ablation.py` 需要本機索引與模型,`eval/run_e2e_eval.py` 還需要 provider;完整答案、judge reasons 與原始 run 保留在不進版控的 `eval/runs/`,不能只靠公開 repository 重生。
+> `v0.3.1 reliability stress evidence` 執行日期:2026-08-29｜官方 snapshot:15 部法規、884 條非刪除條文｜模型 revisions 固定並在隔離 local Qdrant 重建。
 
 ## 摘要
 
@@ -14,6 +15,8 @@
 | Answer Relevancy(1–5) | **5.00**(archived provider verdicts 再聚合) |
 | 拒答正確率(10 題庫外問題) | **10/10** |
 | 誤拒率(30 題可答問題) | 1/30(見失敗案例 1) |
+| v0.3.1 壓力集 Hit@5 / MRR@10 | **0.950 / 0.908** |
+| v0.3.1 門檻直接誤拒 / 不可答直接攔截 | **1/40 / 17/20** |
 
 ## 評估集設計
 
@@ -36,6 +39,19 @@
 | fixed | hybrid+rerank | 1.000 | 0.847 | 266 |
 
 \* structure/vector 的延遲含首次查詢 embedding(未快取);後續設定命中快取,公平比較請看 hybrid(58ms)→ +rerank(292ms)的增量:reranker 約增加 230ms。
+
+## v0.3.1 可靠性壓力證據
+
+`eval/dataset/reliability_stress_v0.3.1.jsonl` 有 60 題：40 題可答、20 題不可答，涵蓋全部 15 部法規；40 題含中英夾雜，55 題採敘事式長句。答案與法源標註繼承自經稽核的正式資料，不由 provider 臨時生成。執行器先重新下載法務部法律／命令 ZIP，只有在 SHA-256、15 部清單與 884 條 snapshot 完全一致時才建立隔離索引；BGE-M3 revision `5617a9f…b181`、reranker revision `953dc6f…d41e` 均固定。
+
+| 資料集 | Hit@5 | MRR@10 | 0.03 直接誤拒 | 0.03 不可答直接攔截 |
+|---|---:|---:|---:|---:|
+| v0.3.1 stress（40 可答／20 不可答） | 0.950 | 0.908 | 1/40 | 17/20 |
+| v0.1.0 formal guard（30 可答／10 不可答） | 0.967 | 0.906 | 0/30 | 9/10 |
+
+門檻 sweep 為 0、0.005、0.01、0.02、0.03、0.04、0.05、0.1。沒有候選能在 stress 與 formal guard 的直接誤拒率及不可答攔截率上同時全面不劣、且至少改善一項，因此結果是 `retain_0.03`，沒有自動改 production config。壓力集的 1/40 直接誤拒確認舊有口語問法風險是真實邊界，但 60 題仍不足以估計自然流量發生率。
+
+Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 的執行器使用 Decimal 成本、每次呼叫前的保守 token 上限與每家 US$5 硬帽；缺失或負 token usage、非正價格、超過授權額度與未知 maxima 都會停止。本機沒有本專案專用 provider 金鑰，因此正式 cross-check 狀態為 `pending_credentials`；沒有使用其他專案 `.env`，也沒有產生可誤認為真實呼叫的 placeholder 結果。
 
 ### 發現 1:每一級管線都有量化貢獻
 
@@ -117,8 +133,8 @@ fixed/vector 的 §24 未進 top-5,structure/vector 則命中——400 字視窗
 
 ## 限制與待辦
 
-1. **樣本量**:40 題足以看出模式,但 hit@5 的 ±1 題 = ±0.033,個位數差異不宜過度解讀
-2. **Judge 單一供應商**:本輪 judge 為 gpt-5-mini;原設計的跨供應商交叉驗證(以 Gemini/Anthropic 複評抽樣)因 Gemini 免費額度(此帳號 flash 每日僅 20 請求)未執行,列為後續工作
+1. **樣本量**:正式集 40 題、壓力集 60 題足以揭露失敗模式，但仍不是自然使用流量樣本；個位數差異不宜外推為母體發生率
+2. **Provider cross-check 待專用金鑰**:雙 provider 硬預算執行器已驗證，但正式呼叫尚未執行；release contract 明確標記 `pending_credentials`
 3. **Judge 決定論**:gpt-5-mini 不接受自訂 temperature(推理模型),重跑分數可能有 ±1 級波動
-4. **語料時效**:條文以 dump 當時版本為準(如勞基法 20240731 版),法規修訂後需重跑 `download_corpus.py` 與重建索引
-5. **拒答門檻對問法風格敏感**:見失敗案例 7——目前的評估集問法整齊,無法量測口語敘事式提問對拒答門檻的實際衝擊範圍,只能確認「存在」不能確認「多常發生」
+4. **語料時效**:snapshot 僅證明 2026-08-29 下載內容；法規修訂後需重新稽核 snapshot、重建索引與重跑評估
+5. **拒答門檻對問法風格敏感**:壓力集已量測 1/40 直接誤拒，只能確認邊界仍存在，不能估計自然使用中「多常發生」

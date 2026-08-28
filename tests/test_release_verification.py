@@ -86,8 +86,8 @@ def git_tracked_paths() -> set[str]:
 def write_version_contract_fixture(
     root: Path,
     *,
-    package_version: str = "0.3.0",
-    release_version: str = "v0.3.0",
+    package_version: str = "0.3.1",
+    release_version: str = "v0.3.1",
     evidence_version: str = "v0.1.0",
 ) -> dict:
     (root / "pyproject.toml").write_text(
@@ -113,8 +113,8 @@ def test_release_version_contract_is_explicit_and_consistent(tmp_path):
     manifest = write_version_contract_fixture(tmp_path)
 
     assert module._verify_release_version_contract(tmp_path, manifest) == {
-        "version": "v0.3.0",
-        "package_version": "0.3.0",
+        "version": "v0.3.1",
+        "package_version": "0.3.1",
         "formal_evidence_version": "v0.1.0",
     }
 
@@ -134,13 +134,60 @@ def test_release_version_contract_rejects_changed_formal_evidence_baseline(tmp_p
         module._verify_release_version_contract(tmp_path, manifest)
 
 
+def test_pending_provider_crosscheck_contract_is_explicit(tmp_path):
+    module = release_module()
+    contract = {
+        "status": "pending_credentials",
+        "authorized_cap_usd_per_provider": "5.00",
+        "required_providers": ["gemini", "openai"],
+        "results_path": "eval/official/provider_crosscheck_results.json",
+        "trace_path": "eval/official/provider_crosscheck_trace.jsonl",
+    }
+
+    assert module._verify_provider_crosscheck_contract(tmp_path, contract) == {
+        "status": "pending_credentials",
+        "authorized_cap_usd_per_provider": "5.00",
+        "required_providers": ["gemini", "openai"],
+    }
+
+
+@pytest.mark.parametrize(
+    "artifact_path",
+    [
+        "eval/official/provider_crosscheck_results.json",
+        "eval/official/provider_crosscheck_trace.jsonl",
+    ],
+)
+def test_pending_provider_crosscheck_rejects_published_artifacts(
+    tmp_path,
+    artifact_path,
+):
+    module = release_module()
+    contract = {
+        "status": "pending_credentials",
+        "authorized_cap_usd_per_provider": "5.00",
+        "required_providers": ["gemini", "openai"],
+        "results_path": "eval/official/provider_crosscheck_results.json",
+        "trace_path": "eval/official/provider_crosscheck_trace.jsonl",
+    }
+    artifact = tmp_path / artifact_path
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(
+        module.ReleaseVerificationError,
+        match="pending provider cross-check must not publish unverified artifacts",
+    ):
+        module._verify_provider_crosscheck_contract(tmp_path, contract)
+
+
 def test_release_verifier_recomputes_committed_evidence():
     report = release_module().verify_release(PROJECT_ROOT)
 
     assert report["status"] == "pass"
     assert report["release"] == {
-        "version": "v0.3.0",
-        "package_version": "0.3.0",
+        "version": "v0.3.1",
+        "package_version": "0.3.1",
         "formal_evidence_version": "v0.1.0",
     }
     assert report["dataset"] == {
@@ -174,6 +221,11 @@ def test_release_verifier_recomputes_committed_evidence():
         "judged": 29,
         "avg_faithfulness": pytest.approx(4.896551724137931),
         "avg_relevancy": pytest.approx(5.0),
+    }
+    assert report["provider_crosscheck"] == {
+        "status": "pending_credentials",
+        "authorized_cap_usd_per_provider": "5.00",
+        "required_providers": ["gemini", "openai"],
     }
     assert report["privacy"] == {
         "official_trace_issues": 0,

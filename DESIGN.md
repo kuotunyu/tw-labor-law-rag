@@ -64,7 +64,7 @@
 
 **理由**:RAGAS 的內建 prompt 是英文優先設計,套在繁體中文法律文本上,經驗上常出現評分標準與語言習慣對不齊的問題(例如對「精簡但正確」的中文法律用語誤判為資訊不足)。這兩個指標的定義其實不複雜,自己刻一個中文 rubric、附上 1–5 分的具體錨點描述(而不是讓模型自由發揮),反而更容易掌控評分標準、也更容易在 EVAL_REPORT.md 裡向讀者交代「這個分數是怎麼打出來的」。一次呼叫評兩個指標也把 judge 的 API 呼叫量減半,在免費/低額度方案上很有感。
 
-**Tradeoff**:自建 judge 需要自己驗證評分穩定性(RAGAS 有社群驗證過的 prompt),且目前只用單一 provider(gpt-5-mini)評分,原計畫的跨 provider 交叉驗證(用 Gemini 複評抽樣)因免費額度限制未執行,列在 EVAL_REPORT.md 的限制章節。
+**Tradeoff**:自建 judge 需要自己驗證評分穩定性(RAGAS 有社群驗證過的 prompt),且既有 `v0.1.0` 正式評分只用單一 provider(gpt-5-mini)。`v0.3.1` 已加入 Gemini／OpenAI 各 US$5 硬上限的 cross-check 執行器，但本機沒有本專案專用金鑰，因此狀態明確維持 `pending_credentials`，不以其他專案金鑰或替代模型補數字。
 
 ## 7. Qdrant:為什麼 local/server 雙模式?
 
@@ -83,7 +83,7 @@
 **Tradeoff**:代價是每個供應商的模型特性差異(temperature 支援、token 參數命名、額度限制)全部要在各自的 adapter 裡個別處理,不能假設行為一致。這次實際踩到三個坑,現在都在 `llm.py` 的 adapter 裡有明確處理與註解:
 - **Gemini 2.5「思考」token**:預設開啟的 thinking 會佔用 `max_output_tokens` 預算,實測 980/1024 token 花在看不見的推理上,只剩 40 token 輸出可見答案,長答案被腰斬。修法:flash 系列模型明確關閉 thinking(`thinking_budget=0`),同時把預設 token 上限從 1024 提高到 2048。
 - **GPT-5 系列參數相容性**:`max_tokens` 被拒絕(需改用 `max_completion_tokens`),部分模型(如 gpt-5-mini)拒絕非預設 `temperature`。Adapter 在收到 400 錯誤時偵測是哪個參數不支援,自動移除後重試一次,之後同一個 adapter instance 記住這個限制不再重試。
-- **免費額度不透明**:Gemini 免費方案文件寫「250 requests/day」,實測這個帳號的 `gemini-2.5-flash` 每分鐘僅 5 次、每日僅 20 次——文件與實際配額不一致,評估腳本因此加了 429 自動退避重試(`eval/lib.py` 的 `retry_rate_limited`),而非假設額度值可信。
+- **額度不透明**:provider 帳戶實際配額可能低於公開頁面的一般說明；一般評估腳本保留 429 退避，而新的預算 cross-check 不跨 provider fallback，並在任何未知 token usage 時 fail closed。
 
 ## 9. 為什麼引用格式是 `[數字]` 而不是直接附條文全文?
 
@@ -92,3 +92,27 @@
 **理由**:把「回答的行內引用標記」和「引用內容的展示」分離,LLM 只需要輸出簡短的數字標記(降低生成錯誤的機會),實際的法規名稱、條號、原文由檢索結果直接帶出(不經過 LLM 转述,不會被生成過程扭曲)。這也讓引用驗證變成一個簡單的規則檢查:解析出的編號如果超出提供的條文數量範圍,直接捨棄該筆引用,不會因為 LLM 引用錯誤編號而顯示錯誤的法條。
 
 **Tradeoff**:繁體中文生成偶爾會用全形括號「［1］」而非半形「[1]」(gpt-5.1 實測觀察到),引用解析的正規表示式因此需要同時支援兩種括號——這是 Phase 4 端到端評估才抓到的真實案例(單元測試原本只覆蓋半形),已修正並補上回歸測試。
+
+## 10. 為什麼要有完整 corpus snapshot 與逐引用 provenance?
+
+**選擇**:每次可靠性 run 先下載法務部法律／命令 ZIP，核對來源 URL、ZIP SHA-256、15 部法規清單、各法規代碼／修正／生效日期、逐條 canonical hash 與 884 條總數；只有整份 snapshot 完全相符才建立索引。`SourceUnit → Chunk → Qdrant payload → Answer.sources → FastAPI → Streamlit` 全鏈路帶 `source_url`、`last_amended`、`effective_date`，舊 payload 缺欄位時則安全顯示既有引用。
+
+**理由**:只保留兩份 sample 無法證明真正建索引的 15 部語料是哪一版；只在 UI 顯示條號也無法讓使用者回查官方法規。snapshot 把「何時、從哪裡、哪些條文」變成可機器驗證的輸入契約，逐引用 provenance 則把這份契約延伸到答案展示。UI 只把 `https://law.moj.gov.tw` 連結渲染成可點擊網址，避免任意 payload URL 變成釣魚連結。
+
+**Tradeoff**:法規一修訂，稽核會故意失敗，必須人工審閱差異、更新 snapshot、重建兩份索引並重跑評估。現有 Qdrant cloud collections 是舊 payload；在取得新的臨時 writer key 前仍相容但不會憑空出現新增的日期欄位。
+
+## 11. 為什麼新增 60 題壓力集卻不取代 40 題正式集?
+
+**選擇**:保留 `v0.1.0` 的 40 題／8 組消融／provider judge 結果作為 immutable formal baseline；另以 `v0.3.1 reliability stress evidence` 發布 40 可答、20 不可答、偏長句與中英夾雜的 retrieval/refusal 壓力結果，並用正式集當 regression guard。
+
+**理由**:新資料可以針對已觀察到的口語問法盲點，但若直接把新舊題混成一個分數，讀者無法分辨提升來自系統變更還是題目組成變更。分版後可同時看到壓力集確實抓到 1/40 直接誤拒，以及正式集仍重現 0/30。門檻 sweep 必須同時在兩組資料不劣才可自動變更；本次沒有 Pareto-better 候選，因此保留 0.03。
+
+**Tradeoff**:60 題仍是策展樣本，不能推估真實流量發生率；它只把「口語風格可能失敗」從單一 anecdote 提升為可重跑的明確測量。
+
+## 12. 為什麼 provider cross-check 要先做硬預算，而不是跑完再算錢?
+
+**選擇**:`BudgetLedger` 使用 `Decimal`，CLI cap 預設為 0 且不得高於每家 US$5 的本次授權；每次呼叫前用最大輸入／輸出 token 計算最壞成本，若剩餘額度不足就不開始。Gemini 成本把 `candidatesTokenCount + thoughtsTokenCount` 都算輸出，OpenAI 使用回傳的 prompt／completion usage；缺欄位、負值或超出 maxima 都停止。
+
+**理由**:事後統計只能描述已經花掉的錢，不能限制下一次呼叫。先各跑 5 題、確認模型與 usage 完整後才擴張，可同時驗證指定模型沒有 fallback，並把故障半徑限制在很小的初始批次。
+
+**Tradeoff**:保守 maxima 會提早停止而留下未使用額度；這是刻意的安全偏向。公開 trace 只留 qid、provider/model、拒答、引用數、token、成本與 0/1 verdict，完整問題／答案只進 ignored `eval/runs/`。目前因缺本專案專用金鑰而沒有正式 trace，release contract 明確標記 `pending_credentials`。
