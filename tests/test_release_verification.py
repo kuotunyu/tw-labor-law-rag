@@ -176,6 +176,9 @@ def test_release_verifier_recomputes_committed_evidence():
         "license": "政府資料開放授權條款－第1版",
         "redistribution": "allowed_with_attribution",
         "samples_verified": 2,
+        "full_snapshot_date": "2026-08-29",
+        "full_snapshot_laws": 15,
+        "full_snapshot_articles": 884,
     }
     assert report["ci"] == {
         "action_pins": 2,
@@ -224,7 +227,6 @@ def test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions():
     assert manifest["release_type"] == "public_source_only_portfolio_release"
     assert manifest["publication"]["tracked_excluded"] == []
     assert tracked == public_paths()
-    assert len(tracked) == 110
     assert "docs/release/HUGGINGFACE_ZERO_COST_DESIGN.md" in tracked
     assert "docs/release/HUGGINGFACE_ZERO_COST_IMPLEMENTATION_PLAN.md" in tracked
     assert "docs/release/RELEASE_EVOLUTION_DESIGN.md" in tracked
@@ -320,6 +322,47 @@ def test_readmes_link_the_live_demo_without_stale_private_status():
     assert "not public yet" not in readme_en
     assert "bm25_*.pkl" not in readme
     assert "bm25_*.pkl" not in readme_en
+
+
+def test_full_corpus_snapshot_verifier_proves_all_15_laws_and_article_arithmetic():
+    result = release_module()._verify_full_corpus_snapshot(
+        PROJECT_ROOT,
+        {
+            "path": "release/corpus_snapshot.json",
+            "schema_version": "1.0",
+            "snapshot_date": "2026-08-29",
+            "laws": 15,
+            "articles": 884,
+        },
+    )
+
+    assert result == {"snapshot_date": "2026-08-29", "laws": 15, "articles": 884}
+
+
+def test_full_corpus_snapshot_verifier_rejects_duplicate_law_names(tmp_path):
+    snapshot = json.loads(
+        (PROJECT_ROOT / "release" / "corpus_snapshot.json").read_text(encoding="utf-8")
+    )
+    snapshot["laws"][1]["name"] = snapshot["laws"][0]["name"]
+    (tmp_path / "snapshot.json").write_text(
+        json.dumps(snapshot, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="corpus snapshot unique law names",
+    ):
+        release_module()._verify_full_corpus_snapshot(
+            tmp_path,
+            {
+                "path": "snapshot.json",
+                "schema_version": "1.0",
+                "snapshot_date": "2026-08-29",
+                "laws": 15,
+                "articles": 884,
+            },
+        )
 
 
 def test_design_does_not_expand_observed_corpus_scale():

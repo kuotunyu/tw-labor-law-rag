@@ -78,6 +78,13 @@
     "license": "政府資料開放授權條款－第1版",
     "license_url": "https://data.gov.tw/license",
     "redistribution": "allowed_with_attribution",
+    "full_snapshot": {
+      "path": "release/corpus_snapshot.json",
+      "schema_version": "1.0",
+      "snapshot_date": "2026-08-29",
+      "laws": 15,
+      "articles": 884
+    },
     "samples": [
       {
         "path": "data/sample/勞工請假規則.json",
