@@ -28,6 +28,8 @@ class LLMOutput:
     model: str
     fallback_used: bool = False
     fallback_from: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
 
 
 class ProviderOperationalError(RuntimeError):
@@ -93,10 +95,23 @@ def _normalized_provider_error(provider: str, exc: Exception) -> RuntimeError:
     return RuntimeError(f"unclassified {provider} provider failure")
 
 
-def _provider_output(provider: str, model: str, text: str) -> LLMOutput:
+def _provider_output(
+    provider: str,
+    model: str,
+    text: str,
+    *,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+) -> LLMOutput:
     if not text or not text.strip():
         raise ProviderOperationalError(provider, "empty_response")
-    return LLMOutput(text=text, provider=provider, model=model)
+    return LLMOutput(
+        text=text,
+        provider=provider,
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
 
 
 def _gemini_response_is_policy_blocked(response, types) -> bool:
@@ -245,7 +260,14 @@ class OpenAIAdapter:
                 if message.refusal is not None or choice.finish_reason == "content_filter":
                     raise ProviderPolicyError(self.provider)
                 text = message.content or ""
-                return _provider_output(self.provider, self.model, text)
+                usage = getattr(resp, "usage", None)
+                return _provider_output(
+                    self.provider,
+                    self.model,
+                    text,
+                    input_tokens=getattr(usage, "prompt_tokens", None),
+                    output_tokens=getattr(usage, "completion_tokens", None),
+                )
 
 
 class GeminiAdapter:
@@ -287,7 +309,19 @@ class GeminiAdapter:
             raise _normalized_provider_error(self.provider, exc) from None
         if _gemini_response_is_policy_blocked(resp, types):
             raise ProviderPolicyError(self.provider)
-        return _provider_output(self.provider, self.model, resp.text or "")
+        usage = getattr(resp, "usage_metadata", None)
+        candidate_tokens = getattr(usage, "candidates_token_count", None)
+        thought_tokens = getattr(usage, "thoughts_token_count", None)
+        output_tokens = None
+        if candidate_tokens is not None:
+            output_tokens = candidate_tokens + (thought_tokens or 0)
+        return _provider_output(
+            self.provider,
+            self.model,
+            resp.text or "",
+            input_tokens=getattr(usage, "prompt_token_count", None),
+            output_tokens=output_tokens,
+        )
 
 
 _COMPLETE_THINK_BLOCK = re.compile(r"<think>.*?</think>", flags=re.DOTALL)
