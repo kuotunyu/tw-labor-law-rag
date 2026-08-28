@@ -13,6 +13,7 @@ README.md
 data/sample/勞動基準法施行細則.json
 data/sample/勞工請假規則.json
 docker-compose.yml
+docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md
 docs/release/CLAIM_MATRIX.md
 docs/release/OGDL_ATTRIBUTION.md
 docs/release/PUBLICATION_BOUNDARY.md
@@ -43,9 +44,11 @@ scripts/ask.py
 scripts/build_index.py
 scripts/download_corpus.py
 scripts/run_api.py
+scripts/run_space.py
 scripts/verify_release.py
 src/rag/__init__.py
 src/rag/api/__init__.py
+src/rag/api/byok.py
 src/rag/api/main.py
 src/rag/config.py
 src/rag/evaluation.py
@@ -75,12 +78,14 @@ src/rag/retrieval/retriever.py
 tests/test_answerer.py
 tests/test_api_response.py
 tests/test_bm25_index.py
+tests/test_byok_policy.py
 tests/test_chunkers.py
 tests/test_cleaner.py
 tests/test_config.py
 tests/test_embedding_cache.py
 tests/test_eval_dataset.py
 tests/test_evaluation.py
+tests/test_factory.py
 tests/test_fusion.py
 tests/test_judge.py
 tests/test_llm.py
@@ -92,8 +97,11 @@ tests/test_pipeline.py
 tests/test_refusal_labels.py
 tests/test_release_verification.py
 tests/test_retriever.py
+tests/test_space_runner.py
 tests/test_tokenizer.py
 tests/test_ui_api_client.py
+tests/test_ui_byok_app.py
+tests/test_vector_store.py
 ui/api_client.py
 ui/app.py
 ui/refusal_labels.py

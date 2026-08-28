@@ -2,7 +2,7 @@
 
 ## Authoritative public set
 
-[`release/public-files.txt`](../../release/public-files.txt) is the authoritative 100-file current public set. `scripts/verify_release.py` checks that every allowlisted file exists, is sorted/deduplicated, and passes the privacy/secret patterns. In this public Git repository, the tracked set must equal that allowlist exactly and `manifest.json:publication.tracked_excluded` must be empty. In a GitHub-generated source archive without `.git` metadata, the verifier rejects non-allowlisted files except conventional generated install/test/build paths and reports the Git-only check as `not_applicable_no_git_metadata` instead of pretending it ran.
+[`release/public-files.txt`](../../release/public-files.txt) is the authoritative 108-file current public set. `scripts/verify_release.py` checks that every allowlisted file exists, is sorted/deduplicated, and passes the privacy/secret patterns. In this public Git repository, the tracked set must equal that allowlist exactly and `manifest.json:publication.tracked_excluded` must be empty. In a GitHub-generated source archive without `.git` metadata, the verifier rejects non-allowlisted files except conventional generated install/test/build paths and reports the Git-only check as `not_applicable_no_git_metadata` instead of pretending it ran.
 
 The allowlist includes source, tests, CI/configuration, lockfile, package metadata, public documentation, privacy-reduced official evidence, and the two attributed OGDL samples. Internal `docs/superpowers/` records and `.claude/launch.json` are absent from both the current public tree and every publishable historical tree.
 
