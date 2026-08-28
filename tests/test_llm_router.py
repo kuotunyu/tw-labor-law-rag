@@ -172,6 +172,20 @@ def test_build_routed_llm_omits_fallback_when_disabled_or_unconfigured(settings)
     assert routed.fallback is None
 
 
+def test_build_routed_llm_treats_whitespace_fallback_key_as_unconfigured():
+    """Catches disagreement between API discovery and router key availability."""
+    gemini = FakeAdapter("gemini", "gemini-test", output="Gemini answer")
+
+    routed = build_routed_llm(
+        router_settings(openai_api_key="   "),
+        "gemini",
+        adapters={"gemini": gemini},
+    )
+
+    assert routed.primary is gemini
+    assert routed.fallback is None
+
+
 def test_build_routed_llm_rejects_non_public_primary_provider():
     """Catches exposing a router for providers outside the dual public contract."""
     with pytest.raises(ValueError, match="unknown public LLM provider: anthropic"):

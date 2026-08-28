@@ -64,7 +64,7 @@ def build_routed_llm(
         "gemini": settings.gemini_api_key,
         "openai": settings.openai_api_key,
     }
-    if settings.llm_fallback_enabled and provider_keys[alternate_provider]:
+    if settings.llm_fallback_enabled and provider_keys[alternate_provider].strip():
         fallback = adapter_for(alternate_provider)
 
     return RoutedLLM(primary, fallback)
