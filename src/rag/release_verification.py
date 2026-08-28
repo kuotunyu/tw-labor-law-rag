@@ -7,15 +7,17 @@ provider client, vector store, API lifespan, or network service.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import math
 import re
 import subprocess
+import tarfile
 import tomllib
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from rag.config import Settings
@@ -418,6 +420,65 @@ def _publishable_commit_ids(project_root: Path) -> list[str]:
     if not commits:
         raise ReleaseVerificationError("Git checkout has no publishable commits")
     return commits
+
+
+def _parse_git_archive(data: bytes, *, commit: str) -> list[PublicEntry]:
+    entries: list[PublicEntry] = []
+    seen: set[str] = set()
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as archive:
+            for member in archive.getmembers():
+                raw = member.name
+                candidate = raw[:-1] if member.isdir() and raw.endswith("/") else raw
+                posix = PurePosixPath(candidate)
+                if (
+                    not candidate
+                    or candidate.startswith("/")
+                    or "\\" in candidate
+                    or not posix.parts
+                    or ":" in posix.parts[0]
+                    or ".." in posix.parts
+                    or posix.as_posix() != candidate
+                ):
+                    raise ReleaseVerificationError(
+                        f"unsafe Git archive path in commit {commit}"
+                    )
+                if member.isdir():
+                    continue
+                if not member.isfile():
+                    raise ReleaseVerificationError(
+                        f"unsupported Git archive entry in commit {commit}: {raw}"
+                    )
+                if raw in seen:
+                    raise ReleaseVerificationError(
+                        f"duplicate Git archive path in commit {commit}: {raw}"
+                    )
+                handle = archive.extractfile(member)
+                if handle is None:
+                    raise ReleaseVerificationError(
+                        f"unreadable Git archive entry in commit {commit}: {raw}"
+                    )
+                seen.add(raw)
+                entries.append(PublicEntry(path=raw, data=handle.read()))
+    except (tarfile.TarError, OSError) as exc:
+        raise ReleaseVerificationError(
+            f"failed to parse Git archive for commit {commit}"
+        ) from exc
+    return sorted(entries, key=lambda entry: entry.path)
+
+
+def _git_archive_entries(project_root: Path, commit: str) -> list[PublicEntry]:
+    try:
+        process = subprocess.run(
+            ["git", "-C", str(project_root), "archive", "--format=tar", commit],
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise ReleaseVerificationError(
+            f"failed to read Git archive for commit {commit}"
+        ) from exc
+    return _parse_git_archive(process.stdout, commit=commit)
 
 
 def _verify_reachable_git_history(

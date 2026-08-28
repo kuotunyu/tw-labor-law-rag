@@ -1,7 +1,9 @@
 import importlib
+import io
 import json
 import re
 import subprocess
+import tarfile
 import tomllib
 from pathlib import Path
 
@@ -37,6 +39,21 @@ def commit_file(repo: Path, relative_path: str, content: bytes, message: str) ->
     run_git(repo, "add", "--", relative_path)
     run_git(repo, "commit", "-m", message)
     return run_git(repo, "rev-parse", "HEAD").stdout.decode("ascii").strip()
+
+
+def tar_bytes(*members: tuple[str, bytes, bytes | None]) -> bytes:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w") as archive:
+        for name, data, link_target in members:
+            info = tarfile.TarInfo(name=name)
+            if link_target is None:
+                info.size = len(data)
+                archive.addfile(info, io.BytesIO(data))
+            else:
+                info.type = tarfile.SYMTYPE
+                info.linkname = link_target.decode("utf-8")
+                archive.addfile(info)
+    return buffer.getvalue()
 
 
 def release_module():
@@ -247,6 +264,71 @@ def test_publishable_commit_ids_reject_empty_ref_set(tmp_path):
         match="no publishable commits",
     ):
         release_module()._publishable_commit_ids(tmp_path)
+
+
+def test_parse_git_archive_returns_regular_entries():
+    module = release_module()
+    payload = tar_bytes(("README.md", b"public", None))
+
+    assert module._parse_git_archive(payload, commit="a" * 40) == [
+        module.PublicEntry(path="README.md", data=b"public")
+    ]
+
+
+@pytest.mark.parametrize(
+    "unsafe_path",
+    ["../secret.txt", "/absolute.txt", "C:" + "/private.txt"],
+)
+def test_parse_git_archive_rejects_unsafe_paths(unsafe_path):
+    payload = tar_bytes((unsafe_path, b"private", None))
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="unsafe Git archive path",
+    ):
+        release_module()._parse_git_archive(payload, commit="b" * 40)
+
+
+def test_parse_git_archive_rejects_links():
+    payload = tar_bytes(("link.txt", b"", b"README.md"))
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="unsupported Git archive entry",
+    ):
+        release_module()._parse_git_archive(payload, commit="c" * 40)
+
+
+def test_parse_git_archive_rejects_duplicate_paths():
+    payload = tar_bytes(
+        ("README.md", b"first", None),
+        ("README.md", b"second", None),
+    )
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="duplicate Git archive path",
+    ):
+        release_module()._parse_git_archive(payload, commit="d" * 40)
+
+
+def test_git_archive_entries_read_committed_tree(tmp_path):
+    init_public_repo(tmp_path)
+    commit = commit_file(tmp_path, "docs/README.md", b"public", "public")
+
+    assert release_module()._git_archive_entries(tmp_path, commit) == [
+        release_module().PublicEntry(path="docs/README.md", data=b"public")
+    ]
+
+
+def test_git_archive_entries_wrap_git_failure(tmp_path):
+    init_public_repo(tmp_path)
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="failed to read Git archive for commit",
+    ):
+        release_module()._git_archive_entries(tmp_path, "f" * 40)
 
 
 def test_reachable_history_rejects_a_forbidden_path(tmp_path):
