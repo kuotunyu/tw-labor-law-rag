@@ -8,6 +8,7 @@ re-indexing with a different chunking strategy only embeds genuinely new text.
 from __future__ import annotations
 
 import hashlib
+import re
 import sqlite3
 import threading
 from pathlib import Path
@@ -17,6 +18,17 @@ import numpy as np
 from rag.config import DEFAULT_EMBEDDING_MODEL_REVISION
 
 _SQLITE_VAR_LIMIT = 500  # stay under SQLite's ~999 bound-variable cap
+_COMMIT_SHA = re.compile(r"[0-9a-fA-F]{40}")
+
+
+def resolve_model_snapshot(model_name: str, model_revision: str) -> str:
+    """Resolve an immutable Hub commit to a local snapshot directory."""
+
+    if not model_name or _COMMIT_SHA.fullmatch(model_revision) is None:
+        raise ValueError("model revision must be a full 40-character commit SHA")
+    from huggingface_hub import snapshot_download
+
+    return snapshot_download(repo_id=model_name, revision=model_revision)
 
 
 class EmbeddingCache:
@@ -100,11 +112,11 @@ class BGEM3Embedder:
         if self._model is None:  # lazy: loading BGE-M3 takes seconds + VRAM
             from FlagEmbedding import BGEM3FlagModel
 
+            model_path = resolve_model_snapshot(self.model_name, self.model_revision)
             self._model = BGEM3FlagModel(
-                self.model_name,
+                model_path,
                 use_fp16=self.device.startswith("cuda"),
                 devices=[self.device],
-                revision=self.model_revision,
                 trust_remote_code=False,
             )
         return self._model

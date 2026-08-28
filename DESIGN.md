@@ -119,6 +119,6 @@
 
 ## 13. 為什麼升級 Transformers 5.x 但保留 FlagEmbedding？
 
-**選擇**:`transformers>=5.5,<6` 避開已公告的 4.x 模型設定載入 RCE；BGE-M3 在 5.x 原生可用。FlagEmbedding 1.4 的 reranker 仍呼叫已移除的 `prepare_for_model`，因此本專案只對固定的 XLM-R tokenizer 補回等價的 pair special-token 組裝，遇到其他 tokenizer 或不支援的 truncation/padding 參數就 fail closed。
+**選擇**:`transformers>=5.5,<6` 避開已公告的 4.x 模型設定載入 RCE；BGE-M3 在 5.x 原生可用。模型名稱與 40 位 commit SHA 先由 `snapshot_download` 解析成不可變的本機 snapshot 路徑，再交給 FlagEmbedding，避免其 1.4 版吞掉 `revision` 後悄悄載入 mutable `main`。FlagEmbedding reranker 仍呼叫已移除的 `prepare_for_model`，因此本專案只對固定的 XLM-R tokenizer 補回等價的 pair special-token 組裝，遇到非完整 SHA、其他 tokenizer 或不支援的 truncation/padding 參數就 fail closed。
 
-**驗證**:固定 revision 的 `bge-reranker-v2-m3` 在 4.57.6 與 5.16.1 對同一組樣本產生完全相同的 normalized scores (`0.966139`, `0.000103`)；BGE-M3 embedding shape 仍為 1,024。完整測試與 `pip-audit --local` 均通過，沒有用 vulnerability ignore 取得綠燈。
+**驗證**:實際 snapshot 路徑末段分別等於 `5617a9f…b181` 與 `953dc6f…d41e`；固定 reranker snapshot 在 4.57.6 與 5.16.1 對同一組樣本產生完全相同的 normalized scores (`0.966139`, `0.000103`)；BGE-M3 embedding shape 仍為 1,024。完整測試與 `pip-audit --local` 均通過，沒有用 vulnerability ignore 取得綠燈。

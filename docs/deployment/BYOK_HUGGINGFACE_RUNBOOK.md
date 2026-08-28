@@ -30,7 +30,7 @@ uv run python scripts/verify_release.py
 ```
 
 Windows 專案路徑若含中文，`PYTHONUTF8=1` 可避免 `pip-audit` 的 `pip-api` 把子程序輸出以錯誤編碼解碼；它不會變更 audit 範圍或忽略項目。
-`transformers>=5.5,<6` 排除 4.x 模型設定載入 RCE；本專案的窄相容層只補回 FlagEmbedding 1.4 對 XLM-R pair encoding 所需的舊 API，固定 model revision 與 `trust_remote_code=False` 仍維持不變。
+`transformers>=5.5,<6` 排除 4.x 模型設定載入 RCE；模型 revision 必須是完整 40 位 commit SHA，並先解析為不可變的 Hub snapshot 本機路徑。本專案的窄相容層只補回 FlagEmbedding 1.4 對 XLM-R pair encoding 所需的舊 API，`trust_remote_code=False` 仍維持不變。
 
 任何一項失敗都停止部署；不得用真實 API 呼叫代替離線測試。
 

@@ -210,3 +210,15 @@ def test_audit_corpus_cli_returns_two_for_invalid_source_without_leaking_detail(
     captured = capsys.readouterr()
     assert "invalid_source" in captured.err
     assert "private malformed source detail" not in captured.err
+
+
+def test_audit_corpus_cli_sanitizes_unsafe_archive_failure(monkeypatch, capsys):
+    def fail_audit(**_kwargs):
+        raise download_corpus.CorpusArchiveError("private unsafe XML detail")
+
+    monkeypatch.setattr(audit_corpus, "build_live_snapshot", fail_audit)
+
+    assert audit_corpus.main(["--check", "release/corpus_snapshot.json"]) == 2
+    captured = capsys.readouterr()
+    assert '"error_type": "CorpusArchiveError"' in captured.err
+    assert "private unsafe XML detail" not in captured.err

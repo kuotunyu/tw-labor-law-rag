@@ -21,10 +21,17 @@ import httpx
 
 if __package__ in {None, ""}:
     import _bootstrap  # noqa: F401
-    from download_corpus import DUMPS, iter_laws, normalize_name, validate_dump_zip
+    from download_corpus import (
+        DUMPS,
+        CorpusArchiveError,
+        iter_laws,
+        normalize_name,
+        validate_dump_zip,
+    )
 else:
     from scripts.download_corpus import (
         DUMPS,
+        CorpusArchiveError,
         iter_laws,
         normalize_name,
         validate_dump_zip,
@@ -131,7 +138,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         return _run(args)
-    except (httpx.HTTPError, OSError, ValueError, KeyError) as exc:
+    except (CorpusArchiveError, httpx.HTTPError, OSError, ValueError, KeyError) as exc:
         print(
             json.dumps(
                 {"status": "invalid_source", "error_type": type(exc).__name__}
