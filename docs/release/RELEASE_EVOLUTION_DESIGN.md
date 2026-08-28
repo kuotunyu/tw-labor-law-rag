@@ -1,7 +1,7 @@
 # Release Evolution Foundation Design
 
-**Status:** Approved for specification on 2026-08-28  
-**Target branch:** `feat/v0.2-release-evolution-foundation`  
+**Status:** Approved for specification on 2026-08-28
+**Target branch:** `feat/v0.2-release-evolution-foundation`
 **Repository:** `tw-labor-law-rag`
 
 ## Context
