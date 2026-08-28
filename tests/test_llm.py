@@ -102,6 +102,46 @@ def test_empty_provider_response_is_operational_failure(monkeypatch):
     assert exc_info.value.reason_code == "empty_response"
 
 
+def test_gemini_output_includes_billable_usage(monkeypatch):
+    """Catches thinking tokens being omitted from Gemini output cost."""
+    llm = build_llm(settings_for("gemini"), model="gemini-test")
+    response = SimpleNamespace(
+        text="回答",
+        prompt_feedback=None,
+        candidates=[],
+        usage_metadata=SimpleNamespace(
+            prompt_token_count=100,
+            candidates_token_count=20,
+            thoughts_token_count=7,
+        ),
+    )
+    monkeypatch.setattr(llm.client.models, "generate_content", lambda **_kwargs: response)
+
+    output = llm.generate("system", "user")
+
+    assert output.input_tokens == 100
+    assert output.output_tokens == 27
+
+
+def test_openai_output_includes_billable_usage(monkeypatch):
+    llm = build_llm(settings_for("openai"), model="openai-test")
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                finish_reason="stop",
+                message=SimpleNamespace(content="回答", refusal=None),
+            )
+        ],
+        usage=SimpleNamespace(prompt_tokens=100, completion_tokens=27),
+    )
+    monkeypatch.setattr(llm.client.chat.completions, "create", lambda **_kwargs: response)
+
+    output = llm.generate("system", "user")
+
+    assert output.input_tokens == 100
+    assert output.output_tokens == 27
+
+
 def test_gemini_35_flash_lite_uses_minimal_thinking_level(monkeypatch):
     """Catches Gemini 3.x being sent the Gemini 2.5 thinking-budget contract."""
     from google.genai import types

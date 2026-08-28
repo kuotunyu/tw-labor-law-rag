@@ -42,6 +42,7 @@ eval/official/e2e_trace.jsonl
 eval/official/reliability_results.json
 eval/official/reliability_trace.jsonl
 eval/run_e2e_eval.py
+eval/run_provider_crosscheck.py
 eval/run_reliability_eval.py
 eval/run_retrieval_eval.py
 pyproject.toml
@@ -80,6 +81,8 @@ src/rag/ingestion/chunkers.py
 src/rag/ingestion/cleaner.py
 src/rag/ingestion/loader.py
 src/rag/models.py
+src/rag/provider_budget.py
+src/rag/provider_crosscheck.py
 src/rag/release_verification.py
 src/rag/reliability.py
 src/rag/retrieval/__init__.py
@@ -107,6 +110,8 @@ tests/test_loader.py
 tests/test_official_artifacts.py
 tests/test_packaging.py
 tests/test_pipeline.py
+tests/test_provider_budget.py
+tests/test_provider_crosscheck.py
 tests/test_refusal_labels.py
 tests/test_release_verification.py
 tests/test_reliability.py
