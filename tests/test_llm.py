@@ -1,5 +1,6 @@
 """Offline provider-adapter contract tests using local fake SDK clients."""
 
+from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 
 import pytest
@@ -65,6 +66,13 @@ def test_llm_output_defaults_to_no_fallback():
     assert output.fallback_from is None
 
 
+def test_llm_output_is_immutable():
+    output = LLMOutput(text="回答", provider="gemini", model="gemini-test")
+
+    with pytest.raises(FrozenInstanceError):
+        output.text = "修改後答案"
+
+
 def test_build_llm_uses_provider_specific_model():
     settings = settings_for("gemini")
     settings.gemini_generation_model = "gemini-specific"
@@ -92,6 +100,77 @@ def test_empty_provider_response_is_operational_failure(monkeypatch):
 
     assert exc_info.value.provider == "gemini"
     assert exc_info.value.reason_code == "empty_response"
+
+
+def test_openai_structured_refusal_is_policy_error(monkeypatch):
+    llm = build_llm(settings_for("openai"), model="openai-test")
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                finish_reason="stop",
+                message=SimpleNamespace(content=None, refusal="I cannot help with that."),
+            )
+        ]
+    )
+    monkeypatch.setattr(llm.client.chat.completions, "create", lambda **_kwargs: response)
+
+    with pytest.raises(ProviderPolicyError) as exc_info:
+        llm.generate("system", "user")
+
+    assert exc_info.value.provider == "openai"
+    assert not isinstance(exc_info.value, ProviderOperationalError)
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        pytest.param(
+            "prompt_feedback",
+            id="prompt-safety-block",
+        ),
+        pytest.param(
+            "candidate_finish_reason",
+            id="candidate-safety-finish",
+        ),
+        pytest.param(
+            "candidate_safety_rating",
+            id="candidate-safety-rating",
+        ),
+    ],
+)
+def test_gemini_structured_safety_block_is_policy_error(monkeypatch, response):
+    from google.genai import types
+
+    llm = build_llm(settings_for("gemini"), model="gemini-test")
+    if response == "prompt_feedback":
+        provider_response = types.GenerateContentResponse(
+            prompt_feedback=types.GenerateContentResponsePromptFeedback(
+                block_reason=types.BlockedReason.SAFETY
+            )
+        )
+    elif response == "candidate_finish_reason":
+        provider_response = types.GenerateContentResponse(
+            candidates=[types.Candidate(finish_reason=types.FinishReason.SAFETY)]
+        )
+    else:
+        provider_response = types.GenerateContentResponse(
+            candidates=[
+                types.Candidate(
+                    safety_ratings=[types.SafetyRating(blocked=True)]
+                )
+            ]
+        )
+    monkeypatch.setattr(
+        llm.client.models,
+        "generate_content",
+        lambda **_kwargs: provider_response,
+    )
+
+    with pytest.raises(ProviderPolicyError) as exc_info:
+        llm.generate("system", "user")
+
+    assert exc_info.value.provider == "gemini"
+    assert not isinstance(exc_info.value, ProviderOperationalError)
 
 
 def test_build_llm_provider_override_ignores_settings_provider():

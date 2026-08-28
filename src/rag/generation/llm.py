@@ -85,6 +85,37 @@ def _provider_output(provider: str, model: str, text: str) -> LLMOutput:
     return LLMOutput(text=text, provider=provider, model=model)
 
 
+def _gemini_response_is_policy_blocked(response, types) -> bool:
+    policy_block_reasons = {
+        types.BlockedReason.SAFETY,
+        types.BlockedReason.BLOCKLIST,
+        types.BlockedReason.PROHIBITED_CONTENT,
+        types.BlockedReason.IMAGE_SAFETY,
+        types.BlockedReason.MODEL_ARMOR,
+        types.BlockedReason.JAILBREAK,
+    }
+    policy_finish_reasons = {
+        types.FinishReason.SAFETY,
+        types.FinishReason.BLOCKLIST,
+        types.FinishReason.PROHIBITED_CONTENT,
+        types.FinishReason.SPII,
+        types.FinishReason.IMAGE_SAFETY,
+        types.FinishReason.IMAGE_PROHIBITED_CONTENT,
+    }
+    prompt_feedback = getattr(response, "prompt_feedback", None)
+    if prompt_feedback is not None:
+        if getattr(prompt_feedback, "block_reason", None) in policy_block_reasons:
+            return True
+        if any(rating.blocked for rating in (prompt_feedback.safety_ratings or [])):
+            return True
+    for candidate in getattr(response, "candidates", None) or []:
+        if candidate.finish_reason in policy_finish_reasons:
+            return True
+        if any(rating.blocked for rating in (candidate.safety_ratings or [])):
+            return True
+    return False
+
+
 class LLMAdapter(Protocol):
     provider: str
     model: str
@@ -178,7 +209,11 @@ class OpenAIAdapter:
             except APIError as exc:
                 raise _normalized_provider_error(self.provider, exc) from None
             else:
-                text = resp.choices[0].message.content or ""
+                choice = resp.choices[0]
+                message = choice.message
+                if message.refusal is not None or choice.finish_reason == "content_filter":
+                    raise ProviderPolicyError(self.provider)
+                text = message.content or ""
                 return _provider_output(self.provider, self.model, text)
 
 
@@ -215,6 +250,8 @@ class GeminiAdapter:
             )
         except errors.APIError as exc:
             raise _normalized_provider_error(self.provider, exc) from None
+        if _gemini_response_is_policy_blocked(resp, types):
+            raise ProviderPolicyError(self.provider)
         return _provider_output(self.provider, self.model, resp.text or "")
 
 
