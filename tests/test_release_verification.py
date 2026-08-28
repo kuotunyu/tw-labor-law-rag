@@ -340,6 +340,7 @@ def test_ruff_is_locked_and_ci_enforces_publication_gates():
     ]
     positions = [workflow.index(command) for command in required_commands]
     assert positions == sorted(positions)
+    assert "--ignore-vuln" not in workflow
     assert re.search(r"(?m)^\s+branches:\s*\[main\]\s*$", workflow)
     assert re.search(r'(?m)^\s+tags:\s*\["v\*"\]\s*$', workflow)
     assert re.search(r"(?m)^\s+pull_request:\s*$", workflow)
