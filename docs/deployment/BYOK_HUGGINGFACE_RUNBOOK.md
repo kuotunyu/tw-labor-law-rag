@@ -9,7 +9,7 @@
 - `QDRANT_API_KEY` 必須只讀且只可存取 `labor_laws_structure`、`labor_laws_fixed`。
 - 禁止在 Space 設定 `GEMINI_API_KEY`、`OPENAI_API_KEY` 或 Qdrant write/manage Key。
 - 訪客 Key 不得貼入 issue、commit、終端輸出、聊天或 `.env`；只可輸入 UI 密碼欄位。
-- Qdrant cluster 與 Hugging Face GPU 都可能計費。建立前先顯示控制台的即時價格與休眠設定，取得擁有者確認。
+- 本部署只允許 Qdrant Free Tier 與 Hugging Face `cpu-basic`；不得申請付費硬體、持久 storage 或額外 replica。
 
 ## 2. 本機驗證
 
@@ -56,7 +56,7 @@ writer Key 不可保存。runtime reader 值只輸入 Hugging Face Secret。
 uvx --from huggingface_hub hf auth login
 ```
 
-2. 在 new-Space 畫面選 Docker、Private、閒置 3600 秒休眠。優先選目前可用且至少 16 GB VRAM 的最低價 GPU；若有 `t4-small` 優先。先向擁有者顯示即時每小時價格並取得確認，再建立 `tw-labor-law-rag-demo`。
+2. 在 new-Space 畫面選 Docker、Private 與 `cpu-basic`（2 vCPU、16 GB RAM、50 GB 非持久磁碟，硬體時薪 US$0），只保留 1 個 replica，不購買持久 storage，也不設定付費硬體才支援的自訂休眠時間。免費層閒置後可自動睡眠並由訪客喚醒。CPU 驗收失敗時保持 private/paused，禁止自動改用任何付費硬體。
 3. Space Variables：
 
 ```text
