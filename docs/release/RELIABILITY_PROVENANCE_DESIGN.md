@@ -168,4 +168,3 @@ reported as pending credentials rather than silently substituting another model.
   credential is currently available.
 - Automatic recurring monitoring, because the owner explicitly deleted that schedule.
 - A production threshold change unless the new evidence meets the gate above.
-
