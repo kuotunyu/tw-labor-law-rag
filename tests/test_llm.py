@@ -102,6 +102,50 @@ def test_empty_provider_response_is_operational_failure(monkeypatch):
     assert exc_info.value.reason_code == "empty_response"
 
 
+def test_gemini_35_flash_lite_uses_minimal_thinking_level(monkeypatch):
+    """Catches Gemini 3.x being sent the Gemini 2.5 thinking-budget contract."""
+    from google.genai import types
+
+    captured = {}
+    llm = build_llm(
+        settings_for("gemini"),
+        model="gemini-3.5-flash-lite",
+    )
+
+    def generate_content(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(text="回答", prompt_feedback=None, candidates=[])
+
+    monkeypatch.setattr(llm.client.models, "generate_content", generate_content)
+
+    llm.generate("system", "user")
+
+    thinking = captured["config"].thinking_config
+    assert thinking.thinking_level == types.ThinkingLevel.MINIMAL
+    assert thinking.thinking_budget is None
+
+
+def test_gemini_25_flash_keeps_zero_thinking_budget(monkeypatch):
+    """Catches the Gemini 3.x compatibility change regressing Gemini 2.5."""
+    captured = {}
+    llm = build_llm(
+        settings_for("gemini"),
+        model="gemini-2.5-flash",
+    )
+
+    def generate_content(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(text="回答", prompt_feedback=None, candidates=[])
+
+    monkeypatch.setattr(llm.client.models, "generate_content", generate_content)
+
+    llm.generate("system", "user")
+
+    thinking = captured["config"].thinking_config
+    assert thinking.thinking_budget == 0
+    assert thinking.thinking_level is None
+
+
 def test_openai_structured_refusal_is_policy_error(monkeypatch):
     llm = build_llm(settings_for("openai"), model="openai-test")
     response = SimpleNamespace(
@@ -267,6 +311,52 @@ def test_timeout_failure_has_specific_safe_reason_code():
     assert error.reason_code == "timeout"
     assert secret not in str(error)
     assert secret not in repr(error)
+
+
+def test_gemini_invalid_key_http_400_is_sanitized_auth_failure():
+    from google.genai import errors
+
+    secret = "visitor-key-must-not-escape"
+    provider_error = errors.ClientError(
+        400,
+        {
+            "error": {
+                "code": 400,
+                "message": f"API key not valid. Credential: {secret}",
+                "status": "INVALID_ARGUMENT",
+            }
+        },
+    )
+
+    error = llm_module._normalized_provider_error("gemini", provider_error)
+
+    assert isinstance(error, ProviderOperationalError)
+    assert error.reason_code == "http_401"
+    assert secret not in str(error)
+    assert secret not in repr(error)
+
+
+def test_gemini_non_auth_http_400_is_sanitized_operational_failure():
+    from google.genai import errors
+
+    provider_detail = "thinking budget is not supported"
+    provider_error = errors.ClientError(
+        400,
+        {
+            "error": {
+                "code": 400,
+                "message": provider_detail,
+                "status": "INVALID_ARGUMENT",
+            }
+        },
+    )
+
+    error = llm_module._normalized_provider_error("gemini", provider_error)
+
+    assert isinstance(error, ProviderOperationalError)
+    assert error.reason_code == "http_400"
+    assert provider_detail not in str(error)
+    assert provider_detail not in repr(error)
 
 
 def test_build_llm_unknown_provider_raises():
