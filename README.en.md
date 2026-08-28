@@ -24,6 +24,16 @@ The retrieval, answerability, refusal, citation, configuration, and ablation ari
 
 The 0.03 reranker gate is calibrated only against this formal 30-answerable/10-unanswerable set. It is not a universal answerability classifier. A real-use question outside the formal set, written as a long colloquial narrative with the English word “deadline,” scored 0.0146 and was directly false-refused even though the correct article remained in the candidates. This demonstrates a query-style boundary; the available evidence does not estimate its prevalence.
 
+## Upcoming v0.3 dual-model runtime (unreleased, post-v0.2.0)
+
+This branch develops an unreleased dual-model answer runtime; it is not part of the existing local `v0.2.0` tag. The public API/UI defaults to Gemini `gemini-3.5-flash-lite`. When OpenAI is also configured on the server, a user may select `gpt-5.6-luna` per request. The model names can be overridden independently with server-side `GEMINI_GENERATION_MODEL` and `OPENAI_GENERATION_MODEL`. When its key is configured, `LLM_PROVIDER=gemini` controls the default for a request that omits a provider; otherwise the API uses the other configured public provider. `LLM_FALLBACK_ENABLED=true` permits fallback. `GEMINI_API_KEY` and `OPENAI_API_KEY` remain only in the API server environment: the UI neither accepts, stores, nor displays them.
+
+The fallback boundary is fixed: only an operational failure of the primary provider—such as transport failure, rate limiting, a 5xx service response, or an empty response—may trigger at most one attempt through the other configured public provider. Retrieval-layer refusal does not call a generator. A model refusal based on the retrieved law, a provider safety block, or a policy rejection never falls back. The formal evaluation path continues to bind directly to one generator and one judge provider with runtime fallback off, so routing changes cannot silently change the evaluated configuration.
+
+The Streamlit sidebar's **Answer model** selector shows only configured Gemini/OpenAI entries returned by API `/models`; the selected provider is sent with each `/query`. In a query response, `requested_provider` records the requested route, `provider` and `model` are metadata for the model that actually generated the answer, `fallback_used`/`fallback_from` describe rerouting, and `generation_called=false` means retrieval refused before generation. The UI displays requested and actual models separately and warns when fallback occurred. Live provider smoke tests require local server-side secrets and are outside public offline CI.
+
+The `v0.1.0` formal metrics remain historical results produced by the generator and judge models recorded in `release/manifest.json`; this unreleased runtime has not rerun, replaced, or independently re-judged those values.
+
 ## Architecture
 
 ```text
