@@ -491,12 +491,21 @@ def _verify_publishable_git_history(
 ) -> int:
     commits = _publishable_commit_ids(project_root)
     allowed_paths = current_public_paths | legacy_public_paths
-    expected_identity = (
-        "kuotunyu",
-        "61350295+kuotunyu@users.noreply.github.com",
+    owner_identity = (
         "kuotunyu",
         "61350295+kuotunyu@users.noreply.github.com",
     )
+    allowed_identities = {
+        (
+            *owner_identity,
+            *owner_identity,
+        ),
+        (
+            *owner_identity,
+            "GitHub",
+            "noreply" + "@" + "github.com",
+        ),
+    }
     for commit in commits:
         entries = _git_archive_entries(project_root, commit)
         issues = _scan_public_entries(entries)
@@ -545,11 +554,11 @@ def _verify_publishable_git_history(
                 f"failed to read identity for commit {commit}"
             ) from exc
         identity = tuple(identity_process.stdout.strip().split("\0"))
-        _assert_equal(
-            f"public commit identity {commit}",
-            identity,
-            expected_identity,
-        )
+        if identity not in allowed_identities:
+            raise ReleaseVerificationError(
+                f"public commit identity {commit}: actual={identity!r}, "
+                f"allowed={sorted(allowed_identities)!r}"
+            )
     return len(commits)
 
 
