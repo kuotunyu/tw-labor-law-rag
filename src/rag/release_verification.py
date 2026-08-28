@@ -481,14 +481,85 @@ def _git_archive_entries(project_root: Path, commit: str) -> list[PublicEntry]:
     return _parse_git_archive(process.stdout, commit=commit)
 
 
+def _verify_publishable_git_history(
+    project_root: Path,
+    current_public_paths: set[str],
+    *,
+    legacy_public_paths: set[str],
+    reviewed_binary_hashes: set[str],
+) -> int:
+    commits = _publishable_commit_ids(project_root)
+    allowed_paths = current_public_paths | legacy_public_paths
+    expected_identity = (
+        "kuotunyu",
+        "61350295+kuotunyu@users.noreply.github.com",
+        "kuotunyu",
+        "61350295+kuotunyu@users.noreply.github.com",
+    )
+    for commit in commits:
+        entries = _git_archive_entries(project_root, commit)
+        issues = _scan_public_entries(entries)
+        for entry in entries:
+            if entry.path not in allowed_paths:
+                issues.append(_issue(entry.path, "unexpected_history_path", commit))
+            if Path(entry.path).suffix.lower() in BINARY_PUBLIC_SUFFIXES:
+                digest = hashlib.sha256(entry.data).hexdigest()
+                if digest not in reviewed_binary_hashes:
+                    issues.append(
+                        _issue(entry.path, "unreviewed_history_binary", commit)
+                    )
+        if issues:
+            sanitized = [
+                {**issue, "commit": commit}
+                for issue in sorted(
+                    issues,
+                    key=lambda item: (
+                        item["path"],
+                        item["category"],
+                        item["location"],
+                    ),
+                )
+            ]
+            raise ReleaseVerificationError(
+                f"publishable history issues: {sanitized}"
+            )
+        try:
+            identity_process = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(project_root),
+                    "show",
+                    "-s",
+                    "--format=%an%x00%ae%x00%cn%x00%ce",
+                    commit,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+        except subprocess.CalledProcessError as exc:
+            raise ReleaseVerificationError(
+                f"failed to read identity for commit {commit}"
+            ) from exc
+        identity = tuple(identity_process.stdout.strip().split("\0"))
+        _assert_equal(
+            f"public commit identity {commit}",
+            identity,
+            expected_identity,
+        )
+    return len(commits)
+
+
 def _verify_reachable_git_history(
     project_root: Path,
     public_paths: set[str],
     *,
     max_commits: int,
 ) -> int:
-    if not (project_root / ".git").exists():
-        return 0
+    """Preserve the v0.1 manifest path until Task 5 migrates its call site."""
+
     commit_process = subprocess.run(
         ["git", "-C", str(project_root), "rev-list", "--all"],
         check=True,
@@ -509,7 +580,16 @@ def _verify_reachable_git_history(
     )
     for commit in commits:
         tree_process = subprocess.run(
-            ["git", "-C", str(project_root), "ls-tree", "-r", "-z", "--name-only", commit],
+            [
+                "git",
+                "-C",
+                str(project_root),
+                "ls-tree",
+                "-r",
+                "-z",
+                "--name-only",
+                commit,
+            ],
             check=True,
             capture_output=True,
         )

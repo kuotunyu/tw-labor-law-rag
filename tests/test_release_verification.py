@@ -331,42 +331,146 @@ def test_git_archive_entries_wrap_git_failure(tmp_path):
         release_module()._git_archive_entries(tmp_path, "f" * 40)
 
 
-def test_reachable_history_rejects_a_forbidden_path(tmp_path):
-    subprocess.run(["git", "init", "-b", "main", str(tmp_path)], check=True)
-    subprocess.run(
-        ["git", "-C", str(tmp_path), "config", "user.name", "kuotunyu"],
-        check=True,
+def test_publishable_history_rejects_forbidden_path_on_public_branch(tmp_path):
+    init_public_repo(tmp_path)
+    public_commit = commit_file(tmp_path, "README.md", b"public", "public")
+    forbidden_commit = commit_file(
+        tmp_path,
+        ".claude/launch.json",
+        b"{}",
+        "forbidden",
     )
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(tmp_path),
-            "config",
-            "user.email",
-            "61350295+kuotunyu@users.noreply.github.com",
-        ],
-        check=True,
-    )
-    (tmp_path / "README.md").write_text("public", encoding="utf-8")
-    forbidden = tmp_path / ".claude"
-    forbidden.mkdir()
-    (forbidden / "launch.json").write_text("{}", encoding="utf-8")
-    subprocess.run(["git", "-C", str(tmp_path), "add", "--all"], check=True)
-    subprocess.run(
-        ["git", "-C", str(tmp_path), "commit", "-m", "test fixture"],
-        check=True,
-        capture_output=True,
-    )
+    run_git(tmp_path, "reset", "--hard", public_commit)
+    run_git(tmp_path, "update-ref", "refs/heads/archive/review", forbidden_commit)
 
     with pytest.raises(
         release_module().ReleaseVerificationError,
-        match="reachable history tree",
+        match="publishable history issues",
     ):
-        release_module()._verify_reachable_git_history(
+        release_module()._verify_publishable_git_history(
             tmp_path,
             {"README.md"},
-            max_commits=1,
+            legacy_public_paths=set(),
+            reviewed_binary_hashes=set(),
+        )
+
+
+def test_publishable_history_rejects_secret_removed_from_current_tree(tmp_path):
+    init_public_repo(tmp_path)
+    secret = "sk-" + "A" * 32
+    commit_file(tmp_path, "README.md", secret.encode("utf-8"), "leak")
+    commit_file(tmp_path, "README.md", b"clean", "remove leak")
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="provider_token",
+    ) as caught:
+        release_module()._verify_publishable_git_history(
+            tmp_path,
+            {"README.md"},
+            legacy_public_paths=set(),
+            reviewed_binary_hashes=set(),
+        )
+
+    assert secret not in str(caught.value)
+
+
+def test_publishable_history_allows_explicit_legacy_path(tmp_path):
+    init_public_repo(tmp_path)
+    commit_file(tmp_path, "legacy.md", b"old public file", "old release")
+    (tmp_path / "legacy.md").unlink()
+    (tmp_path / "README.md").write_bytes(b"current")
+    run_git(tmp_path, "add", "--all")
+    run_git(tmp_path, "commit", "-m", "new release")
+
+    count = release_module()._verify_publishable_git_history(
+        tmp_path,
+        {"README.md"},
+        legacy_public_paths={"legacy.md"},
+        reviewed_binary_hashes=set(),
+    )
+
+    assert count == 2
+
+
+def test_publishable_history_allows_current_file_absent_from_older_commit(tmp_path):
+    init_public_repo(tmp_path)
+    commit_file(tmp_path, "README.md", b"first", "first release")
+    commit_file(tmp_path, "CHANGELOG.md", b"added later", "second release")
+
+    assert release_module()._verify_publishable_git_history(
+        tmp_path,
+        {"README.md", "CHANGELOG.md"},
+        legacy_public_paths=set(),
+        reviewed_binary_hashes=set(),
+    ) == 2
+
+
+def test_publishable_history_rejects_unlisted_legacy_path(tmp_path):
+    init_public_repo(tmp_path)
+    commit_file(tmp_path, "legacy.md", b"old public file", "old release")
+    (tmp_path / "legacy.md").unlink()
+    (tmp_path / "README.md").write_bytes(b"current")
+    run_git(tmp_path, "add", "--all")
+    run_git(tmp_path, "commit", "-m", "new release")
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="unexpected_history_path",
+    ):
+        release_module()._verify_publishable_git_history(
+            tmp_path,
+            {"README.md"},
+            legacy_public_paths=set(),
+            reviewed_binary_hashes=set(),
+        )
+
+
+def test_publishable_history_requires_reviewed_binary_hash(tmp_path):
+    init_public_repo(tmp_path)
+    binary = b"reviewed image bytes"
+    commit_file(tmp_path, "image.png", binary, "image")
+    digest = __import__("hashlib").sha256(binary).hexdigest()
+    module = release_module()
+
+    assert module._verify_publishable_git_history(
+        tmp_path,
+        {"image.png"},
+        legacy_public_paths=set(),
+        reviewed_binary_hashes={digest},
+    ) == 1
+    with pytest.raises(
+        module.ReleaseVerificationError,
+        match="unreviewed_history_binary",
+    ):
+        module._verify_publishable_git_history(
+            tmp_path,
+            {"image.png"},
+            legacy_public_paths=set(),
+            reviewed_binary_hashes=set(),
+        )
+
+
+def test_publishable_history_rejects_unexpected_identity(tmp_path):
+    subprocess.run(
+        ["git", "init", "-b", "main", str(tmp_path)],
+        check=True,
+        capture_output=True,
+    )
+    run_git(tmp_path, "config", "user.name", "Unexpected Author")
+    private_email = "unexpected" + "@" + "example.test"
+    run_git(tmp_path, "config", "user.email", private_email)
+    commit_file(tmp_path, "README.md", b"public", "wrong identity")
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="public commit identity",
+    ):
+        release_module()._verify_publishable_git_history(
+            tmp_path,
+            {"README.md"},
+            legacy_public_paths=set(),
+            reviewed_binary_hashes=set(),
         )
 
 
