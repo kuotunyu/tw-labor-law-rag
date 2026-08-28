@@ -30,6 +30,7 @@ eval/ablation.py
 eval/dataset/README.md
 eval/dataset/eval_set.jsonl
 eval/dataset/mini_eval.jsonl
+eval/dataset/reliability_stress_v0.3.1.jsonl
 eval/export_official.py
 eval/judge.py
 eval/lib.py
@@ -104,6 +105,7 @@ tests/test_packaging.py
 tests/test_pipeline.py
 tests/test_refusal_labels.py
 tests/test_release_verification.py
+tests/test_reliability_dataset.py
 tests/test_retriever.py
 tests/test_space_runner.py
 tests/test_tokenizer.py
