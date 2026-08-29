@@ -13,6 +13,16 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_NAME = "kuotunyu"
 PUBLIC_EMAIL = "61350295+kuotunyu@users.noreply.github.com"
+CURRENT_PROVIDER_EVIDENCE_RELEASE = "v0.3.2 provider safety cross-check"
+CURRENT_PROVIDER_EVIDENCE_DOCUMENTS = (
+    "README.md",
+    "README.en.md",
+    "DESIGN.md",
+    "EVAL_REPORT.md",
+    "docs/release/CLAIM_MATRIX.md",
+    "docs/release/PUBLICATION_BOUNDARY.md",
+    "docs/release/REVIEWER_GUIDE.md",
+)
 
 
 def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess[bytes]:
@@ -82,6 +92,22 @@ def git_tracked_paths() -> set[str]:
         for item in process.stdout.split(b"\0")
         if item
     }
+
+
+def test_current_provider_evidence_docs_publish_completed_release_contract():
+    for relative_path in CURRENT_PROVIDER_EVIDENCE_DOCUMENTS:
+        content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+
+        assert CURRENT_PROVIDER_EVIDENCE_RELEASE in content, relative_path
+        current_section = content.split(CURRENT_PROVIDER_EVIDENCE_RELEASE, 1)[1]
+        current_section = current_section.split("\n## ", 1)[0]
+        assert "pending_credentials" not in current_section, relative_path
+
+    official_artifacts_readme = (
+        PROJECT_ROOT / "eval/official/README.md"
+    ).read_text(encoding="utf-8")
+    assert CURRENT_PROVIDER_EVIDENCE_RELEASE in official_artifacts_readme
+    assert "pending_credentials" not in official_artifacts_readme
 
 
 def write_version_contract_fixture(

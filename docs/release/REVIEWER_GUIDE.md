@@ -31,6 +31,10 @@ git status --short
 
 ## Expected evidence summary
 
+### v0.3.2 provider safety cross-check
+
+Gemini `gemini-3.5-flash-lite` and OpenAI `gpt-5.6-luna` both completed five requests. Gemini observed refusal accuracy `0.8`, citation success `1.0`, and estimated cost `US$0.0022620`; OpenAI observed refusal accuracy `1.0`, citation success `1.0`, and estimated cost `US$0.0026414`. This safety cross-check does not replace the `v0.1.0` formal evidence baseline or constitute a formal model-quality evaluation. The public trace is strictly content-free and contains no question/answer text, provider payload, or credentials.
+
 The release verifier should exit zero and report:
 
 - dataset: 40 questions, 30 answerable, 10 unanswerable
@@ -42,7 +46,7 @@ The release verifier should exit zero and report:
 - refusal stages: 9 threshold, 2 LLM, 0 no-hits
 - threshold score/stage contract: true for all 40 rows at gate `0.03`
 - provider evidence: 29 archived numeric verdicts; faithfulness `4.896551724137931`, relevancy `5.0`
-- provider cross-check: `pending_credentials`, authorized ceiling US$5.00 per provider, required providers Gemini and OpenAI; no official provider cross-check artifacts may exist while pending
+- provider cross-check: complete, five requests per provider under the authorized US$5.00 ceiling; Gemini refusal/citation `0.8`/`1.0`, cost `US$0.0022620`; OpenAI `1.0`/`1.0`, `US$0.0026414`
 - OGDL source samples verified: 2
 - full corpus snapshot: 2026-08-29, 15 laws, 884 non-deleted articles
 - GitHub Action references: 2, both full commit SHAs

@@ -51,7 +51,9 @@
 
 門檻 sweep 為 0、0.005、0.01、0.02、0.03、0.04、0.05、0.1。沒有候選能在 stress 與 formal guard 的直接誤拒率及不可答攔截率上同時全面不劣、且至少改善一項，因此結果是 `retain_0.03`，沒有自動改 production config。壓力集的 1/40 直接誤拒確認舊有口語問法風險是真實邊界，但 60 題仍不足以估計自然流量發生率。
 
-Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 的執行器使用 Decimal 成本、每家 US$5 硬帽，並在每次呼叫前對實際 system + user prompt 做 UTF-8 byte 保守 token 上界；request maxima 固定不超過 20,000 input／1,024 output tokens。缺失或負 token usage、非正價格、prompt／usage 超界、逃出 ignored `eval/runs/` 的 raw run 路徑與未知 maxima 都會在 fail-closed 路徑停止。本機沒有本專案專用 provider 金鑰，因此正式 cross-check 狀態為 `pending_credentials`；沒有使用其他專案 `.env`，也沒有產生可誤認為真實呼叫的 placeholder 結果。
+## v0.3.2 provider safety cross-check
+
+Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 的執行器使用 Decimal 成本、每家 US$5 硬帽，並在每次呼叫前對實際 system + user prompt 做 UTF-8 byte 保守 token 上界；request maxima 固定不超過 20,000 input／1,024 output tokens。缺失或負 token usage、非正價格、prompt／usage 超界、逃出 ignored `eval/runs/` 的 raw run 路徑與未知 maxima 都會在 fail-closed 路徑停止。兩家都完成五筆請求：Gemini observed refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI observed refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 嚴格不含 question/answer text、provider payload 或 credentials。這是 safety cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。
 
 ### 發現 1:每一級管線都有量化貢獻
 
@@ -134,7 +136,7 @@ fixed/vector 的 §24 未進 top-5,structure/vector 則命中——400 字視窗
 ## 限制與待辦
 
 1. **樣本量**:正式集 40 題、壓力集 60 題足以揭露失敗模式，但仍不是自然使用流量樣本；個位數差異不宜外推為母體發生率
-2. **Provider cross-check 待專用金鑰**:雙 provider 硬預算執行器已驗證，但正式呼叫尚未執行；release contract 明確標記 `pending_credentials`
+2. **Provider safety cross-check 的範圍**:雙 provider 各五筆 observed 結果只交叉檢查 safety/refusal 與 citation 行為及成本；它不構成、也不取代 `v0.1.0` formal baseline 的正式模型品質評估
 3. **Judge 決定論**:gpt-5-mini 不接受自訂 temperature(推理模型),重跑分數可能有 ±1 級波動
 4. **語料時效**:snapshot 僅證明 2026-08-29 下載內容；法規修訂後需重新稽核 snapshot、重建索引與重跑評估
 5. **拒答門檻對問法風格敏感**:壓力集已量測 1/40 直接誤拒，只能確認邊界仍存在，不能估計自然使用中「多常發生」

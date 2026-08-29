@@ -13,9 +13,9 @@
 - `reliability_trace.jsonl`：60 筆只含 qid、answerable、rank、top score、threshold decision 與 latency 的隱私精簡 trace；不含問題文字、檢索內容或模型輸出。
 - `reliability_formal_trace.jsonl`：40 筆正式 guard 的同格式隱私精簡 trace，供 verifier 獨立重算 guard 指標與 Pareto 決策。
 
-Gemini／OpenAI 的正式 cross-check 尚未執行，`release/manifest.json` 明確標為
-`pending_credentials`。因此本目錄目前刻意沒有 `provider_crosscheck_results.json` 或
-`provider_crosscheck_trace.jsonl`；pending 狀態若出現任一檔案，release verifier 會失敗，避免未驗證資料被誤認為正式證據。
+## v0.3.2 provider safety cross-check
+
+Gemini／OpenAI 的正式 safety cross-check 已完成，`release/manifest.json` 記錄完整 contract，且本目錄收錄 `provider_crosscheck_results.json` 與 `provider_crosscheck_trace.jsonl`。兩家各五筆請求：Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。這是 safety cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。provider trace 嚴格 content-free，不含 question/answer text、provider payload 或 credentials。
 
 目前已發布的 JSON 都只保留設定白名單,不含 prompt、完整生成答案、judge 理由、provider response、request ID、token usage、API key、服務 URL、使用者名稱、個人識別資訊或本機路徑。
 每份結果內含公開評估集的 SHA-256，可確認題目版本一致。
@@ -42,7 +42,7 @@ uv run python scripts/verify_release.py
 uv run pytest tests/test_official_artifacts.py tests/test_release_verification.py -q
 ```
 
-這條路徑不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,並會核對 canonical dataset hash、40/30/10 組成、60 題壓力集、8×40 grid、全部彙總算術、15 部／884 條 snapshot、provider pending contract、strict trace fields 與 privacy/secret patterns。
+這條路徑不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,並會核對 canonical dataset hash、40/30/10 組成、60 題壓力集、8×40 grid、全部彙總算術、15 部／884 條 snapshot、provider complete contract、strict trace fields 與 privacy/secret patterns。
 
 ## 從 retained private raw runs 重新匯出
 
