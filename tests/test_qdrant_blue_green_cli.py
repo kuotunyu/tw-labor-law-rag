@@ -110,6 +110,43 @@ def test_dry_run_fails_closed_on_snapshot_drift(local_corpus, capsys):
     assert "content_sha256" not in captured.err
 
 
+@pytest.mark.parametrize(
+    ("relative_path", "content"),
+    [
+        (Path("nested/extra.json"), "{}"),
+        (Path("notes.md"), "# unreviewed"),
+        (Path("notes.txt"), "unreviewed"),
+        (Path("attachment.pdf"), "%PDF-1.4"),
+    ],
+)
+def test_dry_run_rejects_uncommitted_indexable_files_before_any_cloud_action(
+    monkeypatch,
+    local_corpus,
+    capsys,
+    relative_path,
+    content,
+):
+    unexpected = local_corpus["laws_dir"] / relative_path
+    unexpected.parent.mkdir(parents=True, exist_ok=True)
+    unexpected.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(
+        cli,
+        "VectorStore",
+        lambda *_args, **_kwargs: pytest.fail("invalid corpus must not create a client"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "snapshot_download",
+        lambda **_kwargs: pytest.fail("invalid corpus must not inspect model cache"),
+    )
+
+    assert cli.main(_base_args(local_corpus)) == 2
+    assert json.loads(capsys.readouterr().err) == {
+        "status": "error",
+        "code": "snapshot_drift",
+    }
+
+
 def test_execute_requires_repeated_candidate_confirmation(local_corpus, capsys):
     args = [
         *_base_args(local_corpus),
@@ -234,6 +271,49 @@ def test_parser_exposes_only_approved_maintenance_options():
     }
 
 
+def test_default_receipt_is_candidate_specific():
+    args = cli.parse_args(["--candidate-base", "labor_laws_20260830_deadbeef"])
+
+    assert args.receipt == Path(
+        "eval/runs/qdrant-maintenance/labor_laws_20260830_deadbeef.json"
+    )
+
+
+def test_execute_rejects_existing_receipt_before_cache_or_client(
+    monkeypatch, local_corpus, capsys, tmp_path
+):
+    monkeypatch.setattr(cli, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setenv("QDRANT_URL", "https://private.example.test")
+    monkeypatch.setenv("QDRANT_WRITER_API_KEY", "private-writer-key")
+    target = tmp_path / local_corpus["receipt"]
+    target.parent.mkdir(parents=True)
+    target.write_text('{"existing": true}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        cli,
+        "snapshot_download",
+        lambda **_kwargs: pytest.fail("existing receipt must fail before cache check"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "VectorStore",
+        lambda *_args, **_kwargs: pytest.fail("existing receipt must not create a client"),
+    )
+    candidate = "labor_laws_20260830_deadbeef"
+
+    assert cli.main(
+        [
+            *_base_args(local_corpus),
+            "--execute",
+            "--confirm-candidate-base",
+            candidate,
+        ]
+    ) == 2
+    assert json.loads(capsys.readouterr().err) == {
+        "status": "error",
+        "code": "receipt_exists",
+    }
+
+
 def test_execute_uses_only_temporary_writer_key_and_writes_receipt(
     monkeypatch, local_corpus, capsys
 ):
@@ -242,6 +322,8 @@ def test_execute_uses_only_temporary_writer_key_and_writes_receipt(
     monkeypatch.setenv("QDRANT_WRITER_API_KEY", "temporary-writer-key")
     monkeypatch.setenv("QDRANT_API_KEY", "runtime-reader-key")
     monkeypatch.setenv("GEMINI_API_KEY", "owner-provider-key")
+    monkeypatch.setenv("CHUNK_SIZE", "999")
+    monkeypatch.setenv("CHUNK_OVERLAP", "998")
     monkeypatch.setattr(cli, "snapshot_download", lambda **_kwargs: "cached")
 
     class FakeStore:
@@ -260,6 +342,11 @@ def test_execute_uses_only_temporary_writer_key_and_writes_receipt(
     receipt = {"schema_version": "1.0", "candidate_base": "safe-candidate"}
 
     def fake_build(request, dependencies):
+        (local_corpus["laws_dir"] / "test-law.json").write_text(
+            '{"name": "changed after audit", "articles": []}', encoding="utf-8"
+        )
+        assert request.units[0].text == "測試內容。"
+        assert request.units[0].source_path == "test-law.json"
         captured["request"] = request
         captured["dependencies"] = dependencies
         return receipt
@@ -287,8 +374,15 @@ def test_execute_uses_only_temporary_writer_key_and_writes_receipt(
     assert settings.qdrant_api_key.get_secret_value() != "runtime-reader-key"
     assert settings.gemini_api_key == ""
     assert settings.openai_api_key == ""
+    assert settings.chunk_size == 400
+    assert settings.chunk_overlap == 80
     assert captured["store"].closed is True
     assert captured["request"].source_sha256.keys() == {"acts", "regulations"}
+    assert captured["request"].expected_point_counts == {
+        "fixed": 481,
+        "structure": 884,
+    }
+    assert captured["embedder"]["local_files_only"] is True
     assert captured["write"] == (receipt, local_corpus["receipt"], cli.PROJECT_ROOT)
     output = capsys.readouterr().out
     assert json.loads(output)["status"] == "candidate_ready"

@@ -49,7 +49,7 @@ $candidateBase = 'labor_laws_YYYYMMDD_HASH'
 uv run python scripts/rebuild_qdrant_blue_green.py --candidate-base $candidateBase
 ```
 
-dry-run 只讀本機 official archives、15 部 normalized laws 與 `release/corpus_snapshot.json`；不讀 writer Key、不載入模型、不建立 Qdrant client、不寫 receipt。任何 snapshot、來源雜湊、法規 metadata、條文數或內容雜湊差異都必須停止，另開 release 任務審閱；不得用參數略過或自動改寫 committed snapshot。
+dry-run 只讀本機 official archives、15 部 normalized laws 與 `release/corpus_snapshot.json`；語料資料夾只允許第一層 law JSON 與選用的 `manifest.json`，任何子目錄、額外 JSON、Markdown、文字或 PDF 都會停止。它不讀 writer Key、不檢查或載入模型、不建立 Qdrant client、不寫 receipt。任何 snapshot、來源雜湊、法規 metadata、條文數或內容雜湊差異都必須停止，另開 release 任務審閱；不得用參數略過或自動改寫 committed snapshot。
 
 ### 3.2 有人值守的 candidate build
 
@@ -71,9 +71,9 @@ try {
 }
 ```
 
-工具會在第一次 Qdrant write 前完成兩種 chunking 與 embedding，然後只建立 `$candidateBase` 對應的 `fixed`／`structure` collections。若同名 candidate 已存在、point count 不符、payload provenance 不完整或任何步驟失敗，正式 collections 不受影響，且工具不自動刪除或覆寫 partial candidate。
+工具會以已稽核且只讀取一次的語料，在第一次 Qdrant write 前完成固定 400/80 設定的兩種 chunking 與 embedding，並要求 `fixed=481`、`structure=884`、向量維度 `1024`，然後只建立 `$candidateBase` 對應的 collections。實際模型解析強制 `local_files_only`。若同名 candidate 已存在、point count 不符、payload provenance 不完整或任何步驟失敗，正式 collections 不受影響，且工具不自動刪除或覆寫 partial candidate。
 
-成功時才會在 ignored 的 `eval/runs/qdrant-maintenance/` 寫入不含 endpoint、key、法規全文或本機絕對路徑的 receipt。無論成功或失敗，立即回 Qdrant Cloud **撤銷 temporary writer key**；partial candidate 的檢查或刪除屬另一個具破壞性的人工任務，本命令未獲授權執行。
+成功時才會在 ignored 的 `eval/runs/qdrant-maintenance/$candidateBase.json` 寫入不含 endpoint、key、法規全文或本機絕對路徑的 receipt；若同名 receipt 已存在會停止，不會覆寫歷史。無論成功或失敗，立即回 Qdrant Cloud **撤銷 temporary writer key**；partial candidate 的檢查或刪除屬另一個具破壞性的人工任務，本命令未獲授權執行。
 
 ### 3.3 Private cutover、驗收與 rollback
 

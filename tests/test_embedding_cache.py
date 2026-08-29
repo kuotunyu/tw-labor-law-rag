@@ -104,6 +104,39 @@ def test_embedder_pins_revision_and_disables_remote_code(monkeypatch):
     assert captured["trust_remote_code"] is False
 
 
+def test_maintenance_embedder_resolves_snapshot_local_only(monkeypatch):
+    captured = {}
+    revision = "a" * 40
+
+    def fake_snapshot_download(**kwargs):
+        captured["snapshot"] = kwargs
+        return "immutable-bge-m3-snapshot"
+
+    def fake_model(model_name, **kwargs):
+        captured.update(model_name=model_name, **kwargs)
+        return object()
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "FlagEmbedding",
+        SimpleNamespace(BGEM3FlagModel=fake_model),
+    )
+    monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snapshot_download)
+    embedder = BGEM3Embedder(
+        model_name="BAAI/bge-m3",
+        model_revision=revision,
+        device="cpu",
+        local_files_only=True,
+    )
+
+    assert embedder.model is not None
+    assert captured["snapshot"] == {
+        "repo_id": "BAAI/bge-m3",
+        "revision": revision,
+        "local_files_only": True,
+    }
+
+
 def test_embedding_cache_key_includes_model_revision():
     first = BGEM3Embedder(model_revision="revision-a", device="cpu")
     second = BGEM3Embedder(model_revision="revision-b", device="cpu")

@@ -10,6 +10,7 @@ import pytest
 
 from rag.corpus_audit import build_snapshot
 from rag.qdrant_maintenance import (
+    audit_local_corpus,
     build_local_snapshot,
     build_maintenance_receipt,
     candidate_collections,
@@ -75,6 +76,10 @@ def test_candidate_base_must_be_distinct_and_portable():
         with pytest.raises(ValueError, match="portable"):
             validate_candidate_base("labor_laws", invalid)
 
+    for invalid_active in ("", "../private-key", "HTTPS://secret.example"):
+        with pytest.raises(ValueError, match="active base"):
+            validate_candidate_base(invalid_active, base)
+
 
 def test_snapshot_match_ignores_only_observation_date():
     committed = _snapshot()
@@ -123,6 +128,62 @@ def test_build_local_snapshot_hashes_archives_and_ignores_manifest(tmp_path: Pat
             "sha256": hashlib.sha256(b"official archive bytes").hexdigest(),
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "content"),
+    [
+        (Path("nested/extra.json"), "{}"),
+        (Path("notes.md"), "# unreviewed"),
+        (Path("notes.txt"), "unreviewed"),
+        (Path("attachment.pdf"), "%PDF-1.4"),
+    ],
+)
+def test_audited_corpus_rejects_every_uncommitted_indexable_file(
+    tmp_path: Path,
+    relative_path: Path,
+    content: str,
+):
+    archive = tmp_path / "acts.zip"
+    archive.write_bytes(b"official archive bytes")
+    laws_dir = tmp_path / "laws"
+    laws_dir.mkdir()
+    (laws_dir / "test-law.json").write_text(
+        json.dumps(_law(), ensure_ascii=False), encoding="utf-8"
+    )
+    unexpected = laws_dir / relative_path
+    unexpected.parent.mkdir(parents=True, exist_ok=True)
+    unexpected.write_text(content, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unexpected corpus entry"):
+        audit_local_corpus(
+            source_archives={
+                "acts": ("https://sendlaw.moj.gov.tw/acts", archive),
+            },
+            laws_dir=laws_dir,
+            snapshot_date="2026-08-30",
+        )
+
+
+def test_audited_corpus_rejects_non_mapping_law_without_leaking_a_path(
+    tmp_path: Path,
+):
+    archive = tmp_path / "acts.zip"
+    archive.write_bytes(b"official archive bytes")
+    laws_dir = tmp_path / "laws"
+    laws_dir.mkdir()
+    (laws_dir / "broken.json").write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="law JSON must be an object") as error:
+        audit_local_corpus(
+            source_archives={
+                "acts": ("https://sendlaw.moj.gov.tw/acts", archive),
+            },
+            laws_dir=laws_dir,
+            snapshot_date="2026-08-30",
+        )
+
+    assert str(tmp_path) not in str(error.value)
 
 
 def test_payloads_require_public_provenance_and_exact_count():
@@ -215,6 +276,12 @@ def test_receipt_write_is_atomic_and_restricted_to_maintenance_directory(
     assert written == tmp_path / target
     assert json.loads(written.read_text(encoding="utf-8")) == _receipt()
     assert list(written.parent.glob("*.tmp")) == []
+
+    with pytest.raises(FileExistsError, match="already exists"):
+        write_receipt_atomic(
+            {"different": "receipt"}, target, project_root=tmp_path
+        )
+    assert json.loads(written.read_text(encoding="utf-8")) == _receipt()
 
     with pytest.raises(ValueError, match="project-relative"):
         write_receipt_atomic(_receipt(), tmp_path / "absolute.json", project_root=tmp_path)

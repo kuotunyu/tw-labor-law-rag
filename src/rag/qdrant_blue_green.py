@@ -5,15 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Protocol
 
 import numpy as np
 
 from rag.config import Settings
 from rag.ingestion.chunkers import get_chunker
-from rag.ingestion.loader import load_corpus
-from rag.models import Chunk
+from rag.models import Chunk, SourceUnit
 from rag.qdrant_maintenance import (
     build_maintenance_receipt,
     candidate_collections,
@@ -22,6 +20,9 @@ from rag.qdrant_maintenance import (
 )
 
 _STRATEGIES = ("fixed", "structure")
+MAINTENANCE_CHUNK_SIZE = 400
+MAINTENANCE_CHUNK_OVERLAP = 80
+MAINTENANCE_VECTOR_DIMENSION = 1024
 
 
 class CandidateStore(Protocol):
@@ -50,8 +51,8 @@ class CandidateEmbedder(Protocol):
 class BuildRequest:
     active_base: str
     candidate_base: str
-    corpus_dir: Path
-    receipt_path: Path
+    units: tuple[SourceUnit, ...]
+    expected_point_counts: Mapping[str, int]
     snapshot_sha256: str
     source_sha256: Mapping[str, str]
 
@@ -72,27 +73,40 @@ def _prepare_all_strategies(
     request: BuildRequest,
     dependencies: BuildDependencies,
 ) -> dict[str, tuple[list[Chunk], np.ndarray]]:
-    units = load_corpus(request.corpus_dir)
+    units = list(request.units)
     if not units:
         raise ValueError("candidate corpus has no source units")
+    if set(request.expected_point_counts) != set(_STRATEGIES) or any(
+        isinstance(value, bool) or not isinstance(value, int) or value <= 0
+        for value in request.expected_point_counts.values()
+    ):
+        raise ValueError("candidate expected point counts are invalid")
 
     prepared: dict[str, tuple[list[Chunk], np.ndarray]] = {}
     vector_dimension: int | None = None
     for strategy in _STRATEGIES:
         chunker = get_chunker(
             strategy,
-            dependencies.settings.chunk_size,
-            dependencies.settings.chunk_overlap,
+            MAINTENANCE_CHUNK_SIZE,
+            MAINTENANCE_CHUNK_OVERLAP,
         )
         chunks = chunker.chunk(units)
         if not chunks:
             raise ValueError(f"candidate strategy has no chunks: {strategy}")
+        if len(chunks) != request.expected_point_counts[strategy]:
+            raise ValueError(f"candidate expected point count mismatch: {strategy}")
         vectors = np.asarray(
             dependencies.embedder.encode([chunk.text for chunk in chunks]),
             dtype=np.float32,
         )
-        if vectors.ndim != 2 or vectors.shape[0] != len(chunks) or vectors.shape[1] <= 0:
-            raise ValueError(f"candidate vectors are invalid: {strategy}")
+        if (
+            vectors.ndim != 2
+            or vectors.shape[0] != len(chunks)
+            or vectors.shape[1] != MAINTENANCE_VECTOR_DIMENSION
+        ):
+            raise ValueError(
+                f"candidate vectors must be 1024-dimensional: {strategy}"
+            )
         if vector_dimension is None:
             vector_dimension = int(vectors.shape[1])
         elif vectors.shape[1] != vector_dimension:
@@ -128,10 +142,14 @@ def build_candidates(
         dependencies.store.upsert_chunks(name, chunks, vectors)
 
         actual_count = dependencies.store.count(name)
-        if actual_count != len(chunks):
+        if actual_count != request.expected_point_counts[strategy]:
             raise ValueError(f"candidate count mismatch: {strategy}")
         payloads = dependencies.store.scroll_payloads(name)
-        validate_candidate_payloads(strategy, payloads, expected_count=len(chunks))
+        validate_candidate_payloads(
+            strategy,
+            payloads,
+            expected_count=request.expected_point_counts[strategy],
+        )
         point_counts[strategy] = actual_count
         vector_dimension = dimension
 
