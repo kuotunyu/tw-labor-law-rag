@@ -77,6 +77,33 @@
       },
       "decision": "retain_0.03"
     },
+    "wage_arrears_regression": {
+      "dataset": {
+        "path": "eval/dataset/wage_arrears_regression_v0.3.4.jsonl",
+        "sha256": "9832ba3982b16f245f44c44d86b70a25e3a790cbf6b91214696421eca8ae6c6f",
+        "questions": 20
+      },
+      "results_path": "eval/official/wage_arrears_regression_v0.3.4.json",
+      "code_revision": "6d0326bbec4f2385bbb78b4b9a3858ae6b122109",
+      "configuration": {
+        "chunking": "structure",
+        "retrieval": "hybrid",
+        "reranker": true,
+        "top_k_retrieve": 20,
+        "top_k_final": 5,
+        "embedding_model": "BAAI/bge-m3",
+        "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+        "reranker_model": "BAAI/bge-reranker-v2-m3",
+        "reranker_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+      },
+      "summary": {
+        "positive_routes": 10,
+        "collision_routes_avoided": 10,
+        "positive_hit_at_5": 10,
+        "positive_hit_at_1": 10,
+        "passed": true
+      }
+    },
     "provider_crosscheck": {
       "status": "complete",
       "authorized_cap_usd_per_provider": "5.00",

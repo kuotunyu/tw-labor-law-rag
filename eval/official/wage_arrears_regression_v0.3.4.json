@@ -1,0 +1,169 @@
+{
+  "cases": [
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-001",
+      "rank": 1,
+      "top_score": 0.9949
+    },
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-002",
+      "rank": 1,
+      "top_score": 0.9955
+    },
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-003",
+      "rank": 1,
+      "top_score": 0.9585
+    },
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-004",
+      "rank": 1,
+      "top_score": 0.9833
+    },
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-005",
+      "rank": 1,
+      "top_score": 0.9915
+    },
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-006",
+      "rank": 1,
+      "top_score": 0.9963
+    },
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-007",
+      "rank": 1,
+      "top_score": 0.9933
+    },
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-008",
+      "rank": 1,
+      "top_score": 0.9344
+    },
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-009",
+      "rank": 1,
+      "top_score": 0.8756
+    },
+    {
+      "expansion_applied": true,
+      "expected_expansion": true,
+      "qid": "wage-reg-010",
+      "rank": 1,
+      "top_score": 0.852
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-011",
+      "rank": null,
+      "top_score": 0.3122
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-012",
+      "rank": null,
+      "top_score": 0.4546
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-013",
+      "rank": null,
+      "top_score": 0.8278
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-014",
+      "rank": null,
+      "top_score": 0.3953
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-015",
+      "rank": null,
+      "top_score": 0.9993
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-016",
+      "rank": null,
+      "top_score": 0.9219
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-017",
+      "rank": null,
+      "top_score": 0.028
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-018",
+      "rank": null,
+      "top_score": 0.0434
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-019",
+      "rank": null,
+      "top_score": 0.0202
+    },
+    {
+      "expansion_applied": false,
+      "expected_expansion": false,
+      "qid": "wage-reg-020",
+      "rank": null,
+      "top_score": 0.9697
+    }
+  ],
+  "code_revision": "6d0326bbec4f2385bbb78b4b9a3858ae6b122109",
+  "configuration": {
+    "chunking": "structure",
+    "embedding_model": "BAAI/bge-m3",
+    "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "reranker": true,
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "reranker_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "retrieval": "hybrid",
+    "top_k_final": 5,
+    "top_k_retrieve": 20
+  },
+  "dataset": {
+    "path": "eval/dataset/wage_arrears_regression_v0.3.4.jsonl",
+    "questions": 20,
+    "sha256": "9832ba3982b16f245f44c44d86b70a25e3a790cbf6b91214696421eca8ae6c6f"
+  },
+  "schema_version": "1.0",
+  "summary": {
+    "collision_routes_avoided": 10,
+    "passed": true,
+    "positive_hit_at_1": 10,
+    "positive_hit_at_5": 10,
+    "positive_routes": 10
+  }
+}

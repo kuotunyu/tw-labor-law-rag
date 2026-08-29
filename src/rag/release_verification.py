@@ -1269,6 +1269,131 @@ def _verify_reliability_evidence(
     }
 
 
+def _verify_wage_arrears_regression_evidence(
+    project_root: Path,
+    contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    dataset_contract = contract["dataset"]
+    dataset_path = project_root / dataset_contract["path"]
+    result = _read_json(project_root / contract["results_path"])
+    dataset_rows = _read_jsonl(dataset_path)
+    dataset_sha = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
+    expected_qids = [f"wage-reg-{index:03d}" for index in range(1, 21)]
+
+    _assert_equal("wage arrears dataset SHA-256", dataset_sha, dataset_contract["sha256"])
+    _assert_equal("wage arrears dataset questions", len(dataset_rows), 20)
+    _assert_equal("wage arrears contract questions", dataset_contract["questions"], 20)
+    _assert_equal(
+        "wage arrears dataset qids",
+        [row.get("qid") for row in dataset_rows],
+        expected_qids,
+    )
+    _assert_equal(
+        "wage arrears result fields",
+        set(result),
+        {
+            "schema_version",
+            "dataset",
+            "code_revision",
+            "configuration",
+            "summary",
+            "cases",
+        },
+    )
+    _assert_equal("wage arrears result schema", result["schema_version"], "1.0")
+    _assert_equal(
+        "wage arrears result dataset",
+        result["dataset"],
+        {
+            "path": dataset_contract["path"],
+            "sha256": dataset_sha,
+            "questions": 20,
+        },
+    )
+    revision = result["code_revision"]
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ReleaseVerificationError("wage arrears code revision")
+    _assert_equal("wage arrears code revision contract", revision, contract["code_revision"])
+    _compare_tree(
+        "wage arrears configuration",
+        result["configuration"],
+        contract["configuration"],
+    )
+
+    cases = result["cases"]
+    _assert_equal("wage arrears result case count", len(cases), 20)
+    _assert_equal(
+        "wage arrears result qids",
+        [case.get("qid") for case in cases],
+        expected_qids,
+    )
+    positive_routes = 0
+    collision_routes_avoided = 0
+    positive_hit_at_5 = 0
+    positive_hit_at_1 = 0
+    for row, case in zip(dataset_rows, cases, strict=True):
+        qid = row["qid"]
+        _assert_equal(
+            f"wage arrears {qid} case fields",
+            set(case),
+            {
+                "qid",
+                "expected_expansion",
+                "expansion_applied",
+                "rank",
+                "top_score",
+            },
+        )
+        expected = row["expect_expansion"]
+        _assert_equal(
+            f"wage arrears {qid} expected expansion",
+            case["expected_expansion"],
+            expected,
+        )
+        _assert_equal(
+            f"wage arrears {qid} applied expansion",
+            case["expansion_applied"],
+            expected,
+        )
+        score = case["top_score"]
+        if (
+            not isinstance(score, (int, float))
+            or isinstance(score, bool)
+            or not math.isfinite(float(score))
+        ):
+            raise ReleaseVerificationError(f"wage arrears {qid} top score")
+        rank = case["rank"]
+        if expected:
+            positive_routes += 1
+            if not isinstance(rank, int) or isinstance(rank, bool) or rank < 1:
+                raise ReleaseVerificationError(f"wage arrears {qid} positive rank")
+            positive_hit_at_5 += rank <= 5
+            positive_hit_at_1 += rank == 1
+        else:
+            collision_routes_avoided += 1
+            _assert_equal(f"wage arrears {qid} collision rank", rank, None)
+
+    summary = {
+        "positive_routes": positive_routes,
+        "collision_routes_avoided": collision_routes_avoided,
+        "positive_hit_at_5": positive_hit_at_5,
+        "positive_hit_at_1": positive_hit_at_1,
+        "passed": (
+            positive_routes == 10
+            and collision_routes_avoided == 10
+            and positive_hit_at_5 == 10
+        ),
+    }
+    _assert_equal(
+        "wage arrears positive Hit@5",
+        positive_hit_at_5,
+        contract["summary"]["positive_hit_at_5"],
+    )
+    _compare_tree("wage arrears result summary", result["summary"], summary)
+    _compare_tree("wage arrears manifest summary", contract["summary"], summary)
+    return {"questions": 20, **summary}
+
+
 def _verify_release_version_contract(
     project_root: Path,
     manifest: dict[str, Any],
@@ -1839,6 +1964,10 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         runtime_config=runtime_config,
         snapshot_contract=manifest["source_data"]["full_snapshot"],
     )
+    wage_arrears_summary = _verify_wage_arrears_regression_evidence(
+        root,
+        manifest["evidence"]["wage_arrears_regression"],
+    )
     provider_crosscheck_contract = manifest["evidence"]["provider_crosscheck"]
     provider_crosscheck_summary = _verify_provider_crosscheck_contract(
         root,
@@ -1931,6 +2060,7 @@ def verify_release(project_root: Path) -> dict[str, Any]:
             "mrr_at_10": primary["mrr_at_10"],
         },
         "reliability": reliability_summary,
+        "wage_arrears_regression": wage_arrears_summary,
         "e2e": {
             "answered": e2e_metrics["n_answered"],
             "refused": sum(1 for row in e2e_rows if row["refused"]),

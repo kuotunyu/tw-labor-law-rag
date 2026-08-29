@@ -1,3 +1,4 @@
+import hashlib
 import importlib
 import io
 import json
@@ -254,6 +255,115 @@ def test_release_version_contract_rejects_changed_formal_evidence_baseline(tmp_p
 
     with pytest.raises(module.ReleaseVerificationError, match="formal evidence version"):
         module._verify_release_version_contract(tmp_path, manifest)
+
+
+def write_wage_arrears_regression_fixture(root: Path) -> dict:
+    dataset_path = root / "eval" / "dataset" / "wage.jsonl"
+    result_path = root / "eval" / "official" / "wage.json"
+    dataset_path.parent.mkdir(parents=True, exist_ok=True)
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+    cases = []
+    for index in range(1, 21):
+        positive = index <= 10
+        qid = f"wage-reg-{index:03d}"
+        rows.append(
+            {
+                "qid": qid,
+                "question": (
+                    f"公司欠薪，我想直接離職。案例 {index}"
+                    if positive
+                    else f"公司欠薪，如何追討？案例 {index}"
+                ),
+                "expect_expansion": positive,
+                "sources": (
+                    [{"doc": "勞動基準法", "article": "第 14 條"}]
+                    if positive
+                    else []
+                ),
+                "style_tags": ["fixture"],
+            }
+        )
+        cases.append(
+            {
+                "qid": qid,
+                "expected_expansion": positive,
+                "expansion_applied": positive,
+                "rank": 1 if positive else None,
+                "top_score": 0.1,
+            }
+        )
+    dataset_path.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    revision = "a" * 40
+    configuration = {
+        "chunking": "structure",
+        "retrieval": "hybrid",
+        "reranker": True,
+        "top_k_retrieve": 20,
+        "top_k_final": 5,
+        "embedding_model": "BAAI/bge-m3",
+        "embedding_revision": "embed-revision",
+        "reranker_model": "BAAI/bge-reranker-v2-m3",
+        "reranker_revision": "rerank-revision",
+    }
+    result = {
+        "schema_version": "1.0",
+        "dataset": {
+            "path": "eval/dataset/wage.jsonl",
+            "sha256": hashlib.sha256(dataset_path.read_bytes()).hexdigest(),
+            "questions": 20,
+        },
+        "code_revision": revision,
+        "configuration": configuration,
+        "summary": {
+            "positive_routes": 10,
+            "collision_routes_avoided": 10,
+            "positive_hit_at_5": 10,
+            "positive_hit_at_1": 10,
+            "passed": True,
+        },
+        "cases": cases,
+    }
+    result_path.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "dataset": {
+            "path": "eval/dataset/wage.jsonl",
+            "sha256": result["dataset"]["sha256"],
+            "questions": 20,
+        },
+        "results_path": "eval/official/wage.json",
+        "code_revision": revision,
+        "configuration": configuration,
+        "summary": result["summary"],
+    }
+
+
+def test_wage_arrears_regression_contract_recomputes_evidence(tmp_path):
+    module = release_module()
+    contract = write_wage_arrears_regression_fixture(tmp_path)
+
+    assert module._verify_wage_arrears_regression_evidence(tmp_path, contract) == {
+        "questions": 20,
+        "positive_routes": 10,
+        "collision_routes_avoided": 10,
+        "positive_hit_at_5": 10,
+        "positive_hit_at_1": 10,
+        "passed": True,
+    }
+
+    result_path = tmp_path / contract["results_path"]
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["cases"][0]["rank"] = 6
+    result_path.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(module.ReleaseVerificationError, match="positive Hit@5"):
+        module._verify_wage_arrears_regression_evidence(tmp_path, contract)
 
 
 def test_pending_provider_crosscheck_contract_is_explicit(tmp_path):
@@ -719,6 +829,14 @@ def test_release_verifier_recomputes_committed_evidence():
         "direct_unanswerable_coverage": pytest.approx(0.85),
         "decision": "retain_0.03",
     }
+    assert report["wage_arrears_regression"] == {
+        "questions": 20,
+        "positive_routes": 10,
+        "collision_routes_avoided": 10,
+        "positive_hit_at_5": 10,
+        "positive_hit_at_1": 10,
+        "passed": True,
+    }
     assert report["e2e"]["answered"] == 29
     assert report["e2e"]["refused"] == 11
     assert report["e2e"]["generation_calls"] == 31
@@ -767,7 +885,7 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
-    assert report["publication"]["files"] == 133
+    assert report["publication"]["files"] == 138
     expected_history = len(
         {
             line
