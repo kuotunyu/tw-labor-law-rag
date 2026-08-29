@@ -1,4 +1,5 @@
 import io
+import json
 import zipfile
 from pathlib import Path
 
@@ -57,6 +58,27 @@ def test_load_corpus_directory():
     titles = {u.doc_title for u in units}
     assert "勞工請假規則" in titles
     assert "勞動基準法施行細則" in titles
+
+
+@pytest.mark.parametrize(
+    "article",
+    [
+        {"no": 1, "chapter": "", "content": "內容"},
+        {"no": "第 1 條", "chapter": None, "content": "內容"},
+        {"no": "第 1 條", "chapter": "", "content": 123},
+    ],
+)
+def test_law_loader_rejects_non_string_article_fields_without_attribute_error(
+    tmp_path: Path, article
+):
+    path = tmp_path / "broken-law.json"
+    path.write_text(
+        json.dumps({"name": "測試法", "articles": [article]}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="law article"):
+        load_law_json(path)
 
 
 def test_load_markdown(tmp_path):
