@@ -34,33 +34,59 @@ Windows 專案路徑若含中文，`PYTHONUTF8=1` 可避免 `pip-audit` 的 `pip
 
 任何一項失敗都停止部署；不得用真實 API 呼叫代替離線測試。
 
-## 3. 建立 Qdrant collections
+## 3. 人工建立或更新 Qdrant collections
 
-1. 建立 Standard 單節點 cluster `tw-labor-law-rag-demo`。
-2. 建立短期 `tw-labor-index-writer`，只給建立兩個 collections 所需的最低 write/manage 權限。
-3. 在新的 PowerShell 視窗以遮罩提示輸入 writer Key：
+本專案維持 **Qdrant Free** 與 Hugging Face **CPU Basic**。索引更新只能在操作人員在場時手動執行，不建立排程、cron、監控自動修復或無人值守的 writer 工作。更新工具採 blue-green：建立新的 candidate pair，正式 pair 保持可讀；不得對正式 collection 執行 build_index.py。
+
+### 3.1 本機 audit 與 dry-run
+
+在已驗證的 worktree 執行。`YYYYMMDD_HASH` 是操作人員依日期與已提交 snapshot 短雜湊選定的非秘密名稱；兩次出現必須完全相同，例如 `labor_laws_20260830_deadbeef`。
 
 ```powershell
-$env:DATA_DIR = Read-Host 'Paste the private corpus laws directory'
-$env:QDRANT_MODE = 'server'
-$env:QDRANT_URL = Read-Host 'Paste the Qdrant cluster endpoint'
-$env:QDRANT_API_KEY = Read-Host -MaskInput 'Paste the temporary Qdrant writer key'
-uv run python scripts/build_index.py --strategy all --corpus $env:DATA_DIR
-Remove-Item Env:QDRANT_API_KEY
-Remove-Item Env:DATA_DIR
-Remove-Item Env:QDRANT_URL
-Remove-Item Env:QDRANT_MODE
+uv run python scripts/download_corpus.py --force-download
+uv run python scripts/audit_corpus.py
+$candidateBase = 'labor_laws_YYYYMMDD_HASH'
+uv run python scripts/rebuild_qdrant_blue_green.py --candidate-base $candidateBase
 ```
 
-4. 在 Qdrant 控制台確認兩個 point count 都大於 0。
-5. 立即撤銷／刪除 `tw-labor-index-writer`。
-6. 建立 `tw-labor-runtime-reader`，限定兩個 collections 且 read-only。
+dry-run 只讀本機 official archives、15 部 normalized laws 與 `release/corpus_snapshot.json`；不讀 writer Key、不載入模型、不建立 Qdrant client、不寫 receipt。任何 snapshot、來源雜湊、法規 metadata、條文數或內容雜湊差異都必須停止，另開 release 任務審閱；不得用參數略過或自動改寫 committed snapshot。
 
-writer Key 不可保存。runtime reader 值只輸入 Hugging Face Secret。
+### 3.2 有人值守的 candidate build
 
-`v0.3.1` 的程式可讀取新舊兩種 Qdrant payload。既有雲端 collections 沒有
-`source_url`、`last_amended`、`effective_date` 時仍可正常問答，只是不顯示新增的法源日期／連結。
-要補齊 provenance 必須另外建立短期 writer Key、用通過 audit 的相同 snapshot 重建兩個 collections、驗證後立刻撤銷；不得用 runtime reader 嘗試寫入，也不得在無人值守時擴權。
+1. 在 Qdrant Cloud 為這一次維護建立 temporary writer key；它只在本 PowerShell 工作階段存在，不放進 `.env`、Hugging Face、聊天、issue 或 commit。
+2. 確認 BGE-M3 與 reranker 的固定 revision 已在本機 cache。維護工具只接受既有 cache，不會自動改用付費 GPU 或下載未審閱 revision。
+3. 使用遮罩輸入 endpoint 與 key，重複 candidate 名稱後才允許執行：
+
+```powershell
+$candidateBase = 'labor_laws_YYYYMMDD_HASH'
+$env:QDRANT_URL = Read-Host 'Paste the Qdrant cluster endpoint'
+$env:QDRANT_WRITER_API_KEY = Read-Host -MaskInput 'Paste the temporary writer key'
+try {
+  uv run python scripts/rebuild_qdrant_blue_green.py --execute `
+    --candidate-base $candidateBase `
+    --confirm-candidate-base $candidateBase
+} finally {
+  Remove-Item Env:QDRANT_WRITER_API_KEY -ErrorAction SilentlyContinue
+  Remove-Item Env:QDRANT_URL -ErrorAction SilentlyContinue
+}
+```
+
+工具會在第一次 Qdrant write 前完成兩種 chunking 與 embedding，然後只建立 `$candidateBase` 對應的 `fixed`／`structure` collections。若同名 candidate 已存在、point count 不符、payload provenance 不完整或任何步驟失敗，正式 collections 不受影響，且工具不自動刪除或覆寫 partial candidate。
+
+成功時才會在 ignored 的 `eval/runs/qdrant-maintenance/` 寫入不含 endpoint、key、法規全文或本機絕對路徑的 receipt。無論成功或失敗，立即回 Qdrant Cloud **撤銷 temporary writer key**；partial candidate 的檢查或刪除屬另一個具破壞性的人工任務，本命令未獲授權執行。
+
+### 3.3 Private cutover、驗收與 rollback
+
+1. 先記錄 **舊 COLLECTION_NAME** 與舊 runtime reader key 的識別名稱，不記錄 key 值。
+2. 建立一把只讀 transition key，暫時只允許讀取舊 pair 與 candidate pair；先把 Hugging Face Secret `QDRANT_API_KEY` 換成 transition key，保持舊 `COLLECTION_NAME` 重啟並確認健康。
+3. 將 Space 保持 private，把 Variable `COLLECTION_NAME` 改成 `$candidateBase` 後 Restart。
+4. 必須依序看到 Space `RUNNING`、domain `READY`、`/health` HTTP 200、啟動 logs 無敏感資料，再用訪客自己的低額度 API Key 驗收 Gemini 與 OpenAI 各一題；引用來源、修正日期與可用時的生效日期都要正確。
+5. 驗收成功後建立只可讀 candidate pair 的新 `tw-labor-runtime-reader`，更新 Space Secret 並再次重啟驗收；最後撤銷舊 reader 與 transition key。
+6. 若任一驗收失敗，立即 rollback：把 `COLLECTION_NAME` 恢復成舊值，使用仍可讀舊 pair 的 transition key Restart，確認健康後再診斷 candidate。不得刪除舊 collections。
+
+舊 collections 的刪除是獨立、具破壞性的容量管理操作；不在 build 或 cutover 命令範圍內。Free Tier 空間不足時先停止更新並人工評估，不自動升級付費方案，也不以刪除正式 pair 換取空間。
+
+`v0.3.1` 之後的程式可讀取新舊兩種 Qdrant payload。舊 collections 沒有 `source_url`、`last_amended`、`effective_date` 時仍可正常問答，只是不顯示新增的法源日期／連結。
 
 ## 4. 建立 private Hugging Face Space
 
