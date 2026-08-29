@@ -25,6 +25,12 @@ Gemini `gemini-3.5-flash-lite`／OpenAI `gpt-5.6-luna` 的 US$5 硬上限 safety
 
 `uv run python scripts/verify_release.py` 不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,會核對 40 題正式集、60 題壓力集、8×40 ablation grid、Hit@5/MRR、0.03 threshold sweep、15 部／884 條 snapshot、設定一致性、OGDL samples、official trace schema、provider complete contract、完整 publication inventory、secret/privacy scan、人工審閱 binary hashes 與 GitHub Action pins。Git 歷史稽核涵蓋 heads、tags、remotes 的所有可公開 commits；GitHub Actions 暫時產生、不可發布的 `refs/remotes/pull/*` 合成 merge refs 除外，本機 `refs/archive/*` recovery evidence 也會保留在 publication graph 之外。0.03 reranker threshold 不是通用 answerability classifier；壓力集已量測到 1/40 直接誤拒，因此只保留現值而不宣稱問題已消失。
 
+## v0.3.3 新舊制資遣費檢索強化
+
+這是 `v0.3.3` source-only runtime and deployment release。當問題同時包含資遣、新制、舊制與計算／比較語意時，檢索管線會以決定論式 query expansion 補上「勞工退休金條例、勞動基準法、工作年資、平均工資、六個月」等法規檢索詞。擴充內容只送往 BM25、向量檢索與 reranker；生成模型仍收到使用者的原始問題，避免檢索輔助詞改寫使用者意圖。
+
+這項擴充必須同時命中四組 cue 才會啟用，因此一般資遣、退休或單純制度差異問題不會被廣泛改寫。`v0.1.0` 正式模型品質基準、`v0.3.1` reliability evidence 與 `v0.3.2` provider safety cross-check 仍維持原來的證據版本；本版沒有用新的 provider 呼叫改寫歷史指標。
+
 ## v0.3.2 provider safety cross-check：可靠性、來源與雙模型 runtime
 
 這是 `v0.3.2` source-only runtime and deployment release。公開 API/UI 預設使用 Gemini `gemini-3.5-flash-lite`，若伺服器同時設定 OpenAI，使用者可逐次請求選擇 `gpt-5.6-luna`。這些型號可分別由 server-side `GEMINI_GENERATION_MODEL` 與 `OPENAI_GENERATION_MODEL` 覆寫；對應 key 已設定時，`LLM_PROVIDER=gemini` 決定省略請求選擇時的預設 provider，否則 API 會改用另一個已設定的公開 provider；`LLM_FALLBACK_ENABLED=true` 才允許備援。`GEMINI_API_KEY` 與 `OPENAI_API_KEY` 只存在 API 伺服器環境，前端不接收、保存或顯示 key。
@@ -166,4 +172,4 @@ Repository **有散布兩份小型 OGDL 命令樣本**供 loader/chunking smoke 
 
 ## 公開範圍
 
-這是 `v0.3.2` source-only runtime and deployment release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版新增完整 corpus snapshot、逐引用法源 provenance、60 題可靠性壓力證據與嚴格預算雙 provider evidence。Gemini／OpenAI safety cross-check 已以固定模型完成，兩家各五筆請求均在 US$5 硬上限內：Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 嚴格不含 question/answer text、provider payload 或憑證；此 cross-check 不取代正式模型品質基準。它是 evidence-backed software portfolio artifact，不是法律意見，也不是 production legal service。完整 corpus、模型權重、私有索引與 provider raw artifacts 仍不在本次 source release 範圍。
+這是 `v0.3.3` source-only runtime and deployment release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版在 v0.3.2 的完整 corpus snapshot、逐引用法源 provenance、60 題可靠性壓力證據與雙 provider evidence 上，新增新舊制資遣費的決定論式檢索強化。v0.3.2 Gemini／OpenAI safety cross-check 已以固定模型完成，兩家各五筆請求均在 US$5 硬上限內：Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 嚴格不含 question/answer text、provider payload 或憑證；此 cross-check 不取代正式模型品質基準。它是 evidence-backed software portfolio artifact，不是法律意見，也不是 production legal service。完整 corpus、模型權重、私有索引與 provider raw artifacts 仍不在本次 source release 範圍。
