@@ -10,6 +10,14 @@
 
 Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 都完成五筆 safety cross-check：Gemini observed refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI observed refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 維持嚴格 content-free：不含 question/answer text、provider payload 或 credentials。這是執行器安全邊界的 cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。
 
+## v0.3.3 為什麼採決定論式資遣費 query expansion？
+
+**選擇**：僅在問題同時出現資遣、新制、舊制與計算／比較四組 cue 時，為檢索與 reranker 補上固定法規詞；生成階段保留原始問題。
+
+**理由**：新舊制資遣費需要同時召回《勞工退休金條例》第 12 條與《勞動基準法》第 17 條，長句、中英夾雜或口語問法容易讓其中一部法規被擠出候選。固定詞擴充不增加 provider 呼叫、延遲或 token 成本，也能由單元測試完整覆蓋。四組 cue 的 conjunction 則把影響範圍限縮在真正的跨制度計算問題。
+
+**Tradeoff**：這不是通用的 LLM query rewriting，無法自動處理所有口語法律同義詞；新增領域規則時仍需具體失敗案例、負向碰撞測試與完整 retrieval regression guard。
+
 ## 1. 為什麼是 Hybrid Search,不是純向量?
 
 **選擇**:BM25(關鍵字)+ BGE-M3(向量),用 RRF 融合。
