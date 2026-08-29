@@ -10,6 +10,14 @@
 
 Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 都完成五筆 safety cross-check：Gemini observed refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI observed refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 維持嚴格 content-free：不含 question/answer text、provider payload 或 credentials。這是執行器安全邊界的 cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。
 
+## v0.3.4 為什麼只針對欠薪／立即離職做 query expansion？
+
+**選擇**：只有欠薪與勞工立即終止兩組 cue 同時命中時，才為檢索及 reranker 補入《勞動基準法》第 14 條用語；生成階段保留原始問題。
+
+**理由**：正式評估唯一誤拒 `eval-10` 已留下具體詞彙鴻溝證據。兩組 cue 的 conjunction 能修補這個已量測案例，又避免把一般薪資、一般離職或雇主解僱問題廣泛導向第 14 條，且不增加 provider 成本。
+
+**Tradeoff**：這是有限詞彙的決定論式規則，不是通用法律 query rewriting；未重跑完整固定模型評估前，不宣稱歷史 Hit@5、MRR 或誤拒率已提升。
+
 ## v0.3.3 為什麼採決定論式資遣費 query expansion？
 
 **選擇**：僅在問題同時出現資遣、新制、舊制與計算／比較四組 cue 時，為檢索與 reranker 補上固定法規詞；生成階段保留原始問題。

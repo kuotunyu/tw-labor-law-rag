@@ -208,8 +208,8 @@ def test_official_provider_trace_documentation_has_token_usage_carve_out():
 def write_version_contract_fixture(
     root: Path,
     *,
-    package_version: str = "0.3.3",
-    release_version: str = "v0.3.3",
+    package_version: str = "0.3.4",
+    release_version: str = "v0.3.4",
     evidence_version: str = "v0.1.0",
 ) -> dict:
     (root / "pyproject.toml").write_text(
@@ -235,8 +235,8 @@ def test_release_version_contract_is_explicit_and_consistent(tmp_path):
     manifest = write_version_contract_fixture(tmp_path)
 
     assert module._verify_release_version_contract(tmp_path, manifest) == {
-        "version": "v0.3.3",
-        "package_version": "0.3.3",
+        "version": "v0.3.4",
+        "package_version": "0.3.4",
         "formal_evidence_version": "v0.1.0",
     }
 
@@ -694,8 +694,8 @@ def test_release_verifier_recomputes_committed_evidence():
 
     assert report["status"] == "pass"
     assert report["release"] == {
-        "version": "v0.3.3",
-        "package_version": "0.3.3",
+        "version": "v0.3.4",
+        "package_version": "0.3.4",
         "formal_evidence_version": "v0.1.0",
     }
     assert report["dataset"] == {
