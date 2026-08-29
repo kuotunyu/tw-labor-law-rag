@@ -110,6 +110,17 @@ def test_current_provider_evidence_docs_publish_completed_release_contract():
     assert "pending_credentials" not in official_artifacts_readme
 
 
+def test_official_provider_trace_documentation_has_token_usage_carve_out():
+    content = (PROJECT_ROOT / "eval/official/README.md").read_text(encoding="utf-8")
+
+    assert "其他 official traces 不含 token usage 或 API metadata。" in content
+    assert (
+        "provider trace 僅含 strict allowlisted "
+        "provider/model/verdict/token count/cost/latency，仍排除 "
+        "prompts/questions/answers/provider payload/credentials/private paths/PII。"
+    ) in content
+
+
 def write_version_contract_fixture(
     root: Path,
     *,
