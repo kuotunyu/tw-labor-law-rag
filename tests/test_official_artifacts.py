@@ -130,15 +130,36 @@ def test_official_reliability_metrics_recompute_from_privacy_reduced_trace():
     }
 
 
+def test_official_provider_crosscheck_artifacts_are_complete_and_content_free():
+    results = json.loads(
+        (OFFICIAL / "provider_crosscheck_results.json").read_text(encoding="utf-8")
+    )
+    traces = read_jsonl(OFFICIAL / "provider_crosscheck_trace.jsonl")
+
+    assert len(traces) == 10
+    assert {row["requested_provider"] for row in traces} == {"gemini", "openai"}
+    assert results["provider_status"] == {
+        "gemini": {"status": "complete", "reason": None},
+        "openai": {"status": "complete", "reason": None},
+    }
+    assert results["privacy"] == {
+        "public_trace_contains_question_or_answer": False,
+        "public_trace_contains_provider_payload": False,
+        "public_trace_contains_credentials": False,
+        "raw_trace_path": "ignored eval/runs only",
+    }
+
+
 def test_official_artifacts_have_no_local_paths_or_secret_fields():
     combined = "\n".join(
         path.read_text(encoding="utf-8")
         for path in OFFICIAL.iterdir()
         if path.is_file()
     )
-    assert not re.search(r"[A-Za-z]:[\\/]", combined)
-    assert "/Users/" not in combined
-    assert "/home/" not in combined
+    assert not re.search(
+        r"(?i)(?:(?<![A-Za-z0-9])[A-Z]:[\\/]|(?<![:/])/(?:Users|home)/)",
+        combined,
+    )
     assert not re.search(r'(?i)api[_-]?key|password|bearer\\s', combined)
 
 
@@ -149,6 +170,8 @@ def test_official_artifacts_have_no_local_paths_or_secret_fields():
         "e2e_results.json",
         "reliability_results.json",
         "reliability_formal_trace.jsonl",
+        "provider_crosscheck_results.json",
+        "provider_crosscheck_trace.jsonl",
     ],
 )
 def test_official_json_ends_with_newline(filename):

@@ -87,8 +87,8 @@ def git_tracked_paths() -> set[str]:
 def write_version_contract_fixture(
     root: Path,
     *,
-    package_version: str = "0.3.1",
-    release_version: str = "v0.3.1",
+    package_version: str = "0.3.2",
+    release_version: str = "v0.3.2",
     evidence_version: str = "v0.1.0",
 ) -> dict:
     (root / "pyproject.toml").write_text(
@@ -114,8 +114,8 @@ def test_release_version_contract_is_explicit_and_consistent(tmp_path):
     manifest = write_version_contract_fixture(tmp_path)
 
     assert module._verify_release_version_contract(tmp_path, manifest) == {
-        "version": "v0.3.1",
-        "package_version": "0.3.1",
+        "version": "v0.3.2",
+        "package_version": "0.3.2",
         "formal_evidence_version": "v0.1.0",
     }
 
@@ -433,8 +433,8 @@ def test_release_verifier_recomputes_committed_evidence():
 
     assert report["status"] == "pass"
     assert report["release"] == {
-        "version": "v0.3.1",
-        "package_version": "0.3.1",
+        "version": "v0.3.2",
+        "package_version": "0.3.2",
         "formal_evidence_version": "v0.1.0",
     }
     assert report["dataset"] == {
@@ -470,9 +470,14 @@ def test_release_verifier_recomputes_committed_evidence():
         "avg_relevancy": pytest.approx(5.0),
     }
     assert report["provider_crosscheck"] == {
-        "status": "pending_credentials",
+        "status": "complete",
         "authorized_cap_usd_per_provider": "5.00",
         "required_providers": ["gemini", "openai"],
+        "requests": {"gemini": 5, "openai": 5},
+        "estimated_cost_usd": {
+            "gemini": "0.0022620",
+            "openai": "0.0026414",
+        },
     }
     assert report["privacy"] == {
         "official_trace_issues": 0,
@@ -501,6 +506,7 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
+    assert report["publication"]["files"] == 131
     expected_history = len(
         {
             line
