@@ -108,7 +108,7 @@ The full 15-instrument corpus is downloaded at runtime and is not distributed in
 
 They are normalized extracts from the Ministry of Justice Department of Information Management dataset [中文法規_命令資料檔下載](https://data.gov.tw/dataset/18290), published under Taiwan's [Open Government Data License 1.0](https://data.gov.tw/license). OGDL permits reproduction, distribution, adaptation, and sublicensing when its attribution requirement is retained. The samples remain under OGDL; the repository's original code is under the [MIT License](LICENSE). See [OGDL_ATTRIBUTION.md](docs/release/OGDL_ATTRIBUTION.md) for the retained attribution and snapshot hashes.
 
-Private raw runs are preserved locally and excluded from the public allowlist. Public official traces do not contain prompts, complete generated answers, judge reasons, provider responses, request identifiers, token usage, API metadata, credentials, private paths, or personal identifiers. See [PUBLICATION_BOUNDARY.md](docs/release/PUBLICATION_BOUNDARY.md).
+Private raw runs are preserved locally and excluded from the public allowlist. Public official traces other than the provider cross-check do not contain prompts, complete generated answers, judge reasons, provider responses, request identifiers, token usage, API metadata, credentials, private paths, or personal identifiers. Provider cross-check traces publish only strict allowlisted metadata: provider, model, answerability/refusal and citation outcomes, token counts, estimated cost, and elapsed time; they exclude prompts, questions, answers, provider payloads, credentials, private paths, and personal identifiers. See [PUBLICATION_BOUNDARY.md](docs/release/PUBLICATION_BOUNDARY.md).
 
 ## Scope
 

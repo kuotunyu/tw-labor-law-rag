@@ -531,6 +531,21 @@ def test_release_verifier_recomputes_committed_evidence():
     ]
 
 
+def test_english_readme_documents_provider_crosscheck_metadata_boundary():
+    readme = (PROJECT_ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    assert (
+        "Provider cross-check traces publish only strict allowlisted metadata"
+        in readme
+    )
+    assert "token counts, estimated cost, and elapsed time" in readme
+    assert (
+        "exclude prompts, questions, answers, provider payloads, credentials, "
+        "private paths, and personal identifiers"
+    ) in readme
+    assert "Public official traces do not contain" not in readme
+
+
 def test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions():
     manifest = json.loads(
         (PROJECT_ROOT / "release" / "manifest.json").read_text(encoding="utf-8")
