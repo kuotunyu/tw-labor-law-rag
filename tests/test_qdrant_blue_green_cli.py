@@ -189,6 +189,28 @@ def test_execute_checks_both_pinned_snapshots_without_downloading(
     assert "private cache path" not in captured.err
 
 
+def test_execute_rejects_unsafe_receipt_before_cache_or_client(
+    monkeypatch, local_corpus, capsys, tmp_path
+):
+    monkeypatch.setenv("QDRANT_URL", "https://private.example.test")
+    monkeypatch.setenv("QDRANT_WRITER_API_KEY", "private-writer-key")
+    monkeypatch.setattr(
+        cli,
+        "snapshot_download",
+        lambda **_kwargs: pytest.fail("unsafe receipt must fail before cache check"),
+    )
+    args = _base_args(local_corpus)
+    args[args.index("--receipt") + 1] = str(tmp_path / "absolute-receipt.json")
+    candidate = "labor_laws_20260830_deadbeef"
+    args.extend(["--execute", "--confirm-candidate-base", candidate])
+
+    assert cli.main(args) == 2
+    assert json.loads(capsys.readouterr().err) == {
+        "status": "error",
+        "code": "invalid_receipt_target",
+    }
+
+
 def test_parser_exposes_only_approved_maintenance_options():
     parser = cli.build_parser()
     options = {
@@ -210,3 +232,113 @@ def test_parser_exposes_only_approved_maintenance_options():
         "--device",
         "--execute",
     }
+
+
+def test_execute_uses_only_temporary_writer_key_and_writes_receipt(
+    monkeypatch, local_corpus, capsys
+):
+    captured = {}
+    monkeypatch.setenv("QDRANT_URL", "https://private.example.test")
+    monkeypatch.setenv("QDRANT_WRITER_API_KEY", "temporary-writer-key")
+    monkeypatch.setenv("QDRANT_API_KEY", "runtime-reader-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "owner-provider-key")
+    monkeypatch.setattr(cli, "snapshot_download", lambda **_kwargs: "cached")
+
+    class FakeStore:
+        def __init__(self, settings):
+            captured["settings"] = settings
+            self.closed = False
+            captured["store"] = self
+
+        def close(self):
+            self.closed = True
+
+    class FakeEmbedder:
+        def __init__(self, **kwargs):
+            captured["embedder"] = kwargs
+
+    receipt = {"schema_version": "1.0", "candidate_base": "safe-candidate"}
+
+    def fake_build(request, dependencies):
+        captured["request"] = request
+        captured["dependencies"] = dependencies
+        return receipt
+
+    def fake_write(value, target, *, project_root):
+        captured["write"] = (value, target, project_root)
+        return project_root / target
+
+    monkeypatch.setattr(cli, "VectorStore", FakeStore, raising=False)
+    monkeypatch.setattr(cli, "BGEM3Embedder", FakeEmbedder, raising=False)
+    monkeypatch.setattr(cli, "build_candidates", fake_build, raising=False)
+    monkeypatch.setattr(cli, "write_receipt_atomic", fake_write, raising=False)
+    candidate = "labor_laws_20260830_deadbeef"
+    args = [
+        *_base_args(local_corpus),
+        "--execute",
+        "--confirm-candidate-base",
+        candidate,
+    ]
+
+    assert cli.main(args) == 0
+
+    settings = captured["settings"]
+    assert settings.qdrant_api_key.get_secret_value() == "temporary-writer-key"
+    assert settings.qdrant_api_key.get_secret_value() != "runtime-reader-key"
+    assert settings.gemini_api_key == ""
+    assert settings.openai_api_key == ""
+    assert captured["store"].closed is True
+    assert captured["request"].source_sha256.keys() == {"acts", "regulations"}
+    assert captured["write"] == (receipt, local_corpus["receipt"], cli.PROJECT_ROOT)
+    output = capsys.readouterr().out
+    assert json.loads(output)["status"] == "candidate_ready"
+    assert "temporary-writer-key" not in output
+    assert "private.example.test" not in output
+
+
+def test_execute_closes_store_and_sanitizes_build_failure(
+    monkeypatch, local_corpus, capsys
+):
+    monkeypatch.setenv("QDRANT_URL", "https://private.example.test")
+    monkeypatch.setenv("QDRANT_WRITER_API_KEY", "temporary-writer-key")
+    monkeypatch.setattr(cli, "snapshot_download", lambda **_kwargs: "cached")
+    state = {"closed": False, "receipt_written": False}
+
+    class FakeStore:
+        def __init__(self, _settings):
+            pass
+
+        def close(self):
+            state["closed"] = True
+
+    def fail_build(_request, _dependencies):
+        raise RuntimeError("private endpoint and temporary-writer-key")
+
+    def fail_if_written(*_args, **_kwargs):
+        state["receipt_written"] = True
+
+    monkeypatch.setattr(cli, "VectorStore", FakeStore, raising=False)
+    monkeypatch.setattr(cli, "BGEM3Embedder", lambda **_kwargs: object(), raising=False)
+    monkeypatch.setattr(cli, "build_candidates", fail_build, raising=False)
+    monkeypatch.setattr(cli, "write_receipt_atomic", fail_if_written, raising=False)
+    candidate = "labor_laws_20260830_deadbeef"
+
+    assert (
+        cli.main(
+            [
+                *_base_args(local_corpus),
+                "--execute",
+                "--confirm-candidate-base",
+                candidate,
+            ]
+        )
+        == 2
+    )
+
+    captured = capsys.readouterr()
+    assert json.loads(captured.err) == {
+        "status": "error",
+        "code": "candidate_build_failed",
+    }
+    assert "temporary-writer-key" not in captured.err
+    assert state == {"closed": True, "receipt_written": False}

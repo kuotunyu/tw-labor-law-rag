@@ -13,7 +13,7 @@ import json
 import os
 import sys
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from huggingface_hub import snapshot_download
@@ -28,12 +28,17 @@ else:
 from rag.config import (
     DEFAULT_EMBEDDING_MODEL_REVISION,
     DEFAULT_RERANKER_MODEL_REVISION,
+    Settings,
 )
+from rag.indexing.embedder import BGEM3Embedder
+from rag.indexing.vector_store import VectorStore
+from rag.qdrant_blue_green import BuildDependencies, BuildRequest, build_candidates
 from rag.qdrant_maintenance import (
     build_local_snapshot,
     candidate_collections,
     validate_candidate_base,
     validate_snapshot_match,
+    write_receipt_atomic,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -131,6 +136,86 @@ def _pinned_models_are_cached() -> bool:
     return not missing
 
 
+def _receipt_target_is_safe(target: Path) -> bool:
+    if target.is_absolute() or ".." in target.parts:
+        return False
+    return target.parts[:3] == ("eval", "runs", "qdrant-maintenance") and len(
+        target.parts
+    ) > 3
+
+
+def _execute(args: argparse.Namespace, plan: dict[str, object]) -> int:
+    store = None
+    writer_settings = None
+    try:
+        writer_settings = Settings(
+            _env_file=None,
+            deployment_mode="standard",
+            qdrant_mode="server",
+            qdrant_url=os.environ["QDRANT_URL"].strip(),
+            qdrant_api_key=os.environ["QDRANT_WRITER_API_KEY"].strip(),
+            collection_name=args.active_base,
+            device=args.device,
+            embedding_model="BAAI/bge-m3",
+            embedding_model_revision=DEFAULT_EMBEDDING_MODEL_REVISION,
+            reranker_model="BAAI/bge-reranker-v2-m3",
+            reranker_model_revision=DEFAULT_RERANKER_MODEL_REVISION,
+            anthropic_api_key="",
+            openai_api_key="",
+            gemini_api_key="",
+        )
+        committed = json.loads(_project_path(args.snapshot).read_text(encoding="utf-8"))
+        source_sha256 = {
+            str(source["id"]): str(source["sha256"])
+            for source in committed["sources"]
+        }
+        request = BuildRequest(
+            active_base=args.active_base,
+            candidate_base=args.candidate_base,
+            corpus_dir=_project_path(args.corpus),
+            receipt_path=args.receipt,
+            snapshot_sha256=str(plan["snapshot_sha256"]),
+            source_sha256=source_sha256,
+        )
+        store = VectorStore(writer_settings)
+        embedder = BGEM3Embedder(
+            model_name=writer_settings.embedding_model,
+            model_revision=writer_settings.embedding_model_revision,
+            device=args.device,
+            cache_path=writer_settings.storage_dir / "emb_cache.sqlite",
+        )
+        dependencies = BuildDependencies(
+            store=store,
+            embedder=embedder,
+            settings=writer_settings,
+            completed_at=lambda: datetime.now(timezone.utc),
+        )
+        receipt = build_candidates(request, dependencies)
+        written = write_receipt_atomic(
+            receipt,
+            args.receipt,
+            project_root=PROJECT_ROOT,
+        )
+    except Exception:
+        return _emit_error("candidate_build_failed")
+    finally:
+        if store is not None:
+            try:
+                store.close()
+            except Exception:
+                pass
+        writer_settings = None
+
+    output = {
+        "status": "candidate_ready",
+        "candidate_base": args.candidate_base,
+        "collections": plan["collections"],
+        "receipt": written.relative_to(PROJECT_ROOT).as_posix(),
+    }
+    print(json.dumps(output, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     try:
@@ -155,12 +240,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if not _writer_environment_ready():
         return _emit_error("missing_writer_environment")
+    if not _receipt_target_is_safe(args.receipt):
+        return _emit_error("invalid_receipt_target")
     if not _pinned_models_are_cached():
         return _emit_error("missing_model_snapshot")
-
-    # Candidate orchestration is added in the next implementation task.  Until
-    # then even a fully authorized invocation remains fail-closed.
-    return _emit_error("execution_not_available")
+    return _execute(args, plan)
 
 
 if __name__ == "__main__":
