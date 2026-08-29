@@ -34,7 +34,8 @@ from rag.indexing.embedder import BGEM3Embedder
 from rag.indexing.vector_store import VectorStore
 from rag.qdrant_blue_green import BuildDependencies, BuildRequest, build_candidates
 from rag.qdrant_maintenance import (
-    build_local_snapshot,
+    AuditedCorpus,
+    audit_local_corpus,
     candidate_collections,
     validate_candidate_base,
     validate_snapshot_match,
@@ -45,7 +46,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS = Path("data/raw/laws")
 DEFAULT_RAW_DIR = Path("data/raw")
 DEFAULT_SNAPSHOT = Path("release/corpus_snapshot.json")
-DEFAULT_RECEIPT = Path("eval/runs/qdrant-maintenance/receipt.json")
+DEFAULT_RECEIPT_ROOT = Path("eval/runs/qdrant-maintenance")
+PRODUCTION_POINT_COUNTS = {"fixed": 481, "structure": 884}
 _PINNED_MODELS = (
     ("BAAI/bge-m3", DEFAULT_EMBEDDING_MODEL_REVISION),
     ("BAAI/bge-reranker-v2-m3", DEFAULT_RERANKER_MODEL_REVISION),
@@ -66,14 +68,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--snapshot", type=Path, default=DEFAULT_SNAPSHOT, metavar="PATH"
     )
-    parser.add_argument("--receipt", type=Path, default=DEFAULT_RECEIPT, metavar="PATH")
+    parser.add_argument("--receipt", type=Path, metavar="PATH")
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--execute", action="store_true")
     return parser
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    return build_parser().parse_args(argv)
+    args = build_parser().parse_args(argv)
+    if args.receipt is None:
+        args.receipt = DEFAULT_RECEIPT_ROOT / f"{args.candidate_base}.json"
+    return args
 
 
 def _project_path(path: Path) -> Path:
@@ -84,8 +89,10 @@ def _snapshot_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build_dry_run_plan(args: argparse.Namespace) -> dict[str, object]:
-    """Validate only local evidence and return the redacted execution plan."""
+def _build_verified_inputs(
+    args: argparse.Namespace,
+) -> tuple[dict[str, object], AuditedCorpus]:
+    """Validate local evidence once and retain the exact decoded source units."""
     validate_candidate_base(args.active_base, args.candidate_base)
     raw_dir = _project_path(args.raw_dir)
     snapshot_path = _project_path(args.snapshot)
@@ -94,13 +101,13 @@ def build_dry_run_plan(args: argparse.Namespace) -> dict[str, object]:
         source_id: (url, raw_dir / f"chlaw_{source_id}.zip")
         for source_id, (url, _targets) in DUMPS.items()
     }
-    local = build_local_snapshot(
+    audited = audit_local_corpus(
         source_archives=source_archives,
         laws_dir=_project_path(args.corpus),
         snapshot_date=date.today().isoformat(),
     )
-    validate_snapshot_match(committed, local)
-    return {
+    validate_snapshot_match(committed, audited.snapshot)
+    plan = {
         "status": "dry_run_ready",
         "active_base": args.active_base,
         "candidate_base": args.candidate_base,
@@ -108,6 +115,13 @@ def build_dry_run_plan(args: argparse.Namespace) -> dict[str, object]:
         "snapshot_sha256": _snapshot_sha256(snapshot_path),
         "execution_required": True,
     }
+    return plan, audited
+
+
+def build_dry_run_plan(args: argparse.Namespace) -> dict[str, object]:
+    """Validate only local evidence and return the redacted execution plan."""
+    plan, _audited = _build_verified_inputs(args)
+    return plan
 
 
 def _emit_error(code: str) -> int:
@@ -144,7 +158,11 @@ def _receipt_target_is_safe(target: Path) -> bool:
     ) > 3
 
 
-def _execute(args: argparse.Namespace, plan: dict[str, object]) -> int:
+def _execute(
+    args: argparse.Namespace,
+    plan: dict[str, object],
+    audited: AuditedCorpus,
+) -> int:
     store = None
     writer_settings = None
     try:
@@ -160,6 +178,8 @@ def _execute(args: argparse.Namespace, plan: dict[str, object]) -> int:
             embedding_model_revision=DEFAULT_EMBEDDING_MODEL_REVISION,
             reranker_model="BAAI/bge-reranker-v2-m3",
             reranker_model_revision=DEFAULT_RERANKER_MODEL_REVISION,
+            chunk_size=400,
+            chunk_overlap=80,
             anthropic_api_key="",
             openai_api_key="",
             gemini_api_key="",
@@ -172,8 +192,8 @@ def _execute(args: argparse.Namespace, plan: dict[str, object]) -> int:
         request = BuildRequest(
             active_base=args.active_base,
             candidate_base=args.candidate_base,
-            corpus_dir=_project_path(args.corpus),
-            receipt_path=args.receipt,
+            units=audited.units,
+            expected_point_counts=PRODUCTION_POINT_COUNTS,
             snapshot_sha256=str(plan["snapshot_sha256"]),
             source_sha256=source_sha256,
         )
@@ -183,6 +203,7 @@ def _execute(args: argparse.Namespace, plan: dict[str, object]) -> int:
             model_revision=writer_settings.embedding_model_revision,
             device=args.device,
             cache_path=writer_settings.storage_dir / "emb_cache.sqlite",
+            local_files_only=True,
         )
         dependencies = BuildDependencies(
             store=store,
@@ -227,7 +248,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _emit_error("candidate_confirmation_mismatch")
 
     try:
-        plan = build_dry_run_plan(args)
+        plan, audited = _build_verified_inputs(args)
     except FileNotFoundError:
         return _emit_error("missing_local_corpus")
     except (json.JSONDecodeError, KeyError, TypeError):
@@ -242,9 +263,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _emit_error("missing_writer_environment")
     if not _receipt_target_is_safe(args.receipt):
         return _emit_error("invalid_receipt_target")
+    if _project_path(args.receipt).exists():
+        return _emit_error("receipt_exists")
     if not _pinned_models_are_cached():
         return _emit_error("missing_model_snapshot")
-    return _execute(args, plan)
+    return _execute(args, plan, audited)
 
 
 if __name__ == "__main__":

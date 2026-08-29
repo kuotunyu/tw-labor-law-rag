@@ -122,9 +122,12 @@ stops. Cleanup is a separate, explicitly authorized operator action.
 ### 4. Manual command boundary
 
 `scripts/rebuild_qdrant_blue_green.py` is dry-run by default. Dry-run performs
-the local corpus gate, computes the candidate collection names and expected
-point counts, verifies the pinned embedding model is locally available, and
-prints a redacted plan without connecting to Qdrant.
+the local corpus gate, validates the exact top-level law JSON file set, and
+computes the candidate collection names. It does not inspect model caches,
+load model weights, compute vectors, connect to Qdrant, or write a receipt.
+Execute mode separately requires the pinned snapshots in the local cache and
+prepares the exact 400/80, 481/884-point, 1024-dimensional build before the
+first cloud write.
 
 Cloud mutation requires all of the following:
 
@@ -172,8 +175,9 @@ this design and requires a later, separately confirmed destructive operation.
   only candidate names and error class.
 - Count, vector, or provenance mismatch marks the candidate invalid and blocks
   cutover; it does not delete the candidate automatically.
-- Receipts are written atomically through a temporary file and renamed only
-  after both collections pass.
+- Receipts are published atomically through a temporary file only after both
+  collections pass. Existing receipts are never overwritten; the default file
+  name is derived from the candidate base.
 
 ## Security and privacy
 

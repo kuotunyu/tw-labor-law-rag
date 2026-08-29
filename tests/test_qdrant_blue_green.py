@@ -8,6 +8,8 @@ import numpy as np
 import pytest
 
 from rag.config import Settings
+from rag.indexing.vector_store import VectorStore
+from rag.ingestion.loader import load_law_json
 from rag.qdrant_blue_green import BuildDependencies, BuildRequest, build_candidates
 
 
@@ -27,7 +29,7 @@ class FakeStore:
         return name in self.existing
 
     def create_collection(self, name: str, dim: int) -> None:
-        assert dim == 4
+        assert dim == 1024
         if name in self.existing:
             raise AssertionError("orchestrator must preflight every candidate")
         self.created.append(name)
@@ -36,7 +38,7 @@ class FakeStore:
     def upsert_chunks(self, name, chunks, vectors) -> None:
         if name == self.fail_upsert_for:
             raise RuntimeError("simulated write failure")
-        assert vectors.shape == (len(chunks), 4)
+        assert vectors.shape == (len(chunks), 1024)
         self.payloads[name] = [chunk.payload() for chunk in chunks]
 
     def count(self, name: str) -> int:
@@ -58,7 +60,7 @@ class FakeEmbedder:
         self.calls.append(texts)
         if len(self.calls) == self.fail_on_call:
             raise RuntimeError("simulated local embedding failure")
-        return np.ones((len(texts), 4), dtype=np.float32)
+        return np.ones((len(texts), 1024), dtype=np.float32)
 
 
 @pytest.fixture
@@ -87,8 +89,8 @@ def build_request(corpus_dir: Path) -> BuildRequest:
     return BuildRequest(
         active_base="labor_laws",
         candidate_base="labor_laws_20260830_deadbeef",
-        corpus_dir=corpus_dir,
-        receipt_path=Path("eval/runs/qdrant-maintenance/test.json"),
+        units=tuple(load_law_json(corpus_dir / "test-law.json")),
+        expected_point_counts={"fixed": 1, "structure": 2},
         snapshot_sha256="c" * 64,
         source_sha256={"acts": "a" * 64, "regulations": "b" * 64},
     )
@@ -171,7 +173,7 @@ def test_success_builds_fixed_then_structure_and_returns_redacted_receipt(
         dependencies.store.payloads[build_request.collections["fixed"]]
     )
     assert receipt["collections"]["structure"]["points"] == 2
-    assert receipt["vector_dimension"] == 4
+    assert receipt["vector_dimension"] == 1024
     serialized = json.dumps(receipt)
     assert "https://" not in serialized
     assert "api_key" not in serialized.lower()
@@ -182,3 +184,59 @@ def test_request_derives_only_candidate_collection_names(build_request):
         "fixed": "labor_laws_20260830_deadbeef_fixed",
         "structure": "labor_laws_20260830_deadbeef_structure",
     }
+
+
+def test_wrong_vector_dimension_fails_before_any_cloud_write(
+    dependencies, build_request
+):
+    dependencies.embedder.encode = lambda texts: np.ones(
+        (len(texts), 4), dtype=np.float32
+    )
+
+    with pytest.raises(ValueError, match="1024"):
+        build_candidates(build_request, dependencies)
+
+    assert dependencies.store.created == []
+
+
+def test_wrong_expected_point_contract_fails_before_any_cloud_write(
+    dependencies, build_request
+):
+    build_request.expected_point_counts["fixed"] = 999
+
+    with pytest.raises(ValueError, match="expected point count"):
+        build_candidates(build_request, dependencies)
+
+    assert dependencies.store.created == []
+
+
+def test_real_local_qdrant_builds_both_create_only_candidates(
+    tmp_path, build_request, monkeypatch
+):
+    settings = Settings(
+        _env_file=None,
+        qdrant_mode="local",
+        qdrant_path=str(tmp_path / "qdrant"),
+        embedding_model="BAAI/bge-m3",
+        embedding_model_revision="d" * 40,
+    )
+    store = VectorStore(settings)
+    monkeypatch.setattr(
+        store.client,
+        "delete_collection",
+        lambda *_args, **_kwargs: pytest.fail("candidate build must never delete"),
+    )
+    dependencies = BuildDependencies(
+        store=store,
+        embedder=FakeEmbedder(),
+        settings=settings,
+        completed_at=lambda: datetime(2026, 8, 30, 1, 2, 3, tzinfo=timezone.utc),
+    )
+
+    try:
+        receipt = build_candidates(build_request, dependencies)
+        assert store.count(build_request.collections["fixed"]) == 1
+        assert store.count(build_request.collections["structure"]) == 2
+        assert receipt["vector_dimension"] == 1024
+    finally:
+        store.close()

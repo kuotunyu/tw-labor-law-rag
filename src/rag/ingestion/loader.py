@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 from rag.ingestion.cleaner import clean_text, normalize_label
 from rag.models import SourceUnit
@@ -20,14 +22,23 @@ _DELETED_ARTICLE = re.compile(r"^[（(]\s*刪除\s*[）)]$")
 _MD_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 
 
-def load_law_json(path: Path) -> list[SourceUnit]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+def load_law_data(
+    data: Mapping[str, Any], *, source_path: str = ""
+) -> list[SourceUnit]:
+    """Load one already-decoded law without reading it from disk again."""
     title = data["name"]
     source_url = str(data.get("url", "")).strip()
     last_amended = str(data.get("last_amended", "")).strip()
     effective_date = str(data.get("effective_date", "")).strip()
     units = []
-    for article in data.get("articles", []):
+    articles = data.get("articles", [])
+    if not isinstance(articles, Sequence) or isinstance(
+        articles, (str, bytes, bytearray)
+    ):
+        raise ValueError("law articles must be a list")
+    for article in articles:
+        if not isinstance(article, Mapping):
+            raise ValueError("law article must be an object")
         text = clean_text(article.get("content", ""))
         if not text or _DELETED_ARTICLE.match(text):
             continue
@@ -38,13 +49,20 @@ def load_law_json(path: Path) -> list[SourceUnit]:
                 doc_title=title,
                 article_no=normalize_label(article.get("no", "")),
                 chapter=normalize_label(article.get("chapter", "")),
-                source_path=str(path),
+                source_path=source_path,
                 source_url=source_url,
                 last_amended=last_amended,
                 effective_date=effective_date,
             )
         )
     return units
+
+
+def load_law_json(path: Path) -> list[SourceUnit]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, Mapping):
+        raise ValueError("law JSON must be an object")
+    return load_law_data(data, source_path=str(path))
 
 
 def load_markdown(path: Path) -> list[SourceUnit]:

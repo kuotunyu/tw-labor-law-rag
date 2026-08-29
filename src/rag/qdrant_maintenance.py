@@ -9,14 +9,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import tempfile
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from rag.corpus_audit import build_snapshot
+from rag.ingestion.loader import load_law_data
+from rag.models import SourceUnit
 
 _CANDIDATE_BASE = re.compile(r"^[a-z0-9][a-z0-9_-]{2,63}$")
 _DATE_YYYYMMDD = re.compile(r"^\d{8}$")
@@ -29,6 +33,14 @@ _STRATEGIES = ("fixed", "structure")
 _RECEIPT_ROOT = Path("eval/runs/qdrant-maintenance")
 
 
+@dataclass(frozen=True)
+class AuditedCorpus:
+    """One immutable-in-practice view used by validation and candidate builds."""
+
+    snapshot: dict[str, Any]
+    units: tuple[SourceUnit, ...]
+
+
 def candidate_collections(base: str) -> dict[str, str]:
     """Return the two candidate collection names for *base*."""
     return {strategy: f"{base}_{strategy}" for strategy in _STRATEGIES}
@@ -36,6 +48,8 @@ def candidate_collections(base: str) -> dict[str, str]:
 
 def validate_candidate_base(active_base: str, candidate_base: str) -> None:
     """Reject an active, ambiguous, or non-portable candidate base name."""
+    if not _CANDIDATE_BASE.fullmatch(active_base):
+        raise ValueError("active base must be a portable lowercase name")
     if candidate_base == active_base:
         raise ValueError("candidate base must differ from active base")
     if not _CANDIDATE_BASE.fullmatch(candidate_base):
@@ -57,6 +71,41 @@ def build_local_snapshot(
     snapshot_date: str,
 ) -> dict[str, Any]:
     """Reconstruct a canonical snapshot from already-downloaded local files."""
+    return audit_local_corpus(
+        source_archives=source_archives,
+        laws_dir=laws_dir,
+        snapshot_date=snapshot_date,
+    ).snapshot
+
+
+def audit_local_corpus(
+    *,
+    source_archives: Mapping[str, tuple[str, Path]],
+    laws_dir: Path,
+    snapshot_date: str,
+) -> AuditedCorpus:
+    """Read the exact top-level law JSON set once and reject every extra entry."""
+    corpus_root = Path(laws_dir)
+    if not corpus_root.is_dir():
+        raise FileNotFoundError("local law corpus is unavailable")
+
+    law_paths: list[Path] = []
+    for path in sorted(corpus_root.rglob("*")):
+        relative = path.relative_to(corpus_root)
+        is_allowed_manifest = relative == Path("manifest.json") and path.is_file()
+        is_top_level_law = (
+            len(relative.parts) == 1
+            and path.is_file()
+            and path.suffix.lower() == ".json"
+            and path.name != "manifest.json"
+        )
+        if path.is_symlink() or not (is_allowed_manifest or is_top_level_law):
+            raise ValueError("unexpected corpus entry")
+        if is_top_level_law:
+            law_paths.append(path)
+    if not law_paths:
+        raise ValueError("law corpus contains no law JSON")
+
     sources = [
         {
             "id": source_id,
@@ -65,12 +114,16 @@ def build_local_snapshot(
         }
         for source_id, (url, path) in source_archives.items()
     ]
-    laws = [
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted(Path(laws_dir).glob("*.json"))
-        if path.name != "manifest.json"
-    ]
-    return build_snapshot(sources=sources, laws=laws, snapshot_date=snapshot_date)
+    laws: list[Mapping[str, Any]] = []
+    units: list[SourceUnit] = []
+    for path in law_paths:
+        law = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(law, Mapping):
+            raise ValueError("law JSON must be an object")
+        laws.append(law)
+        units.extend(load_law_data(law, source_path=path.name))
+    snapshot = build_snapshot(sources=sources, laws=laws, snapshot_date=snapshot_date)
+    return AuditedCorpus(snapshot=snapshot, units=tuple(units))
 
 
 def _difference_paths(expected: Any, observed: Any, path: str = "") -> list[str]:
@@ -251,6 +304,8 @@ def write_receipt_atomic(
         raise ValueError("receipt target must be under qdrant-maintenance") from exc
     if destination == allowed_root:
         raise ValueError("receipt target must name a file under qdrant-maintenance")
+    if destination.exists():
+        raise FileExistsError("maintenance receipt already exists")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
@@ -266,7 +321,10 @@ def write_receipt_atomic(
             json.dump(receipt, temporary, ensure_ascii=False, indent=2, sort_keys=True)
             temporary.write("\n")
             temporary_path = Path(temporary.name)
-        temporary_path.replace(destination)
+        try:
+            os.link(temporary_path, destination)
+        except FileExistsError as exc:
+            raise FileExistsError("maintenance receipt already exists") from exc
     finally:
         if temporary_path is not None and temporary_path.exists():
             temporary_path.unlink()

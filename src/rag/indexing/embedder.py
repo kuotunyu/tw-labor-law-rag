@@ -21,13 +21,24 @@ _SQLITE_VAR_LIMIT = 500  # stay under SQLite's ~999 bound-variable cap
 _COMMIT_SHA = re.compile(r"[0-9a-fA-F]{40}")
 
 
-def resolve_model_snapshot(model_name: str, model_revision: str) -> str:
+def resolve_model_snapshot(
+    model_name: str,
+    model_revision: str,
+    *,
+    local_files_only: bool = False,
+) -> str:
     """Resolve an immutable Hub commit to a local snapshot directory."""
 
     if not model_name or _COMMIT_SHA.fullmatch(model_revision) is None:
         raise ValueError("model revision must be a full 40-character commit SHA")
     from huggingface_hub import snapshot_download
 
+    if local_files_only:
+        return snapshot_download(
+            repo_id=model_name,
+            revision=model_revision,
+            local_files_only=True,
+        )
     return snapshot_download(repo_id=model_name, revision=model_revision)
 
 
@@ -98,12 +109,14 @@ class BGEM3Embedder:
         cache_path: Path | None = None,
         batch_size: int = 64,
         max_length: int = 1024,
+        local_files_only: bool = False,
     ):
         self.model_name = model_name
         self.model_revision = model_revision
         self.device = resolve_device(device)
         self.batch_size = batch_size
         self.max_length = max_length
+        self.local_files_only = local_files_only
         self.cache = EmbeddingCache(cache_path) if cache_path else None
         self._model = None
 
@@ -112,7 +125,11 @@ class BGEM3Embedder:
         if self._model is None:  # lazy: loading BGE-M3 takes seconds + VRAM
             from FlagEmbedding import BGEM3FlagModel
 
-            model_path = resolve_model_snapshot(self.model_name, self.model_revision)
+            model_path = resolve_model_snapshot(
+                self.model_name,
+                self.model_revision,
+                local_files_only=self.local_files_only,
+            )
             self._model = BGEM3FlagModel(
                 model_path,
                 use_fp16=self.device.startswith("cuda"),
