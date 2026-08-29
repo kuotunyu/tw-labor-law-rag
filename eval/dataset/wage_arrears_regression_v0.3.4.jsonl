@@ -1,0 +1,20 @@
+{"qid":"wage-reg-001","question":"公司一直拖欠薪水，我可以不經預告直接離職嗎？","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["colloquial","formal_notice"]}
+{"qid":"wage-reg-002","question":"雇主已經欠薪兩個月，我能立即離職並終止勞動契約嗎？","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["narrative","duration"]}
+{"qid":"wage-reg-003","question":"這個月公司沒發薪，我想馬上離職，法律允許嗎？","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["colloquial","punctuation"]}
+{"qid":"wage-reg-004","question":"公司沒有付薪，勞工可否立刻離職，不必再等預告期？","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["colloquial","question"]}
+{"qid":"wage-reg-005","question":"雇主未發薪時，我是否可以立即終止契約？","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["formal","short"]}
+{"qid":"wage-reg-006","question":"公司長期拖欠工資，我打算直接終止勞動契約，應依哪一條？","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["statute_request","narrative"]}
+{"qid":"wage-reg-007","question":"雇主未給付工作報酬，勞工能直接離職嗎？","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["statutory_language","short"]}
+{"qid":"wage-reg-008","question":"公司已經兩個月沒有付 salary，我可以直接 resign 嗎？","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["code_switch","narrative"]}
+{"qid":"wage-reg-009","question":"Because of unpaid salary, can I immediately resign and end the employment contract?","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["english","code_switch"]}
+{"qid":"wage-reg-010","question":"The company has wage arrears; may a worker resign without notice under Taiwan labor law?","expect_expansion":true,"sources":[{"doc":"勞動基準法","article":"第 14 條"}],"style_tags":["english","formal_notice"]}
+{"qid":"wage-reg-011","question":"公司欠薪兩個月，我要怎麼追討積欠的工資？","expect_expansion":false,"sources":[],"style_tags":["wage_only","collision"]}
+{"qid":"wage-reg-012","question":"我想直接離職，需要提前幾天預告公司？","expect_expansion":false,"sources":[],"style_tags":["exit_only","collision"]}
+{"qid":"wage-reg-013","question":"公司欠薪後，雇主可以不經預告直接解僱勞工嗎？","expect_expansion":false,"sources":[],"style_tags":["employer_dismissal","collision"]}
+{"qid":"wage-reg-014","question":"公司每月正常付 salary，我想了解工資應在何時結算。","expect_expansion":false,"sources":[],"style_tags":["generic_salary","collision"]}
+{"qid":"wage-reg-015","question":"勞工在什麼情況下可以不經預告終止契約？","expect_expansion":false,"sources":[],"style_tags":["notice_only","collision"]}
+{"qid":"wage-reg-016","question":"被資遣時，資遣費應該如何計算？","expect_expansion":false,"sources":[],"style_tags":["severance_only","collision"]}
+{"qid":"wage-reg-017","question":"公司沒發薪資證明，會影響我申請貸款嗎？","expect_expansion":false,"sources":[],"style_tags":["substring_wage_cue","collision"]}
+{"qid":"wage-reg-018","question":"雇主未給付工作報酬後，又說要直接解僱我，這樣合法嗎？","expect_expansion":false,"sources":[],"style_tags":["employer_action","collision"]}
+{"qid":"wage-reg-019","question":"My salary is paid normally; may I resign without notice for personal reasons?","expect_expansion":false,"sources":[],"style_tags":["english","exit_only","collision"]}
+{"qid":"wage-reg-020","question":"雇主暴力侮辱勞工時，我能立即終止契約嗎？","expect_expansion":false,"sources":[],"style_tags":["article_14_neighbor","collision"]}
