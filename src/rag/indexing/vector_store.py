@@ -41,6 +41,19 @@ class VectorStore:
         if self._read_only:
             raise RuntimeError("write operation is disabled in the read-only Qdrant runtime")
 
+    def collection_exists(self, name: str) -> bool:
+        return bool(self.client.collection_exists(name))
+
+    def create_collection(self, name: str, dim: int) -> None:
+        """Create a collection only when the target name is still unused."""
+        self._require_writable()
+        if self.collection_exists(name):
+            raise ValueError(f"collection already exists: {name}")
+        self.client.create_collection(
+            collection_name=name,
+            vectors_config=qm.VectorParams(size=dim, distance=qm.Distance.COSINE),
+        )
+
     def recreate_collection(self, name: str, dim: int) -> None:
         self._require_writable()
         if self.client.collection_exists(name):
