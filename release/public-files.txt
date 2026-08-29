@@ -33,6 +33,7 @@ eval/dataset/README.md
 eval/dataset/eval_set.jsonl
 eval/dataset/mini_eval.jsonl
 eval/dataset/reliability_stress_v0.3.1.jsonl
+eval/dataset/wage_arrears_regression_v0.3.4.jsonl
 eval/export_official.py
 eval/judge.py
 eval/lib.py
@@ -46,10 +47,12 @@ eval/official/provider_crosscheck_trace.jsonl
 eval/official/reliability_formal_trace.jsonl
 eval/official/reliability_results.json
 eval/official/reliability_trace.jsonl
+eval/official/wage_arrears_regression_v0.3.4.json
 eval/run_e2e_eval.py
 eval/run_provider_crosscheck.py
 eval/run_reliability_eval.py
 eval/run_retrieval_eval.py
+eval/run_wage_arrears_regression.py
 pyproject.toml
 release/corpus_snapshot.json
 release/manifest.json
@@ -95,6 +98,7 @@ src/rag/retrieval/fusion.py
 src/rag/retrieval/pipeline.py
 src/rag/retrieval/reranker.py
 src/rag/retrieval/retriever.py
+src/rag/wage_arrears_regression.py
 tests/test_answerer.py
 tests/test_api_response.py
 tests/test_bm25_index.py
@@ -127,6 +131,7 @@ tests/test_tokenizer.py
 tests/test_ui_api_client.py
 tests/test_ui_byok_app.py
 tests/test_vector_store.py
+tests/test_wage_arrears_regression.py
 ui/api_client.py
 ui/app.py
 ui/refusal_labels.py

@@ -14,6 +14,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OFFICIAL = PROJECT_ROOT / "eval" / "official"
 DATASET = PROJECT_ROOT / "eval" / "dataset" / "eval_set.jsonl"
 STRESS_DATASET = PROJECT_ROOT / "eval" / "dataset" / "reliability_stress_v0.3.1.jsonl"
+WAGE_ARREARS_DATASET = (
+    PROJECT_ROOT / "eval" / "dataset" / "wage_arrears_regression_v0.3.4.jsonl"
+)
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -150,6 +153,42 @@ def test_official_provider_crosscheck_artifacts_are_complete_and_content_free():
     }
 
 
+def test_official_wage_arrears_regression_is_complete_and_content_free():
+    dataset = read_jsonl(WAGE_ARREARS_DATASET)
+    result = json.loads(
+        (OFFICIAL / "wage_arrears_regression_v0.3.4.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert result["schema_version"] == "1.0"
+    assert result["dataset"]["questions"] == 20
+    assert result["summary"]["positive_routes"] == 10
+    assert result["summary"]["collision_routes_avoided"] == 10
+    assert result["summary"]["positive_hit_at_5"] == 10
+    assert 0 <= result["summary"]["positive_hit_at_1"] <= 10
+    assert result["summary"]["positive_hit_at_1"] == sum(
+        case["rank"] == 1
+        for case in result["cases"]
+        if case["expected_expansion"]
+    )
+    assert result["summary"]["passed"] is True
+    assert [case["qid"] for case in result["cases"]] == [
+        row["qid"] for row in dataset
+    ]
+    assert all(
+        set(case)
+        == {
+            "qid",
+            "expected_expansion",
+            "expansion_applied",
+            "rank",
+            "top_score",
+        }
+        for case in result["cases"]
+    )
+
+
 def test_official_artifacts_have_no_local_paths_or_secret_fields():
     combined = "\n".join(
         path.read_text(encoding="utf-8")
@@ -172,6 +211,7 @@ def test_official_artifacts_have_no_local_paths_or_secret_fields():
         "reliability_formal_trace.jsonl",
         "provider_crosscheck_results.json",
         "provider_crosscheck_trace.jsonl",
+        "wage_arrears_regression_v0.3.4.json",
     ],
 )
 def test_official_json_ends_with_newline(filename):
