@@ -17,7 +17,7 @@
 
 Gemini／OpenAI 的正式 safety cross-check 已完成，`release/manifest.json` 記錄完整 contract，且本目錄收錄 `provider_crosscheck_results.json` 與 `provider_crosscheck_trace.jsonl`。兩家各五筆請求：Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。這是 safety cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。provider trace 嚴格 content-free，不含 question/answer text、provider payload 或 credentials。
 
-目前已發布的 JSON 都只保留設定白名單,不含 prompt、完整生成答案、judge 理由、provider response、request ID、token usage、API key、服務 URL、使用者名稱、個人識別資訊或本機路徑。
+其他 official traces 不含 token usage 或 API metadata。provider trace 僅含 strict allowlisted provider/model/verdict/token count/cost/latency，仍排除 prompts/questions/answers/provider payload/credentials/private paths/PII。
 每份結果內含公開評估集的 SHA-256，可確認題目版本一致。
 
 Retrieval、answerability、refusal、citation、ablation、reliability stress 與 formal guard summaries，以及門檻 Pareto 決策，都可由 committed traces 完整離線重算。Faithfulness/relevancy 只可從 trace 中留下的 numeric verdicts 再聚合;缺少的 provider output 與 judge reasoning 是刻意的 privacy/publication boundary,所以這兩項應標為 **archived provider evidence**,不得描述為只靠公開資料即可重生的評分。
