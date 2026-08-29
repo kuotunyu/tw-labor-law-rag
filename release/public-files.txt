@@ -64,6 +64,7 @@ scripts/ask.py
 scripts/audit_corpus.py
 scripts/build_index.py
 scripts/download_corpus.py
+scripts/rebuild_qdrant_blue_green.py
 scripts/run_api.py
 scripts/run_space.py
 scripts/verify_release.py
@@ -124,6 +125,7 @@ tests/test_packaging.py
 tests/test_pipeline.py
 tests/test_provider_budget.py
 tests/test_provider_crosscheck.py
+tests/test_qdrant_blue_green_cli.py
 tests/test_qdrant_maintenance.py
 tests/test_refusal_labels.py
 tests/test_release_verification.py
