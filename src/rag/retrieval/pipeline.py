@@ -17,20 +17,36 @@ _EMPLOYER_CUES = ("老闆", "主管", "雇主")
 _OFF_HOURS_CUES = ("假日", "休假日", "休息日", "例假", "下班後", "非上班時間")
 _MESSAGE_CUES = ("群組傳訊", "群組訊息", "傳訊", "回訊", "line群組", "line訊息")
 _OFF_HOURS_LEGAL_TERMS = "雇主 休息日 例假 工作時間 延長工作時間 出勤 加班"
+_SEVERANCE_CUES = ("資遣", "資遣費", "severance", "termination package")
+_NEW_REGIME_CUES = ("勞退新制", "新制")
+_OLD_REGIME_CUES = ("勞基法舊制", "舊制")
+_SEVERANCE_CALC_CUES = ("試算", "計算", "公式", "formula", "上限", "年資")
+_SEVERANCE_LEGAL_TERMS = "資遣費 勞工退休金條例 勞動基準法 工作年資 平均工資 六個月"
+
+
+def _matches_all(folded: str, *cue_groups: tuple[str, ...]) -> bool:
+    return all(any(cue in folded for cue in cues) for cues in cue_groups)
 
 
 def _retrieval_query(query: str) -> str:
-    """Bridge one observed colloquial gap without spending a provider call.
+    """Bridge measured colloquial gaps without spending a provider call.
 
-    Expansion is deliberately gated on employer, off-hours, and messaging
-    cues occurring together.  The original question remains intact for the
-    answer-generation layer; only retrieval and reranking see the legal terms.
+    The original question remains intact for the answer-generation layer;
+    only retrieval and reranking see the appended legal terms.
     """
     folded = query.casefold()
-    cue_groups = (_EMPLOYER_CUES, _OFF_HOURS_CUES, _MESSAGE_CUES)
-    if all(any(cue in folded for cue in cues) for cues in cue_groups):
-        return f"{query} {_OFF_HOURS_LEGAL_TERMS}"
-    return query
+    expansions = []
+    if _matches_all(folded, _EMPLOYER_CUES, _OFF_HOURS_CUES, _MESSAGE_CUES):
+        expansions.append(_OFF_HOURS_LEGAL_TERMS)
+    if _matches_all(
+        folded,
+        _SEVERANCE_CUES,
+        _NEW_REGIME_CUES,
+        _OLD_REGIME_CUES,
+        _SEVERANCE_CALC_CUES,
+    ):
+        expansions.append(_SEVERANCE_LEGAL_TERMS)
+    return " ".join((query, *expansions))
 
 
 @dataclass
