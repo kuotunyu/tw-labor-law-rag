@@ -156,11 +156,18 @@ def build_local_snapshot(
 ```python
 def test_payloads_require_complete_public_provenance(valid_payload):
     validate_candidate_payloads("structure", [valid_payload], expected_count=1)
-    for field in ("doc_title", "article_label", "source_url", "last_amended", "effective_date"):
+    for field in ("doc_title", "article_label", "source_url", "last_amended"):
         broken = dict(valid_payload)
         broken[field] = ""
         with pytest.raises(ValueError, match=field):
             validate_candidate_payloads("structure", [broken], expected_count=1)
+
+    missing_effective_date = dict(valid_payload)
+    del missing_effective_date["effective_date"]
+    with pytest.raises(ValueError, match="effective_date"):
+        validate_candidate_payloads(
+            "structure", [missing_effective_date], expected_count=1
+        )
 
 
 def test_receipt_has_exact_redacted_schema(receipt_input):
@@ -179,8 +186,10 @@ def test_receipt_has_exact_redacted_schema(receipt_input):
 
 Implement fixed field allowlists, `YYYYMMDD` date validation, official
 `https://law.moj.gov.tw/` URL validation, exact count validation, UTC ISO time,
-and `temporary.replace(target)` atomic receipt publication. Accept only a
-project-relative receipt target beneath `eval/runs/qdrant-maintenance/`.
+and `temporary.replace(target)` atomic receipt publication. Require the
+`effective_date` field but allow it to be empty when the audited official
+source has no value; never synthesize one. Accept only a project-relative
+receipt target beneath `eval/runs/qdrant-maintenance/`.
 
 - [ ] **Step 8: Run Task 1 tests and release-boundary checks**
 
