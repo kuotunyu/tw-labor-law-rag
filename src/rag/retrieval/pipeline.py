@@ -22,6 +22,41 @@ _NEW_REGIME_CUES = ("勞退新制", "新制")
 _OLD_REGIME_CUES = ("勞基法舊制", "舊制")
 _SEVERANCE_CALC_CUES = ("試算", "計算", "公式", "formula", "上限", "年資")
 _SEVERANCE_LEGAL_TERMS = "資遣費 勞工退休金條例 勞動基準法 工作年資 平均工資 六個月"
+_WAGE_NONPAYMENT_CUES = (
+    "欠薪",
+    "沒發薪",
+    "沒有發薪",
+    "未發薪",
+    "沒付薪",
+    "沒有付薪",
+    "未付薪",
+    "拖欠工資",
+    "積欠工資",
+    "沒付工資",
+    "沒有付工資",
+    "未付工資",
+    "未給付工資",
+    "未給付工作報酬",
+    "沒有付 salary",
+    "沒付 salary",
+    "unpaid salary",
+    "wage arrears",
+)
+_WORKER_IMMEDIATE_TERMINATION_CUES = (
+    "直接離職",
+    "立即離職",
+    "馬上離職",
+    "立刻離職",
+    "立即終止",
+    "直接終止",
+    "直接 resign",
+    "immediately resign",
+    "resign without notice",
+)
+_WAGE_ARREARS_LEGAL_TERMS = (
+    "勞動基準法 第十四條 不依勞動契約給付工作報酬 "
+    "勞工得不經預告終止契約"
+)
 
 
 def _matches_all(folded: str, *cue_groups: tuple[str, ...]) -> bool:
@@ -46,6 +81,8 @@ def _retrieval_query(query: str) -> str:
         _SEVERANCE_CALC_CUES,
     ):
         expansions.append(_SEVERANCE_LEGAL_TERMS)
+    if _matches_all(folded, _WAGE_NONPAYMENT_CUES, _WORKER_IMMEDIATE_TERMINATION_CUES):
+        expansions.append(_WAGE_ARREARS_LEGAL_TERMS)
     return " ".join((query, *expansions))
 
 

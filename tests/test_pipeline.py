@@ -125,6 +125,113 @@ def test_pipeline_expands_new_and_old_regime_severance_calculations(question):
 @pytest.mark.parametrize(
     "question",
     [
+        "公司一直拖欠薪水,我可以不經預告直接離職嗎?這樣還能拿到資遣費嗎?",
+        (
+            "公司已經兩個月沒有付 salary，我想今天直接 resign 又怕拿不到 "
+            "severance；雇主欠薪時能否不經預告終止契約，之後還能請求資遣費嗎？"
+        ),
+        (
+            "公司連續欠薪後要求我照常打卡，還說沒有先交 resignation notice 就拿不到"
+            "任何錢；我能否立即終止，並依哪個規則請求資遣費？"
+        ),
+    ],
+)
+def test_pipeline_expands_wage_nonpayment_worker_termination(question):
+    calls = []
+    legal_terms = (
+        "勞動基準法 第十四條 不依勞動契約給付工作報酬 "
+        "勞工得不經預告終止契約"
+    )
+
+    recorded_pipeline(calls).run(question)
+
+    expected = f"{question} {legal_terms}"
+    assert calls == [("retrieve", expected), ("rerank", expected)]
+
+
+@pytest.mark.parametrize(
+    "wage_cue",
+    [
+        "欠薪",
+        "沒發薪",
+        "沒有發薪",
+        "未發薪",
+        "沒付薪",
+        "沒有付薪",
+        "未付薪",
+        "拖欠工資",
+        "積欠工資",
+        "沒付工資",
+        "沒有付工資",
+        "未付工資",
+        "未給付工資",
+        "未給付工作報酬",
+        "沒有付 salary",
+        "沒付 salary",
+        "unpaid salary",
+        "wage arrears",
+    ],
+)
+def test_pipeline_accepts_each_reviewed_wage_nonpayment_cue(wage_cue):
+    calls = []
+    question = f"公司{wage_cue}，我想直接離職。"
+    legal_terms = (
+        "勞動基準法 第十四條 不依勞動契約給付工作報酬 "
+        "勞工得不經預告終止契約"
+    )
+
+    recorded_pipeline(calls, rerank=False).run(question)
+
+    assert calls == [("retrieve", f"{question} {legal_terms}")]
+
+
+@pytest.mark.parametrize(
+    "exit_cue",
+    [
+        "直接離職",
+        "立即離職",
+        "馬上離職",
+        "立刻離職",
+        "立即終止",
+        "直接終止",
+        "直接 resign",
+        "immediately resign",
+        "resign without notice",
+    ],
+)
+def test_pipeline_accepts_each_reviewed_worker_exit_cue(exit_cue):
+    calls = []
+    question = f"公司欠薪，我想{exit_cue}。"
+    legal_terms = (
+        "勞動基準法 第十四條 不依勞動契約給付工作報酬 "
+        "勞工得不經預告終止契約"
+    )
+
+    recorded_pipeline(calls, rerank=False).run(question)
+
+    assert calls == [("retrieve", f"{question} {legal_terms}")]
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "公司已經欠薪兩個月，該怎麼追討？",
+        "我想直接離職，應該怎麼做？",
+        "我是雇主，公司欠薪後可以不經預告直接解僱勞工嗎？",
+        "公司薪資怎麼算？我將來可能離職。",
+    ],
+)
+def test_pipeline_requires_wage_and_worker_exit_cue_groups(question):
+    calls = []
+
+    recorded_pipeline(calls, rerank=False).run(question)
+
+    assert calls == [("retrieve", question)]
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
         "公司終止勞動契約時要注意什麼？",
         "被資遣後可以申請哪些給付？",
         "勞退新制與舊制有什麼差別？",
@@ -142,12 +249,16 @@ def test_pipeline_requires_all_severance_comparison_cue_groups(question):
 def test_pipeline_appends_each_matching_rule_once_in_stable_order():
     calls = []
     question = (
-        "老闆在休假日用群組傳訊說明我的勞退新制與勞基法舊制資遣費試算，"
-        "要我立刻確認。"
+        "老闆在休假日用群組傳訊，說公司欠薪、也要我直接離職，"
+        "還附上勞退新制與勞基法舊制資遣費試算。"
     )
     off_hours = "雇主 休息日 例假 工作時間 延長工作時間 出勤 加班"
     severance = "資遣費 勞工退休金條例 勞動基準法 工作年資 平均工資 六個月"
-    expected = f"{question} {off_hours} {severance}"
+    wage_arrears = (
+        "勞動基準法 第十四條 不依勞動契約給付工作報酬 "
+        "勞工得不經預告終止契約"
+    )
+    expected = f"{question} {off_hours} {severance} {wage_arrears}"
 
     recorded_pipeline(calls).run(question)
 
