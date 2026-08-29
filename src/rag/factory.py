@@ -66,7 +66,9 @@ def build_retrieval_pipeline(
     active_reranker = None
     if use_reranker:
         active_reranker = reranker or Reranker(
-            model_name=settings.reranker_model, device=settings.device
+            model_name=settings.reranker_model,
+            model_revision=settings.reranker_model_revision,
+            device=settings.device,
         )
 
     return RetrievalPipeline(

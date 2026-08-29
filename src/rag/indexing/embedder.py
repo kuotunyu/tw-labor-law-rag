@@ -1,20 +1,34 @@
 """BGE-M3 dense embedder with a content-hash cache.
 
 The cache makes ablation runs cheap: vectors are keyed by
-``sha256(model_name + text)`` and stored in a single SQLite file, so
+``sha256(model_name + model_revision + text)`` and stored in a single SQLite file, so
 re-indexing with a different chunking strategy only embeds genuinely new text.
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 import sqlite3
 import threading
 from pathlib import Path
 
 import numpy as np
 
+from rag.config import DEFAULT_EMBEDDING_MODEL_REVISION
+
 _SQLITE_VAR_LIMIT = 500  # stay under SQLite's ~999 bound-variable cap
+_COMMIT_SHA = re.compile(r"[0-9a-fA-F]{40}")
+
+
+def resolve_model_snapshot(model_name: str, model_revision: str) -> str:
+    """Resolve an immutable Hub commit to a local snapshot directory."""
+
+    if not model_name or _COMMIT_SHA.fullmatch(model_revision) is None:
+        raise ValueError("model revision must be a full 40-character commit SHA")
+    from huggingface_hub import snapshot_download
+
+    return snapshot_download(repo_id=model_name, revision=model_revision)
 
 
 class EmbeddingCache:
@@ -43,7 +57,10 @@ class EmbeddingCache:
                 batch = unique[i : i + _SQLITE_VAR_LIMIT]
                 placeholders = ",".join("?" * len(batch))
                 rows = self.conn.execute(
-                    f"SELECT key, dim, vec FROM embeddings WHERE key IN ({placeholders})", batch
+                    # Only the count of literal '?' placeholders is dynamic;
+                    # every key remains a separately bound SQLite parameter.
+                    f"SELECT key, dim, vec FROM embeddings WHERE key IN ({placeholders})",  # nosec B608
+                    batch,
                 )
                 for key, dim, blob in rows:
                     found[key] = np.frombuffer(blob, dtype=np.float32).reshape(dim)
@@ -76,12 +93,14 @@ class BGEM3Embedder:
     def __init__(
         self,
         model_name: str = "BAAI/bge-m3",
+        model_revision: str = DEFAULT_EMBEDDING_MODEL_REVISION,
         device: str = "auto",
         cache_path: Path | None = None,
         batch_size: int = 64,
         max_length: int = 1024,
     ):
         self.model_name = model_name
+        self.model_revision = model_revision
         self.device = resolve_device(device)
         self.batch_size = batch_size
         self.max_length = max_length
@@ -93,15 +112,18 @@ class BGEM3Embedder:
         if self._model is None:  # lazy: loading BGE-M3 takes seconds + VRAM
             from FlagEmbedding import BGEM3FlagModel
 
+            model_path = resolve_model_snapshot(self.model_name, self.model_revision)
             self._model = BGEM3FlagModel(
-                self.model_name,
+                model_path,
                 use_fp16=self.device.startswith("cuda"),
                 devices=[self.device],
+                trust_remote_code=False,
             )
         return self._model
 
     def _key(self, text: str) -> str:
-        return hashlib.sha256(f"{self.model_name}\n{text}".encode("utf-8")).hexdigest()
+        material = f"{self.model_name}@{self.model_revision}\n{text}"
+        return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
     def encode(self, texts: list[str]) -> np.ndarray:
         """Embed ``texts`` (cache-aware), preserving input order."""

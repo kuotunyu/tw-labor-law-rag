@@ -9,7 +9,7 @@ app_port: 7860
 
 [![CI](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml)
 
-以台灣 15 部勞動法規（13 部法律、2 部命令）為目標知識庫的檢索增強生成(RAG)問答系統:BM25 + BGE-M3 向量檢索以 RRF 融合,經 bge-reranker-v2-m3 重排序後生成附條文引用的答案,回答附上「哪份法規哪一條」的引用來源,查無依據時誠實拒答而非瞎掰。設計決策由 40 題正式評估集與 8 組消融實驗檢驗——見 [EVAL_REPORT.md](EVAL_REPORT.md)。
+以台灣 15 部勞動法規（13 部法律、2 部命令）為目標知識庫的檢索增強生成(RAG)問答系統:BM25 + BGE-M3 向量檢索以 RRF 融合,經 bge-reranker-v2-m3 重排序後生成附條文引用的答案,回答附上法規、條號、法規來源連結與修正／生效日期,查無依據時誠實拒答而非瞎掰。設計決策由 40 題正式評估、8 組消融實驗與 60 題可靠性壓力集檢驗——見 [EVAL_REPORT.md](EVAL_REPORT.md)。
 
 ## 正式評估摘要
 
@@ -17,25 +17,43 @@ app_port: 7860
 
 實際作答的 29 題平均 faithfulness **4.90/5**、relevancy **5.00/5** 則屬 **archived provider evidence**:repository 可離線重新聚合已提交的 judge 數字,但不含完整生成答案、judge 理由或 provider response,因此不能從公開 evidence 重新產生或獨立複判這些評分。完整方法與限制見 [EVAL_REPORT.md](EVAL_REPORT.md),去識別化逐題 trace 見 [`eval/official/`](eval/official/README.md),claim 到 evidence 的映射見 [claim matrix](docs/release/CLAIM_MATRIX.md)。
 
+`v0.3.1 reliability stress evidence` 另以 40 題可答、20 題不可答的長句／中英夾雜壓力集，對 2026-08-29 稽核的 **15 部／884 條** snapshot 重建隔離索引。主設定 Hit@5 **0.950**、MRR@10 **0.908**；0.03 門檻直接誤拒 **1/40**、直接攔下不可答 **17/20**。既有 40 題正式集 guard 同時重現 Hit@5 **0.967**、MRR@10 **0.906**、門檻誤拒 **0/30** 與直接攔截 **9/10**。門檻掃描沒有 Pareto-better 候選，因此保留 0.03，不以新壓力集改寫 `v0.1.0` 正式模型品質指標。
+
+Gemini `gemini-3.5-flash-lite`／OpenAI `gpt-5.6-luna` 的 US$5 硬上限 safety cross-check 已完成並 fail closed：兩家各五筆請求；Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 evidence 僅含去識別化、嚴格 content-free 的十筆 trace、可重算的 metrics 與每家 US$5 預算 ledger；trace 不含 question/answer text、provider payload、憑證或原始 run artifacts。這是 safety cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質指標。
+
 ### Release evidence boundary
 
-`uv run python scripts/verify_release.py` 不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,會核對 40 題資料集、8×40 ablation grid、Hit@5/MRR、0.03 score/stage 契約、設定一致性、OGDL samples、official trace schema、完整 publication inventory、secret/privacy scan、人工審閱 binary hashes 與 GitHub Action pins。Git 歷史稽核涵蓋 heads、tags、remotes 的所有可公開 commits；GitHub Actions 暫時產生、不可發布的 `refs/remotes/pull/*` 合成 merge refs 除外，本機 `refs/archive/*` recovery evidence 也會保留在 publication graph 之外。0.03 reranker threshold 只在正式集的 30 題可答/10 題不可答範圍內有量測支持,不是通用 answerability classifier;一筆正式集外的口語敘事問法曾以 0.0146 被第一層誤拒,目前證據只能確認此失敗邊界存在,不能估計發生率。詳見 [EVAL_REPORT.md](EVAL_REPORT.md) 案例 7。
+`uv run python scripts/verify_release.py` 不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,會核對 40 題正式集、60 題壓力集、8×40 ablation grid、Hit@5/MRR、0.03 threshold sweep、15 部／884 條 snapshot、設定一致性、OGDL samples、official trace schema、provider complete contract、完整 publication inventory、secret/privacy scan、人工審閱 binary hashes 與 GitHub Action pins。Git 歷史稽核涵蓋 heads、tags、remotes 的所有可公開 commits；GitHub Actions 暫時產生、不可發布的 `refs/remotes/pull/*` 合成 merge refs 除外，本機 `refs/archive/*` recovery evidence 也會保留在 publication graph 之外。0.03 reranker threshold 不是通用 answerability classifier；壓力集已量測到 1/40 直接誤拒，因此只保留現值而不宣稱問題已消失。
 
-## v0.3.0 雙模型 runtime
+## v0.3.4 欠薪／立即離職檢索強化
 
-這是 `v0.3.0` source-only runtime and deployment release。公開 API/UI 預設使用 Gemini `gemini-3.5-flash-lite`，若伺服器同時設定 OpenAI，使用者可逐次請求選擇 `gpt-5.6-luna`。這些型號可分別由 server-side `GEMINI_GENERATION_MODEL` 與 `OPENAI_GENERATION_MODEL` 覆寫；對應 key 已設定時，`LLM_PROVIDER=gemini` 決定省略請求選擇時的預設 provider，否則 API 會改用另一個已設定的公開 provider；`LLM_FALLBACK_ENABLED=true` 才允許備援。`GEMINI_API_KEY` 與 `OPENAI_API_KEY` 只存在 API 伺服器環境，前端不接收、保存或顯示 key。
+只有同時命中「欠薪」與「勞工立即離職」兩組已審閱 cue 的問題，檢索管線才會補上《勞動基準法》第 14 條的固定法規詞。BM25、向量檢索與 reranker 看到擴充查詢；生成模型仍收到使用者原始問題。
+
+本版沒有新增 provider 呼叫、調整 0.03 門檻、重建 Qdrant 或改寫歷史指標。`v0.1.0` formal baseline 與 `v0.3.1` reliability evidence 保持原證據版本；v0.3.4 的公開主張只涵蓋可由單元測試驗證的決定論式路由契約。
+
+## v0.3.3 新舊制資遣費檢索強化
+
+這是 `v0.3.3` source-only runtime and deployment release。當問題同時包含資遣、新制、舊制與計算／比較語意時，檢索管線會以決定論式 query expansion 補上「勞工退休金條例、勞動基準法、工作年資、平均工資、六個月」等法規檢索詞。擴充內容只送往 BM25、向量檢索與 reranker；生成模型仍收到使用者的原始問題，避免檢索輔助詞改寫使用者意圖。
+
+這項擴充必須同時命中四組 cue 才會啟用，因此一般資遣、退休或單純制度差異問題不會被廣泛改寫。`v0.1.0` 正式模型品質基準、`v0.3.1` reliability evidence 與 `v0.3.2` provider safety cross-check 仍維持原來的證據版本；本版沒有用新的 provider 呼叫改寫歷史指標。
+
+## v0.3.2 provider safety cross-check：可靠性、來源與雙模型 runtime
+
+這是 `v0.3.2` source-only runtime and deployment release。公開 API/UI 預設使用 Gemini `gemini-3.5-flash-lite`，若伺服器同時設定 OpenAI，使用者可逐次請求選擇 `gpt-5.6-luna`。這些型號可分別由 server-side `GEMINI_GENERATION_MODEL` 與 `OPENAI_GENERATION_MODEL` 覆寫；對應 key 已設定時，`LLM_PROVIDER=gemini` 決定省略請求選擇時的預設 provider，否則 API 會改用另一個已設定的公開 provider；`LLM_FALLBACK_ENABLED=true` 才允許備援。`GEMINI_API_KEY` 與 `OPENAI_API_KEY` 只存在 API 伺服器環境，前端不接收、保存或顯示 key。
 
 備援邊界是固定的：只有主 provider 發生連線、限流、5xx 服務或空回應等 operational failure 時，才會最多嘗試另一個已設定的公開 provider 一次。檢索階段拒答不會呼叫生成模型；模型依據條文拒答、provider 安全擋下或政策拒絕也不會 fallback。正式評估路徑仍直接固定單一 generator/judge provider，不使用 runtime fallback，避免路由變動改寫評估設定。
 
 Streamlit 側邊欄的「回答模型」只顯示 API `/models` 回傳的已設定 Gemini/OpenAI；送出問題時會將選擇的 provider 一併傳給 `/query`。回應中 `requested_provider` 保留指定 provider，`provider` 與 `model` 是實際生成結果的 metadata，`fallback_used`/`fallback_from` 說明是否改走備援，`generation_called=false` 表示在檢索層已拒答。UI 會分開顯示指定與實際作答模型，並在改走備援時警示。Live provider smoke test 需要伺服器端本機 secrets，不屬公開 offline CI。
 
-`v0.1.0` 的正式指標仍是歷史結果，由 `release/manifest.json` 所列 generator 與 judge 模型產生；本版 runtime 沒有重跑、取代或重新審計這些數值。
+`v0.1.0` 的正式模型品質指標仍是歷史結果，由 `release/manifest.json` 所列 generator 與 judge 模型產生；本版沒有取代或重新審計這些數值。本版已在不呼叫 provider 的情況下，以 60 題壓力集與既有 40 題正式集 guard 重跑 retrieval 與 threshold 行為。
 
-### 公開 BYOK Docker Space（部署分支，尚未公開）
+### 公開 BYOK Docker Space（已上線）
+
+**Live Demo：** [steven0226-tw-labor-law-rag-demo.hf.space](https://steven0226-tw-labor-law-rag-demo.hf.space)
 
 公開作品集模式採 BYOK（Bring Your Own Key）：訪客選擇 Gemini `gemini-3.5-flash-lite` 或 OpenAI `gpt-5.6-luna`，並在遮罩欄位輸入自己的專用 API Key。Key 只存在目前 Streamlit 工作階段、送往同容器 loopback FastAPI 的單次內部 header，以及該次請求建立的 provider client；不寫入檔案、聊天紀錄、共用設定或跨請求快取。公開 Space 不設定站長的 `GEMINI_API_KEY`／`OPENAI_API_KEY`，也不做跨 provider fallback，因此訪客不會消耗站長的模型 token 額度。
 
-Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.pkl` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，並先在 private Space 完成 Key 隔離、log scan 與唯讀權限驗收，取得最終確認後才公開。完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
+Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.json` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，最多保留 1,000 個未過期的匿名工作階段。公開前已完成 Key 隔離、唯讀權限與免費 `cpu-basic` 驗收；完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
 
 ## 架構
 
@@ -160,4 +178,4 @@ Repository **有散布兩份小型 OGDL 命令樣本**供 loader/chunking smoke 
 
 ## 公開範圍
 
-這是 `v0.3.0` source-only runtime and deployment release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版新增雙模型路由、請求級備援邊界、visitor BYOK 與 private-Space 部署支援，不代表重新執行 provider benchmark，也不宣稱 hosted public acceptance 已完成。它是 evidence-backed software portfolio artifact，不是法律意見，也不是 production legal service。完整 corpus、模型權重、私有索引、provider artifacts 與公開 Space 驗收證據仍不在本次 source release 範圍。
+這是 `v0.3.4` source-only runtime and deployment release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版在 v0.3.3 新舊制資遣費檢索強化之外，新增欠薪／立即離職問題的決定論式第 14 條檢索輔助，但不把這項路由契約寫成重新量測的品質提升。v0.3.2 Gemini／OpenAI safety cross-check 已以固定模型完成，兩家各五筆請求均在 US$5 硬上限內：Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 嚴格不含 question/answer text、provider payload 或憑證；此 cross-check 不取代正式模型品質基準。它是 evidence-backed software portfolio artifact，不是法律意見，也不是 production legal service。完整 corpus、模型權重、私有索引與 provider raw artifacts 仍不在本次 source release 範圍。

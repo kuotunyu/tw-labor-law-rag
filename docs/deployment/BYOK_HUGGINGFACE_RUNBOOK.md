@@ -10,6 +10,9 @@
 - 禁止在 Space 設定 `GEMINI_API_KEY`、`OPENAI_API_KEY` 或 Qdrant write/manage Key。
 - 訪客 Key 不得貼入 issue、commit、終端輸出、聊天或 `.env`；只可輸入 UI 密碼欄位。
 - 本部署只允許 Qdrant Free Tier 與 Hugging Face `cpu-basic`；不得申請付費硬體、持久 storage 或額外 replica。
+- LLM 費用由訪客自己的 API Key 承擔，部署端不持有或代付模型額度。
+- 正式 Gemini／OpenAI cross-check 的每家 US$5 額度只適用於本機、專案專用金鑰的評估 runner；不得把擁有者的評估金鑰放進公開 Space。
+- BGE-M3 與 reranker 固定在已審閱的官方 immutable revision，且 `trust_remote_code=False`。Transformers 4.x 因 FlagEmbedding 相容性暫留四組已知 advisory 例外；專案不使用其 Trainer、LightGlue、X-CLIP 或遠端自訂程式碼路徑，CI 只忽略這四組明確編號，任何新增 advisory 仍會失敗。
 
 ## 2. 本機驗證
 
@@ -19,8 +22,15 @@
 uv sync --locked
 uv run pytest -q
 uv run ruff check .
+uv run bandit -r src scripts -ll
+$env:PYTHONUTF8='1'
+uv run pip-audit --local
+Remove-Item Env:PYTHONUTF8
 uv run python scripts/verify_release.py
 ```
+
+Windows 專案路徑若含中文，`PYTHONUTF8=1` 可避免 `pip-audit` 的 `pip-api` 把子程序輸出以錯誤編碼解碼；它不會變更 audit 範圍或忽略項目。
+`transformers>=5.5,<6` 排除 4.x 模型設定載入 RCE；模型 revision 必須是完整 40 位 commit SHA，並先解析為不可變的 Hub snapshot 本機路徑。本專案的窄相容層只補回 FlagEmbedding 1.4 對 XLM-R pair encoding 所需的舊 API，`trust_remote_code=False` 仍維持不變。
 
 任何一項失敗都停止部署；不得用真實 API 呼叫代替離線測試。
 
@@ -48,6 +58,10 @@ Remove-Item Env:QDRANT_MODE
 
 writer Key 不可保存。runtime reader 值只輸入 Hugging Face Secret。
 
+`v0.3.1` 的程式可讀取新舊兩種 Qdrant payload。既有雲端 collections 沒有
+`source_url`、`last_amended`、`effective_date` 時仍可正常問答，只是不顯示新增的法源日期／連結。
+要補齊 provenance 必須另外建立短期 writer Key、用通過 audit 的相同 snapshot 重建兩個 collections、驗證後立刻撤銷；不得用 runtime reader 嘗試寫入，也不得在無人值守時擴權。
+
 ## 4. 建立 private Hugging Face Space
 
 1. 先登入：
@@ -70,6 +84,7 @@ GEMINI_GENERATION_MODEL=gemini-3.5-flash-lite
 OPENAI_GENERATION_MODEL=gpt-5.6-luna
 BYOK_SESSION_QUERY_LIMIT=20
 BYOK_SESSION_TTL_SECONDS=86400
+BYOK_MAX_TRACKED_SESSIONS=1000
 BYOK_MAX_CONCURRENCY=2
 BYOK_REQUEST_TIMEOUT_SECONDS=60
 BYOK_MAX_QUESTION_CHARS=2000
@@ -121,7 +136,8 @@ GitHub `main`、release tags 與其他 worktrees 在此步保持不變。
 6. 第 21 次請求被 session quota 拒絕；同時超過 2 題時立即回 429。
 7. Space logs 找不到測試 Key 全值或任一事先記錄的 8 字元片段，也沒有問題、答案、provider body 或 Qdrant URL。
 8. runtime Qdrant Key 可讀，create/upsert/delete 操作遭拒。
-9. image/repository 不含 private `data/raw/` 或 `storage/bm25_*.pkl`。
+9. image/repository 不含 private `data/raw/` 或 `storage/bm25_*.json`。
+10. 若 collections 尚未重建，答案仍可顯示法規／條號且應明確記錄為 legacy payload；重建後才驗收法源 URL 與修正／生效日期。
 
 記錄 branch commit、完整測試數、release verifier 結果、Space revision、硬體 tier 與兩個 collection point counts。Key、endpoint、session token 不列入證據。
 

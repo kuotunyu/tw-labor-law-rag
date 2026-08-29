@@ -31,21 +31,29 @@ git status --short
 
 ## Expected evidence summary
 
+### v0.3.2 provider safety cross-check
+
+Gemini `gemini-3.5-flash-lite` and OpenAI `gpt-5.6-luna` both completed five requests. Gemini observed refusal accuracy `0.8`, citation success `1.0`, and estimated cost `US$0.0022620`; OpenAI observed refusal accuracy `1.0`, citation success `1.0`, and estimated cost `US$0.0026414`. This safety cross-check does not replace the `v0.1.0` formal evidence baseline or constitute a formal model-quality evaluation. The public trace is strictly content-free and contains no question/answer text, provider payload, or credentials.
+
 The release verifier should exit zero and report:
 
 - dataset: 40 questions, 30 answerable, 10 unanswerable
 - canonical dataset SHA-256: `760e33eaa0821001d37ff974bc037043d019fc670b8f3621b6e713030274ca07`
 - ablation: 8 configurations, 320 rows
 - primary retrieval: Hit@5 `0.9666666666666667`, MRR@10 `0.9055555555555554`
+- reliability stress: 60 questions, Hit@5 `0.95`, MRR@10 `0.9083333333333334`, 1 direct false refusal, 0.85 direct unanswerable coverage, decision `retain_0.03`
 - end-to-end: 29 answered, 11 refused, 31 generation calls recorded
 - refusal stages: 9 threshold, 2 LLM, 0 no-hits
 - threshold score/stage contract: true for all 40 rows at gate `0.03`
 - provider evidence: 29 archived numeric verdicts; faithfulness `4.896551724137931`, relevancy `5.0`
+- provider cross-check: complete, five requests per provider under the authorized US$5.00 ceiling; Gemini refusal/citation `0.8`/`1.0`, cost `US$0.0022620`; OpenAI `1.0`/`1.0`, `US$0.0026414`
 - OGDL source samples verified: 2
+- full corpus snapshot: 2026-08-29, 15 laws, 884 non-deleted articles
 - GitHub Action references: 2, both full commit SHAs
-- publication inventory: exactly 108 tracked files, empty `tracked_excluded`, 0 unexpected archive files, 1 current reviewed binary hash
+- publication inventory: exact match to `release/public-files.txt`, empty `tracked_excluded`, 0 unexpected archive files, and only manifest-reviewed binary hashes
 - public Git history: all commits reachable from heads/tags/ordinary remotes pass identity and historical path/content/binary scanning; ephemeral `refs/remotes/pull/*` merge refs and local `refs/archive/*` recovery refs are excluded
 - locked Ruff dependency and CI lint/tag gates: verified
+- dependency audit: no known PyPI vulnerabilities; custom CUDA `torch` wheel is reported separately because it is not present on PyPI
 - official trace issues: 0
 - public scan issues: 0
 

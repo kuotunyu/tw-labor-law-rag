@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from rag.api import main as api_main
 from rag.api.byok import ByokConcurrencyGate, ByokSessionManager
-from rag.api.main import QueryResponse
+from rag.api.main import QueryResponse, SourceOut
 from rag.config import Settings
 from rag.generation.llm import LLMOutput, ProviderOperationalError, ProviderPolicyError
 from rag.generation.router import build_routed_llm
@@ -103,6 +103,26 @@ def test_query_response_accepts_known_refusal_stages(stage):
 def test_query_response_rejects_unknown_refusal_stage():
     with pytest.raises(ValidationError):
         QueryResponse(**_response_payload(), refusal_stage="other")
+
+
+def test_source_response_supports_current_and_legacy_provenance():
+    current = SourceOut(
+        index=1,
+        doc="勞動基準法",
+        article="第 24 條",
+        content="內容",
+        source_url="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001",
+        last_amended="20250718",
+        effective_date="20250718",
+    )
+    legacy = SourceOut(index=2, doc="工會法", article="第 11 條", content="內容")
+
+    assert current.source_url.startswith("https://law.moj.gov.tw/")
+    assert current.last_amended == "20250718"
+    assert current.effective_date == "20250718"
+    assert legacy.source_url == ""
+    assert legacy.last_amended == ""
+    assert legacy.effective_date == ""
 
 
 def test_query_request_accepts_only_public_providers():
@@ -697,6 +717,27 @@ def test_session_endpoint_issues_token_only_in_byok_mode(monkeypatch):
         api_main.create_session()
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "byok_not_enabled"
+
+
+def test_session_endpoint_maps_capacity_to_429(monkeypatch):
+    settings = byok_settings(byok_max_tracked_sessions=1)
+    manager = ByokSessionManager(
+        secret="session-secret",
+        query_limit=20,
+        ttl_seconds=60,
+        max_tracked_sessions=1,
+        clock=lambda: 1_000.0,
+        token_factory=lambda: "fixed-session",
+    )
+    monkeypatch.setattr(api_main.state, "settings", settings, raising=False)
+    monkeypatch.setattr(api_main.state, "byok_sessions", manager, raising=False)
+    api_main.create_session()
+
+    with pytest.raises(HTTPException) as exc_info:
+        api_main.create_session()
+
+    assert exc_info.value.status_code == 429
+    assert exc_info.value.detail == "session_capacity_exceeded"
 
 
 def test_configure_runtime_builds_each_bm25_index_once_from_qdrant():

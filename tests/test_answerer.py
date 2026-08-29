@@ -96,9 +96,64 @@ def test_answerer_parses_citations():
     assert not result.refused
     assert result.refusal_stage is None
     assert result.sources == [
-        {"index": 1, "doc": "勞動基準法", "article": "第 24 條", "content": "加班費規定..."}
+        {
+            "index": 1,
+            "doc": "勞動基準法",
+            "article": "第 24 條",
+            "content": "加班費規定...",
+            "source_url": "",
+            "last_amended": "",
+            "effective_date": "",
+        }
     ]
     assert llm.calls[0]["temperature"] == 0.0
+
+
+def test_answerer_expands_retrieval_but_keeps_original_generation_question():
+    captured = {}
+
+    class RecordingRetriever:
+        def retrieve(self, query, top_k):
+            captured["query"] = query
+            return [make_hit("c1", "勞動基準法", "第 14 條", "證據內容")]
+
+    question = "公司一直拖欠薪水，我可以直接離職嗎？"
+    legal_terms = (
+        "勞動基準法 第十四條 不依勞動契約給付工作報酬 "
+        "勞工得不經預告終止契約"
+    )
+    llm = FakeLLM("依 [1] 回答。")
+    pipeline = RetrievalPipeline(
+        RecordingRetriever(), reranker=None, top_k_retrieve=20, top_k_final=5
+    )
+
+    Answerer(pipeline, llm).answer(question)
+
+    assert captured["query"] == f"{question} {legal_terms}"
+    assert question in llm.calls[0]["user"]
+    assert legal_terms not in llm.calls[0]["user"]
+
+
+def test_answerer_exposes_provenance_and_accepts_legacy_payloads():
+    current = make_hit("c1", "勞動基準法", "第 24 條", "加班費規定...")
+    current.payload.update(
+        {
+            "source_url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001",
+            "last_amended": "20250718",
+            "effective_date": "20250718",
+        }
+    )
+    legacy = make_hit("c2", "工會法", "第 11 條", "連署規定...")
+    llm = FakeLLM("依 [1] 與 [2] 回答。")
+
+    sources = Answerer(make_pipeline([current, legacy]), llm).answer("問題").sources
+
+    assert sources[0]["source_url"].startswith("https://law.moj.gov.tw/")
+    assert sources[0]["last_amended"] == "20250718"
+    assert sources[0]["effective_date"] == "20250718"
+    assert sources[1]["source_url"] == ""
+    assert sources[1]["last_amended"] == ""
+    assert sources[1]["effective_date"] == ""
 
 
 def test_answerer_reports_generation_provider_metadata():

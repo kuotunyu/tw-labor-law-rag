@@ -1,0 +1,161 @@
+{
+  "schema_version": "1.0",
+  "run_date": "2026-08-29",
+  "dataset": {
+    "path": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+    "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f"
+  },
+  "formal_guard_dataset": {
+    "path": "eval/dataset/eval_set.jsonl",
+    "sha256": "760e33eaa0821001d37ff974bc037043d019fc670b8f3621b6e713030274ca07"
+  },
+  "corpus_snapshot": {
+    "path": "release/corpus_snapshot.json",
+    "snapshot_date": "2026-08-29",
+    "laws": 15,
+    "articles": 884
+  },
+  "configuration": {
+    "chunking": "structure",
+    "retrieval": "hybrid",
+    "reranker": true,
+    "top_k_retrieve": 20,
+    "top_k_final": 5,
+    "embedding_model": "BAAI/bge-m3",
+    "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "reranker_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+  },
+  "production_threshold": 0.03,
+  "threshold_candidates": [
+    0.0,
+    0.005,
+    0.01,
+    0.02,
+    0.03,
+    0.04,
+    0.05,
+    0.1
+  ],
+  "stress_metrics": {
+    "questions": 60,
+    "answerable": 40,
+    "unanswerable": 20,
+    "hit_at_5": 0.95,
+    "mrr_at_10": 0.9083333333333334,
+    "avg_latency_ms": 172.7,
+    "threshold_sweep": {
+      "0.0": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 0,
+        "direct_unanswerable_coverage": 0.0
+      },
+      "0.005": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 5,
+        "direct_unanswerable_coverage": 0.25
+      },
+      "0.01": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 10,
+        "direct_unanswerable_coverage": 0.5
+      },
+      "0.02": {
+        "direct_false_refusals": 1,
+        "direct_false_refusal_rate": 0.025,
+        "direct_unanswerable_refusals": 16,
+        "direct_unanswerable_coverage": 0.8
+      },
+      "0.03": {
+        "direct_false_refusals": 1,
+        "direct_false_refusal_rate": 0.025,
+        "direct_unanswerable_refusals": 17,
+        "direct_unanswerable_coverage": 0.85
+      },
+      "0.04": {
+        "direct_false_refusals": 3,
+        "direct_false_refusal_rate": 0.075,
+        "direct_unanswerable_refusals": 17,
+        "direct_unanswerable_coverage": 0.85
+      },
+      "0.05": {
+        "direct_false_refusals": 3,
+        "direct_false_refusal_rate": 0.075,
+        "direct_unanswerable_refusals": 17,
+        "direct_unanswerable_coverage": 0.85
+      },
+      "0.1": {
+        "direct_false_refusals": 4,
+        "direct_false_refusal_rate": 0.1,
+        "direct_unanswerable_refusals": 19,
+        "direct_unanswerable_coverage": 0.95
+      }
+    }
+  },
+  "formal_guard_metrics": {
+    "questions": 40,
+    "answerable": 30,
+    "unanswerable": 10,
+    "hit_at_5": 0.9666666666666667,
+    "mrr_at_10": 0.9055555555555554,
+    "avg_latency_ms": 128.8,
+    "threshold_sweep": {
+      "0.0": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 0,
+        "direct_unanswerable_coverage": 0.0
+      },
+      "0.005": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 6,
+        "direct_unanswerable_coverage": 0.6
+      },
+      "0.01": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 7,
+        "direct_unanswerable_coverage": 0.7
+      },
+      "0.02": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 8,
+        "direct_unanswerable_coverage": 0.8
+      },
+      "0.03": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 9,
+        "direct_unanswerable_coverage": 0.9
+      },
+      "0.04": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 9,
+        "direct_unanswerable_coverage": 0.9
+      },
+      "0.05": {
+        "direct_false_refusals": 0,
+        "direct_false_refusal_rate": 0.0,
+        "direct_unanswerable_refusals": 9,
+        "direct_unanswerable_coverage": 0.9
+      },
+      "0.1": {
+        "direct_false_refusals": 1,
+        "direct_false_refusal_rate": 0.03333333333333333,
+        "direct_unanswerable_refusals": 9,
+        "direct_unanswerable_coverage": 0.9
+      }
+    }
+  },
+  "decision": {
+    "pareto_better_candidates": [],
+    "outcome": "retain_0.03",
+    "automatic_config_change": false
+  }
+}

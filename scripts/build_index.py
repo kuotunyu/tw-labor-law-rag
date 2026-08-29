@@ -40,6 +40,7 @@ def main() -> None:
 
     embedder = BGEM3Embedder(
         model_name=settings.embedding_model,
+        model_revision=settings.embedding_model_revision,
         device=settings.device,
         cache_path=settings.storage_dir / "emb_cache.sqlite",
     )

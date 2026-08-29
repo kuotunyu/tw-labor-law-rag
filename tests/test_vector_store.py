@@ -39,6 +39,27 @@ def test_server_store_uses_secret_api_key_and_public_byok_blocks_writes(monkeypa
         store.upsert_chunks("labor_laws_structure", [], np.empty((0, 1024)))
 
 
+def test_upsert_rejects_chunk_vector_count_mismatch_when_assertions_are_disabled(
+    monkeypatch,
+):
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        def upsert(self, **_kwargs):
+            pytest.fail("mismatched chunks and vectors must fail before Qdrant is called")
+
+    monkeypatch.setattr(vector_store, "QdrantClient", FakeClient)
+    store = vector_store.VectorStore(
+        Settings(_env_file=None, qdrant_mode="server", qdrant_url="https://example.test")
+    )
+
+    with pytest.raises(ValueError, match="chunk and vector counts must match"):
+        store.upsert_chunks(
+            "labor_laws_structure", [], np.empty((1, 1024), dtype=np.float32)
+        )
+
+
 def test_scroll_payloads_reads_all_pages_without_vectors(monkeypatch):
     calls = []
 

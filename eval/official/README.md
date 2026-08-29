@@ -9,11 +9,20 @@
 - `ablation_trace.jsonl`：8 × 40 筆逐題 rank、top score 與 latency；不重複存題目文字。
 - `e2e_results.json`：生成品質、引用解析覆蓋率、最終拒答率，以及按拒答層拆分的指標。
 - `e2e_trace.jsonl`：40 筆逐題的拒答階段、分數、引用與 judge 數字；不含完整生成答案或 judge 理由。
+- `reliability_results.json`：60 題可靠性壓力集的 Hit@5、MRR、延遲、拒答門檻掃描，以及既有 40 題正式集 guard 結果。
+- `reliability_trace.jsonl`：60 筆只含 qid、answerable、rank、top score、threshold decision 與 latency 的隱私精簡 trace；不含問題文字、檢索內容或模型輸出。
+- `reliability_formal_trace.jsonl`：40 筆正式 guard 的同格式隱私精簡 trace，供 verifier 獨立重算 guard 指標與 Pareto 決策。
 
-所有 JSON 都只保留設定白名單,不含 prompt、完整生成答案、judge 理由、provider response、request ID、token usage、API key、服務 URL、使用者名稱、個人識別資訊或本機路徑。
+## v0.3.2 provider safety cross-check
+
+Gemini `gemini-3.5-flash-lite`／OpenAI `gpt-5.6-luna` 的正式 safety cross-check 已完成，`release/manifest.json` 記錄完整 contract，且本目錄收錄 `provider_crosscheck_results.json` 與 `provider_crosscheck_trace.jsonl`。兩家各五筆請求：Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。這是 safety cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。provider trace 嚴格 content-free，不含 question/answer text、provider payload 或 credentials。
+
+其他 official traces 不含 token usage 或 API metadata。provider trace 僅含 strict allowlisted provider/model/verdict/token count/cost/latency，仍排除 prompts/questions/answers/provider payload/credentials/private paths/PII。
 每份結果內含公開評估集的 SHA-256，可確認題目版本一致。
 
-Retrieval、answerability、refusal、citation 與 ablation summaries 可由 committed traces 完整離線重算。Faithfulness/relevancy 只可從 trace 中留下的 numeric verdicts 再聚合;缺少的 provider output 與 judge reasoning 是刻意的 privacy/publication boundary,所以這兩項應標為 **archived provider evidence**,不得描述為只靠公開資料即可重生的評分。
+Retrieval、answerability、refusal、citation、ablation、reliability stress 與 formal guard summaries，以及門檻 Pareto 決策，都可由 committed traces 完整離線重算。Faithfulness/relevancy 只可從 trace 中留下的 numeric verdicts 再聚合;缺少的 provider output 與 judge reasoning 是刻意的 privacy/publication boundary,所以這兩項應標為 **archived provider evidence**,不得描述為只靠公開資料即可重生的評分。
+
+可靠性壓力集使用 2026-08-29 經稽核的 15 部法規／884 條非刪除條文，以及固定 revision 的 BGE-M3 與 bge-reranker-v2-m3，在隔離的 local Qdrant 執行。現行 `0.03` 門檻於壓力集直接誤拒 1/40 可答題，並攔下 17/20 不可答題；既有正式集仍重現 0/30 直接誤拒與 9/10 攔截。門檻掃描沒有同時在壓力集與正式 guard 全面不劣、且至少一項更好的候選，因此保留 `0.03`，不自動修改 production config。
 
 正式 run 當時 eval-26 的答案使用全形 `［1］`,舊 parser 因此留下空的 `cited_sources`;
 目前程式已同時支援全形與半形括號並有回歸測試。產物保留當時的 28/29 解析結果,
@@ -33,7 +42,7 @@ uv run python scripts/verify_release.py
 uv run pytest tests/test_official_artifacts.py tests/test_release_verification.py -q
 ```
 
-這條路徑不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,並會核對 canonical dataset hash、40/30/10 組成、8×40 grid、全部彙總算術、strict trace fields 與 privacy/secret patterns。
+這條路徑不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,並會核對 canonical dataset hash、40/30/10 組成、60 題壓力集、8×40 grid、全部彙總算術、15 部／884 條 snapshot、provider complete contract、strict trace fields 與 privacy/secret patterns。
 
 ## 從 retained private raw runs 重新匯出
 

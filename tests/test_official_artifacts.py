@@ -8,10 +8,15 @@ from pathlib import Path
 import pytest
 
 from rag.evaluation import canonical_text_sha256, compute_e2e_metrics
+from rag.reliability import PUBLIC_TRACE_FIELDS, compute_reliability_metrics
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OFFICIAL = PROJECT_ROOT / "eval" / "official"
 DATASET = PROJECT_ROOT / "eval" / "dataset" / "eval_set.jsonl"
+STRESS_DATASET = PROJECT_ROOT / "eval" / "dataset" / "reliability_stress_v0.3.1.jsonl"
+WAGE_ARREARS_DATASET = (
+    PROJECT_ROOT / "eval" / "dataset" / "wage_arrears_regression_v0.3.4.jsonl"
+)
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -94,19 +99,121 @@ def test_official_ablation_metrics_recompute_from_trace():
         )
 
 
+def test_official_reliability_metrics_recompute_from_privacy_reduced_trace():
+    result = json.loads((OFFICIAL / "reliability_results.json").read_text(encoding="utf-8"))
+    traces = read_jsonl(OFFICIAL / "reliability_trace.jsonl")
+    formal_traces = read_jsonl(OFFICIAL / "reliability_formal_trace.jsonl")
+    dataset = read_jsonl(STRESS_DATASET)
+    formal_dataset = read_jsonl(DATASET)
+
+    assert len(traces) == 60
+    assert {row["qid"] for row in traces} == {row["qid"] for row in dataset}
+    assert all(tuple(row) == PUBLIC_TRACE_FIELDS for row in traces)
+    recomputed = compute_reliability_metrics(traces, result["threshold_candidates"])
+    assert recomputed == result["stress_metrics"]
+    assert recomputed["hit_at_5"] == 0.95
+    assert recomputed["mrr_at_10"] == pytest.approx(0.9083333333333334)
+    assert recomputed["threshold_sweep"]["0.03"]["direct_false_refusals"] == 1
+    assert recomputed["threshold_sweep"]["0.03"]["direct_unanswerable_coverage"] == 0.85
+    assert len(formal_traces) == 40
+    assert {row["qid"] for row in formal_traces} == {
+        row["qid"] for row in formal_dataset
+    }
+    assert all(tuple(row) == PUBLIC_TRACE_FIELDS for row in formal_traces)
+    formal_recomputed = compute_reliability_metrics(
+        formal_traces,
+        result["threshold_candidates"],
+    )
+    assert formal_recomputed == result["formal_guard_metrics"]
+    assert formal_recomputed["hit_at_5"] == pytest.approx(29 / 30)
+    assert result["decision"] == {
+        "pareto_better_candidates": [],
+        "outcome": "retain_0.03",
+        "automatic_config_change": False,
+    }
+
+
+def test_official_provider_crosscheck_artifacts_are_complete_and_content_free():
+    results = json.loads(
+        (OFFICIAL / "provider_crosscheck_results.json").read_text(encoding="utf-8")
+    )
+    traces = read_jsonl(OFFICIAL / "provider_crosscheck_trace.jsonl")
+
+    assert len(traces) == 10
+    assert {row["requested_provider"] for row in traces} == {"gemini", "openai"}
+    assert results["provider_status"] == {
+        "gemini": {"status": "complete", "reason": None},
+        "openai": {"status": "complete", "reason": None},
+    }
+    assert results["privacy"] == {
+        "public_trace_contains_question_or_answer": False,
+        "public_trace_contains_provider_payload": False,
+        "public_trace_contains_credentials": False,
+        "raw_trace_path": "ignored eval/runs only",
+    }
+
+
+def test_official_wage_arrears_regression_is_complete_and_content_free():
+    dataset = read_jsonl(WAGE_ARREARS_DATASET)
+    result = json.loads(
+        (OFFICIAL / "wage_arrears_regression_v0.3.4.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert result["schema_version"] == "1.0"
+    assert result["dataset"]["questions"] == 20
+    assert result["summary"]["positive_routes"] == 10
+    assert result["summary"]["collision_routes_avoided"] == 10
+    assert result["summary"]["positive_hit_at_5"] == 10
+    assert 0 <= result["summary"]["positive_hit_at_1"] <= 10
+    assert result["summary"]["positive_hit_at_1"] == sum(
+        case["rank"] == 1
+        for case in result["cases"]
+        if case["expected_expansion"]
+    )
+    assert result["summary"]["passed"] is True
+    assert [case["qid"] for case in result["cases"]] == [
+        row["qid"] for row in dataset
+    ]
+    assert all(
+        set(case)
+        == {
+            "qid",
+            "expected_expansion",
+            "expansion_applied",
+            "rank",
+            "top_score",
+        }
+        for case in result["cases"]
+    )
+
+
 def test_official_artifacts_have_no_local_paths_or_secret_fields():
     combined = "\n".join(
         path.read_text(encoding="utf-8")
         for path in OFFICIAL.iterdir()
         if path.is_file()
     )
-    assert not re.search(r"[A-Za-z]:[\\/]", combined)
-    assert "/Users/" not in combined
-    assert "/home/" not in combined
+    assert not re.search(
+        r"(?i)(?:(?<![A-Za-z0-9])[A-Z]:[\\/]|(?<![:/])/(?:Users|home)/)",
+        combined,
+    )
     assert not re.search(r'(?i)api[_-]?key|password|bearer\\s', combined)
 
 
-@pytest.mark.parametrize("filename", ["ablation_results.json", "e2e_results.json"])
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "ablation_results.json",
+        "e2e_results.json",
+        "reliability_results.json",
+        "reliability_formal_trace.jsonl",
+        "provider_crosscheck_results.json",
+        "provider_crosscheck_trace.jsonl",
+        "wage_arrears_regression_v0.3.4.json",
+    ],
+)
 def test_official_json_ends_with_newline(filename):
     assert (OFFICIAL / filename).read_bytes().endswith(b"\n")
 

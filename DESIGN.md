@@ -6,6 +6,26 @@
 
 40 題資料集、8 組 ablation、Hit@5、MRR、latency 算術、answer/refusal counts 與設定一致性,可由 `scripts/verify_release.py` 從 committed privacy-reduced traces 離線重算。Faithfulness/relevancy 則是 archived provider evidence:公開 repository 只保留 numeric verdicts 供再聚合,沒有完整生成答案、judge reason 或 provider response,因此不能宣稱可從公開 evidence 重新產生 judge 決定。逐項映射見 [docs/release/CLAIM_MATRIX.md](docs/release/CLAIM_MATRIX.md)。
 
+## v0.3.2 provider safety cross-check
+
+Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 都完成五筆 safety cross-check：Gemini observed refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI observed refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 維持嚴格 content-free：不含 question/answer text、provider payload 或 credentials。這是執行器安全邊界的 cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。
+
+## v0.3.4 為什麼只針對欠薪／立即離職做 query expansion？
+
+**選擇**：只有欠薪與勞工立即終止兩組 cue 同時命中時，才為檢索及 reranker 補入《勞動基準法》第 14 條用語；生成階段保留原始問題。
+
+**理由**：正式評估唯一誤拒 `eval-10` 已留下具體詞彙鴻溝證據。兩組 cue 的 conjunction 能修補這個已量測案例，又避免把一般薪資、一般離職或雇主解僱問題廣泛導向第 14 條，且不增加 provider 成本。
+
+**Tradeoff**：這是有限詞彙的決定論式規則，不是通用法律 query rewriting；未重跑完整固定模型評估前，不宣稱歷史 Hit@5、MRR 或誤拒率已提升。
+
+## v0.3.3 為什麼採決定論式資遣費 query expansion？
+
+**選擇**：僅在問題同時出現資遣、新制、舊制與計算／比較四組 cue 時，為檢索與 reranker 補上固定法規詞；生成階段保留原始問題。
+
+**理由**：新舊制資遣費需要同時召回《勞工退休金條例》第 12 條與《勞動基準法》第 17 條，長句、中英夾雜或口語問法容易讓其中一部法規被擠出候選。固定詞擴充不增加 provider 呼叫、延遲或 token 成本，也能由單元測試完整覆蓋。四組 cue 的 conjunction 則把影響範圍限縮在真正的跨制度計算問題。
+
+**Tradeoff**：這不是通用的 LLM query rewriting，無法自動處理所有口語法律同義詞；新增領域規則時仍需具體失敗案例、負向碰撞測試與完整 retrieval regression guard。
+
 ## 1. 為什麼是 Hybrid Search,不是純向量?
 
 **選擇**:BM25(關鍵字)+ BGE-M3(向量),用 RRF 融合。
@@ -64,7 +84,7 @@
 
 **理由**:RAGAS 的內建 prompt 是英文優先設計,套在繁體中文法律文本上,經驗上常出現評分標準與語言習慣對不齊的問題(例如對「精簡但正確」的中文法律用語誤判為資訊不足)。這兩個指標的定義其實不複雜,自己刻一個中文 rubric、附上 1–5 分的具體錨點描述(而不是讓模型自由發揮),反而更容易掌控評分標準、也更容易在 EVAL_REPORT.md 裡向讀者交代「這個分數是怎麼打出來的」。一次呼叫評兩個指標也把 judge 的 API 呼叫量減半,在免費/低額度方案上很有感。
 
-**Tradeoff**:自建 judge 需要自己驗證評分穩定性(RAGAS 有社群驗證過的 prompt),且目前只用單一 provider(gpt-5-mini)評分,原計畫的跨 provider 交叉驗證(用 Gemini 複評抽樣)因免費額度限制未執行,列在 EVAL_REPORT.md 的限制章節。
+**Tradeoff**:自建 judge 需要自己驗證評分穩定性(RAGAS 有社群驗證過的 prompt),且既有 `v0.1.0` 正式評分只用單一 provider(gpt-5-mini)。`v0.3.2` 已完成 Gemini／OpenAI 各 US$5 硬上限的五筆 safety cross-check；這些 observed safety metrics 不以其他專案金鑰、替代模型或 placeholder 補數字，也不改寫 formal baseline。
 
 ## 7. Qdrant:為什麼 local/server 雙模式?
 
@@ -83,7 +103,7 @@
 **Tradeoff**:代價是每個供應商的模型特性差異(temperature 支援、token 參數命名、額度限制)全部要在各自的 adapter 裡個別處理,不能假設行為一致。這次實際踩到三個坑,現在都在 `llm.py` 的 adapter 裡有明確處理與註解:
 - **Gemini 2.5「思考」token**:預設開啟的 thinking 會佔用 `max_output_tokens` 預算,實測 980/1024 token 花在看不見的推理上,只剩 40 token 輸出可見答案,長答案被腰斬。修法:flash 系列模型明確關閉 thinking(`thinking_budget=0`),同時把預設 token 上限從 1024 提高到 2048。
 - **GPT-5 系列參數相容性**:`max_tokens` 被拒絕(需改用 `max_completion_tokens`),部分模型(如 gpt-5-mini)拒絕非預設 `temperature`。Adapter 在收到 400 錯誤時偵測是哪個參數不支援,自動移除後重試一次,之後同一個 adapter instance 記住這個限制不再重試。
-- **免費額度不透明**:Gemini 免費方案文件寫「250 requests/day」,實測這個帳號的 `gemini-2.5-flash` 每分鐘僅 5 次、每日僅 20 次——文件與實際配額不一致,評估腳本因此加了 429 自動退避重試(`eval/lib.py` 的 `retry_rate_limited`),而非假設額度值可信。
+- **額度不透明**:provider 帳戶實際配額可能低於公開頁面的一般說明；一般評估腳本保留 429 退避，而新的預算 cross-check 不跨 provider fallback，並在任何未知 token usage 時 fail closed。
 
 ## 9. 為什麼引用格式是 `[數字]` 而不是直接附條文全文?
 
@@ -92,3 +112,33 @@
 **理由**:把「回答的行內引用標記」和「引用內容的展示」分離,LLM 只需要輸出簡短的數字標記(降低生成錯誤的機會),實際的法規名稱、條號、原文由檢索結果直接帶出(不經過 LLM 转述,不會被生成過程扭曲)。這也讓引用驗證變成一個簡單的規則檢查:解析出的編號如果超出提供的條文數量範圍,直接捨棄該筆引用,不會因為 LLM 引用錯誤編號而顯示錯誤的法條。
 
 **Tradeoff**:繁體中文生成偶爾會用全形括號「［1］」而非半形「[1]」(gpt-5.1 實測觀察到),引用解析的正規表示式因此需要同時支援兩種括號——這是 Phase 4 端到端評估才抓到的真實案例(單元測試原本只覆蓋半形),已修正並補上回歸測試。
+
+## 10. 為什麼要有完整 corpus snapshot 與逐引用 provenance?
+
+**選擇**:每次可靠性 run 先下載法務部法律／命令 ZIP，核對來源 URL、ZIP SHA-256、15 部法規清單、各法規代碼／修正／生效日期、逐條 canonical hash 與 884 條總數；只有整份 snapshot 完全相符才建立索引。`SourceUnit → Chunk → Qdrant payload → Answer.sources → FastAPI → Streamlit` 全鏈路帶 `source_url`、`last_amended`、`effective_date`，舊 payload 缺欄位時則安全顯示既有引用。
+
+**理由**:只保留兩份 sample 無法證明真正建索引的 15 部語料是哪一版；只在 UI 顯示條號也無法讓使用者回查官方法規。snapshot 把「何時、從哪裡、哪些條文」變成可機器驗證的輸入契約，逐引用 provenance 則把這份契約延伸到答案展示。UI 只把 `https://law.moj.gov.tw` 連結渲染成可點擊網址，避免任意 payload URL 變成釣魚連結。
+
+**Tradeoff**:法規一修訂，稽核會故意失敗，必須人工審閱差異、更新 snapshot、重建兩份索引並重跑評估。現有 Qdrant cloud collections 是舊 payload；在取得新的臨時 writer key 前仍相容但不會憑空出現新增的日期欄位。
+
+## 11. 為什麼新增 60 題壓力集卻不取代 40 題正式集?
+
+**選擇**:保留 `v0.1.0` 的 40 題／8 組消融／provider judge 結果作為 immutable formal baseline；另以 `v0.3.1 reliability stress evidence` 發布 40 可答、20 不可答、偏長句與中英夾雜的 retrieval/refusal 壓力結果，並用正式集當 regression guard。
+
+**理由**:新資料可以針對已觀察到的口語問法盲點，但若直接把新舊題混成一個分數，讀者無法分辨提升來自系統變更還是題目組成變更。分版後可同時看到壓力集確實抓到 1/40 直接誤拒，以及正式集仍重現 0/30。門檻 sweep 必須同時在兩組資料不劣才可自動變更；本次沒有 Pareto-better 候選，因此保留 0.03。
+
+**Tradeoff**:60 題仍是策展樣本，不能推估真實流量發生率；它只把「口語風格可能失敗」從單一 anecdote 提升為可重跑的明確測量。
+
+## 12. 為什麼 provider cross-check 要先做硬預算，而不是跑完再算錢?
+
+**選擇**:`BudgetLedger` 使用 `Decimal`，CLI cap 預設為 0 且不得高於每家 US$5 的本次授權；每次呼叫前對實際 system + user prompt 以 UTF-8 byte 數加 1,024-token message envelope 做保守上界，再連同最大 1,024 output tokens 計算最壞成本。請求 maxima 固定不得高於 20,000 input／1,024 output tokens，額度不足或 prompt 超界就不送出。Gemini 成本把 `candidatesTokenCount + thoughtsTokenCount` 都算輸出，OpenAI 使用回傳的 prompt／completion usage；缺欄位、負值或超出 maxima 都停止。
+
+**理由**:事後統計只能描述已經花掉的錢，不能限制下一次呼叫。先各跑 5 題、確認模型與 usage 完整後才擴張，可同時驗證指定模型沒有 fallback，並把故障半徑限制在很小的初始批次。
+
+**Tradeoff**:保守 maxima 會提早停止而留下未使用額度；這是刻意的安全偏向。公開 trace 只留 qid、provider/model、拒答、引用數、token、成本與 0/1 verdict，完整問題／答案只能進 ignored `eval/runs/`，任意 `--work-dir` 若逃出該目錄會在呼叫前被拒絕。`v0.3.2` 已完成兩家各五筆的 safety batch；公開 trace 仍嚴格不留 question/answer text、provider payload 或 credentials。
+
+## 13. 為什麼升級 Transformers 5.x 但保留 FlagEmbedding？
+
+**選擇**:`transformers>=5.5,<6` 避開已公告的 4.x 模型設定載入 RCE；BGE-M3 在 5.x 原生可用。模型名稱與 40 位 commit SHA 先由 `snapshot_download` 解析成不可變的本機 snapshot 路徑，再交給 FlagEmbedding，避免其 1.4 版吞掉 `revision` 後悄悄載入 mutable `main`。FlagEmbedding reranker 仍呼叫已移除的 `prepare_for_model`，因此本專案只對固定的 XLM-R tokenizer 補回等價的 pair special-token 組裝，遇到非完整 SHA、其他 tokenizer 或不支援的 truncation/padding 參數就 fail closed。
+
+**驗證**:實際 snapshot 路徑末段分別等於 `5617a9f…b181` 與 `953dc6f…d41e`；固定 reranker snapshot 在 4.57.6 與 5.16.1 對同一組樣本產生完全相同的 normalized scores (`0.966139`, `0.000103`)；BGE-M3 embedding shape 仍為 1,024。完整測試與 `pip-audit --local` 均通過，沒有用 vulnerability ignore 取得綠燈。

@@ -1,4 +1,6 @@
 import json
+import pickle
+from pathlib import Path
 
 import pytest
 
@@ -48,14 +50,35 @@ def test_save_and_load_roundtrip(tmp_path):
         [make_row("c1", "勞工結婚者給予婚假八日。"), make_row("c2", "雇主延長工作時間之工資加給。")],
     )
     index = BM25Index.build(chunks_path)
-    save_path = tmp_path / "bm25.pkl"
+    save_path = tmp_path / "bm25.json"
     index.save(save_path)
+
+    saved = json.loads(save_path.read_text(encoding="utf-8"))
+    assert saved == {
+        "format": "bm25-payloads-v1",
+        "payloads": index.payloads,
+    }
 
     loaded = BM25Index.load(save_path)
     assert len(loaded) == 2
     hits_before = index.search("婚假", top_k=2)
     hits_after = loaded.search("婚假", top_k=2)
     assert [h.payload["chunk_id"] for h in hits_before] == [h.payload["chunk_id"] for h in hits_after]
+
+
+def test_load_never_executes_pickle_payload(tmp_path):
+    marker = tmp_path / "pickle-executed.txt"
+
+    class WriteMarker:
+        def __reduce__(self):
+            return (Path.write_text, (marker, "executed"))
+
+    unsafe_path = tmp_path / "legacy.pkl"
+    unsafe_path.write_bytes(pickle.dumps(WriteMarker()))
+
+    with pytest.raises((ValueError, TypeError, pickle.UnpicklingError)):
+        BM25Index.load(unsafe_path)
+    assert not marker.exists()
 
 
 def test_build_from_payloads_keeps_payloads_and_searches_text():

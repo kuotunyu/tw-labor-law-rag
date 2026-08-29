@@ -118,6 +118,9 @@ class Answerer:
                         "doc": hit.payload["doc_title"],
                         "article": hit.payload["article_label"],
                         "content": hit.payload["content"],
+                        "source_url": hit.payload.get("source_url", ""),
+                        "last_amended": hit.payload.get("last_amended", ""),
+                        "effective_date": hit.payload.get("effective_date", ""),
                     }
                 )
         return sources

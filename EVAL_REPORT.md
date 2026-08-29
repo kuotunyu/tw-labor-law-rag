@@ -3,6 +3,7 @@
 > 評估日期:2026-07-06 ｜ 語料版本:全國法規資料庫 2026-07 dump(15 部勞動法規、884 條文)
 > 生成模型:gpt-5.1(temperature=0, reasoning_effort=low)｜ Judge:gpt-5-mini(不支援自訂 temperature,已由 adapter 自動降級)
 > 公開 evidence 驗證:`uv run python scripts/verify_release.py` 可離線重算 committed retrieval/refusal/arithmetic summaries。`eval/ablation.py` 需要本機索引與模型,`eval/run_e2e_eval.py` 還需要 provider;完整答案、judge reasons 與原始 run 保留在不進版控的 `eval/runs/`,不能只靠公開 repository 重生。
+> `v0.3.1 reliability stress evidence` 執行日期:2026-08-29｜官方 snapshot:15 部法規、884 條非刪除條文｜模型 revisions 固定並在隔離 local Qdrant 重建。
 
 ## 摘要
 
@@ -14,6 +15,8 @@
 | Answer Relevancy(1–5) | **5.00**(archived provider verdicts 再聚合) |
 | 拒答正確率(10 題庫外問題) | **10/10** |
 | 誤拒率(30 題可答問題) | 1/30(見失敗案例 1) |
+| v0.3.1 壓力集 Hit@5 / MRR@10 | **0.950 / 0.908** |
+| v0.3.1 門檻直接誤拒 / 不可答直接攔截 | **1/40 / 17/20** |
 
 ## 評估集設計
 
@@ -36,6 +39,21 @@
 | fixed | hybrid+rerank | 1.000 | 0.847 | 266 |
 
 \* structure/vector 的延遲含首次查詢 embedding(未快取);後續設定命中快取,公平比較請看 hybrid(58ms)→ +rerank(292ms)的增量:reranker 約增加 230ms。
+
+## v0.3.1 可靠性壓力證據
+
+`eval/dataset/reliability_stress_v0.3.1.jsonl` 有 60 題：40 題可答、20 題不可答，涵蓋全部 15 部法規；40 題含中英夾雜，55 題採敘事式長句。答案與法源標註繼承自經稽核的正式資料，不由 provider 臨時生成。執行器先重新下載法務部法律／命令 ZIP，只有在 SHA-256、15 部清單與 884 條 snapshot 完全一致時才建立隔離索引；BGE-M3 revision `5617a9f…b181`、reranker revision `953dc6f…d41e` 先解析成該 commit 的本機 snapshot 路徑，再交給模型載入器，避免 mutable `main`。
+
+| 資料集 | Hit@5 | MRR@10 | 0.03 直接誤拒 | 0.03 不可答直接攔截 |
+|---|---:|---:|---:|---:|
+| v0.3.1 stress（40 可答／20 不可答） | 0.950 | 0.908 | 1/40 | 17/20 |
+| v0.1.0 formal guard（30 可答／10 不可答） | 0.967 | 0.906 | 0/30 | 9/10 |
+
+門檻 sweep 為 0、0.005、0.01、0.02、0.03、0.04、0.05、0.1。沒有候選能在 stress 與 formal guard 的直接誤拒率及不可答攔截率上同時全面不劣、且至少改善一項，因此結果是 `retain_0.03`，沒有自動改 production config。壓力集的 1/40 直接誤拒確認舊有口語問法風險是真實邊界，但 60 題仍不足以估計自然流量發生率。
+
+## v0.3.2 provider safety cross-check
+
+Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 的執行器使用 Decimal 成本、每家 US$5 硬帽，並在每次呼叫前對實際 system + user prompt 做 UTF-8 byte 保守 token 上界；request maxima 固定不超過 20,000 input／1,024 output tokens。缺失或負 token usage、非正價格、prompt／usage 超界、逃出 ignored `eval/runs/` 的 raw run 路徑與未知 maxima 都會在 fail-closed 路徑停止。兩家都完成五筆請求：Gemini observed refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI observed refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 嚴格不含 question/answer text、provider payload 或 credentials。這是 safety cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。
 
 ### 發現 1:每一級管線都有量化貢獻
 
@@ -77,6 +95,10 @@ fixed 的 hit@5 略高(1.000 vs 0.967),但 structure 的 MRR 明顯較好(0.906 
 - **有趣的反例**:fixed/hybrid+rerank 是唯一命中的設定——固定視窗恰好把 §14 和鄰近的資遣費條文包進同一 chunk,關鍵字意外對上。這說明 fixed 的「意外召回」有時反而有利,但不可依賴
 - **可能改法**:query expansion(「拖欠薪水」→「未給付工資」)、HyDE(先生成假設性法條再檢索)、或用勞資 FAQ 資料微調 embedding
 
+> **v0.3.4 緩解邊界**：runtime 現在只在「欠薪」與「勞工立即離職」兩組已審閱 cue 同時命中時，套用決定論式第 14 條檢索擴展。這是經測試的路由契約，不是對上述歷史 `eval-10` 結果或整體指標的重新計算。
+
+> **v0.3.4 專項離線回歸**：另以 20 題凍結資料集驗證上述邊界；10/10 正例均觸發第 14 條擴展、10/10 碰撞例均未誤觸發，且正例的《勞動基準法》第 14 條 Hit@5 與觀察性 Hit@1 都是 10/10。此結果由 pinned 本機 BGE-M3／bge-reranker-v2-m3、15 部法規的已稽核 snapshot 與一次性 local Qdrant 產生，未呼叫生成模型或 Qdrant Cloud。它是獨立的 v0.3.4 regression evidence，不取代本節歷史 `eval-10` 數字，也未改寫 40 題 formal 或 60 題 reliability 指標。
+
 ### 案例 2:eval-17「病假」— BM25 詞彙不匹配 + RRF 稀釋,reranker 救回
 
 「病假」在法規中叫「普通傷病假」,BM25 完全比對不到(structure/bm25 漏掉);純向量有撈到,但 structure/hybrid 的 RRF 把 BM25 的雜訊候選混入後,正解被擠出 top-5;加 reranker 後救回。單一案例完整走過「發現 2」的機制,也是 rubric 上「hybrid 不是免費午餐」的證據。
@@ -117,8 +139,8 @@ fixed/vector 的 §24 未進 top-5,structure/vector 則命中——400 字視窗
 
 ## 限制與待辦
 
-1. **樣本量**:40 題足以看出模式,但 hit@5 的 ±1 題 = ±0.033,個位數差異不宜過度解讀
-2. **Judge 單一供應商**:本輪 judge 為 gpt-5-mini;原設計的跨供應商交叉驗證(以 Gemini/Anthropic 複評抽樣)因 Gemini 免費額度(此帳號 flash 每日僅 20 請求)未執行,列為後續工作
+1. **樣本量**:正式集 40 題、壓力集 60 題足以揭露失敗模式，但仍不是自然使用流量樣本；個位數差異不宜外推為母體發生率
+2. **Provider safety cross-check 的範圍**:雙 provider 各五筆 observed 結果只交叉檢查 safety/refusal 與 citation 行為及成本；它不構成、也不取代 `v0.1.0` formal baseline 的正式模型品質評估
 3. **Judge 決定論**:gpt-5-mini 不接受自訂 temperature(推理模型),重跑分數可能有 ±1 級波動
-4. **語料時效**:條文以 dump 當時版本為準(如勞基法 20240731 版),法規修訂後需重跑 `download_corpus.py` 與重建索引
-5. **拒答門檻對問法風格敏感**:見失敗案例 7——目前的評估集問法整齊,無法量測口語敘事式提問對拒答門檻的實際衝擊範圍,只能確認「存在」不能確認「多常發生」
+4. **語料時效**:snapshot 僅證明 2026-08-29 下載內容；法規修訂後需重新稽核 snapshot、重建索引與重跑評估
+5. **拒答門檻對問法風格敏感**:壓力集已量測 1/40 直接誤拒，只能確認邊界仍存在，不能估計自然使用中「多常發生」

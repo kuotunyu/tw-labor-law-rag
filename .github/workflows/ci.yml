@@ -41,6 +41,11 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
+      - name: Audit Python security
+        run: |
+          uv run bandit -r src scripts -ll
+          uv run pip-audit --local
+
       - name: Verify release evidence and public boundary
         run: uv run python scripts/verify_release.py
 

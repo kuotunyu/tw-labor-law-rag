@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "release_type": "public_source_only_portfolio_release",
-  "release_version": "v0.3.0",
+  "release_version": "v0.3.4",
   "formal_evidence_version": "v0.1.0",
   "base_commit": "24bd48f9a5ae0257f962e7401cbb3c759fbefe35",
   "evidence": {
@@ -40,6 +40,83 @@
       "answered": 29,
       "refused": 11,
       "judged": 29
+    },
+    "reliability": {
+      "dataset": {
+        "path": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f",
+        "questions": 60,
+        "answerable": 40,
+        "unanswerable": 20
+      },
+      "results_path": "eval/official/reliability_results.json",
+      "trace_path": "eval/official/reliability_trace.jsonl",
+      "formal_trace_path": "eval/official/reliability_formal_trace.jsonl",
+      "production_threshold": 0.03,
+      "threshold_candidates": [
+        0.0,
+        0.005,
+        0.01,
+        0.02,
+        0.03,
+        0.04,
+        0.05,
+        0.1
+      ],
+      "stress": {
+        "hit_at_5": 0.95,
+        "mrr_at_10": 0.9083333333333334,
+        "direct_false_refusals": 1,
+        "direct_unanswerable_coverage": 0.85
+      },
+      "formal_guard": {
+        "hit_at_5": 0.9666666666666667,
+        "mrr_at_10": 0.9055555555555554,
+        "direct_false_refusals": 0,
+        "direct_unanswerable_coverage": 0.9
+      },
+      "decision": "retain_0.03"
+    },
+    "wage_arrears_regression": {
+      "dataset": {
+        "path": "eval/dataset/wage_arrears_regression_v0.3.4.jsonl",
+        "sha256": "9832ba3982b16f245f44c44d86b70a25e3a790cbf6b91214696421eca8ae6c6f",
+        "questions": 20
+      },
+      "results_path": "eval/official/wage_arrears_regression_v0.3.4.json",
+      "code_revision": "6d0326bbec4f2385bbb78b4b9a3858ae6b122109",
+      "configuration": {
+        "chunking": "structure",
+        "retrieval": "hybrid",
+        "reranker": true,
+        "top_k_retrieve": 20,
+        "top_k_final": 5,
+        "embedding_model": "BAAI/bge-m3",
+        "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+        "reranker_model": "BAAI/bge-reranker-v2-m3",
+        "reranker_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+      },
+      "summary": {
+        "positive_routes": 10,
+        "collision_routes_avoided": 10,
+        "positive_hit_at_5": 10,
+        "positive_hit_at_1": 10,
+        "passed": true
+      }
+    },
+    "provider_crosscheck": {
+      "status": "complete",
+      "authorized_cap_usd_per_provider": "5.00",
+      "required_providers": [
+        "gemini",
+        "openai"
+      ],
+      "results_path": "eval/official/provider_crosscheck_results.json",
+      "trace_path": "eval/official/provider_crosscheck_trace.jsonl",
+      "dataset": {
+        "path": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f"
+      }
     }
   },
   "runtime_config": {
@@ -78,6 +155,13 @@
     "license": "政府資料開放授權條款－第1版",
     "license_url": "https://data.gov.tw/license",
     "redistribution": "allowed_with_attribution",
+    "full_snapshot": {
+      "path": "release/corpus_snapshot.json",
+      "schema_version": "1.0",
+      "snapshot_date": "2026-08-29",
+      "laws": 15,
+      "articles": 884
+    },
     "samples": [
       {
         "path": "data/sample/勞工請假規則.json",

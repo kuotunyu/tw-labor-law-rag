@@ -2,7 +2,7 @@
 
 ## Authoritative public set
 
-[`release/public-files.txt`](../../release/public-files.txt) is the authoritative 108-file current public set. `scripts/verify_release.py` checks that every allowlisted file exists, is sorted/deduplicated, and passes the privacy/secret patterns. In this public Git repository, the tracked set must equal that allowlist exactly and `manifest.json:publication.tracked_excluded` must be empty. In a GitHub-generated source archive without `.git` metadata, the verifier rejects non-allowlisted files except conventional generated install/test/build paths and reports the Git-only check as `not_applicable_no_git_metadata` instead of pretending it ran.
+[`release/public-files.txt`](../../release/public-files.txt) is the authoritative current public set. `scripts/verify_release.py` checks that every allowlisted file exists, is sorted/deduplicated, and passes the privacy/secret patterns. In this public Git repository, the tracked set must equal that allowlist exactly and `manifest.json:publication.tracked_excluded` must be empty. In a GitHub-generated source archive without `.git` metadata, the verifier rejects non-allowlisted files except conventional generated install/test/build paths and reports the Git-only check as `not_applicable_no_git_metadata` instead of pretending it ran.
 
 The allowlist includes source, tests, CI/configuration, lockfile, package metadata, public documentation, privacy-reduced official evidence, and the two attributed OGDL samples. Internal `docs/superpowers/` records and `.claude/launch.json` are absent from both the current public tree and every publishable historical tree.
 
@@ -24,7 +24,15 @@ The 40-row end-to-end trace permits exactly:
 
 Nested `judge` objects permit only `faithfulness` and `relevancy`. Nested citations permit only `doc` and `article`. Unknown fields fail closed.
 
-The official result files also record the model identifiers needed to interpret historical evidence. Model identifiers such as `openai/gpt-5.1` are evaluation provenance; request IDs, headers, endpoints, token usage, credentials, or provider response payloads are not retained.
+The 60-row stress trace and 40-row formal-guard reliability trace each permit exactly:
+
+`qid`, `answerable`, `rank`, `top_score`, `threshold_refused`, `elapsed_ms`.
+
+## v0.3.2 provider safety cross-check
+
+Both providers completed five requests: Gemini `gemini-3.5-flash-lite` observed refusal accuracy `0.8`, citation success `1.0`, and estimated cost `US$0.0022620`; OpenAI `gpt-5.6-luna` observed refusal accuracy `1.0`, citation success `1.0`, and estimated cost `US$0.0026414`. This is a safety cross-check, not a replacement for the `v0.1.0` formal evidence baseline or a formal model-quality evaluation. Its public trace is strictly content-free: it contains no question/answer text, provider payload, or credentials. Only the reducer's content-free allowlist is exported; raw output remains inside ignored `eval/runs/`.
+
+The official result files also record the model identifiers needed to interpret historical evidence. Model identifiers such as `openai/gpt-5.1` are evaluation provenance; request IDs, headers, endpoints, token usage, credentials, or provider response payloads are not retained. Provider cross-check traces retain only their strict allowlisted metadata and do not include question/answer text.
 
 ## Explicit exclusions
 
@@ -40,13 +48,13 @@ The following are retained locally when they exist and excluded from publication
 - local working notes: `INTERVIEW_PREP.md`, `STARTUP.md`, and `plan.md`
 - machine/session files under `.claude/` other than no allowlisted entries
 
-The full 15-instrument corpus is therefore outside the public set. The two files under `data/sample/` are deliberate exceptions covered by [OGDL_ATTRIBUTION.md](OGDL_ATTRIBUTION.md).
+The full 15-instrument raw/normalized corpus is therefore outside the public set. The non-textual `release/corpus_snapshot.json` audit record and the two files under `data/sample/` are deliberate exceptions; sample redistribution is covered by [OGDL_ATTRIBUTION.md](OGDL_ATTRIBUTION.md).
 
 ## Scans and data minimization
 
 The verifier performs three complementary checks:
 
-1. Exact JSON field allowlists for both official traces and their nested objects.
+1. Exact JSON field allowlists for all currently published official traces and their nested objects.
 2. Current-tree and publishable-history scans for private filesystem paths, private-key blocks, known GitHub/Google/OpenAI/Anthropic token forms, non-placeholder key assignments, provider payload fields, personal identifiers, missing files, non-UTF-8 public text, forbidden local paths, and unreviewed historical binaries.
 3. Existing official-artifact tests that reject local paths and secret-like fields and recompute all arithmetic summaries.
 
@@ -54,4 +62,4 @@ Scanner findings contain only repository-relative path, category, location, andâ
 
 ## Current audit result
 
-At public-release verification time, both official trace schemas pass with zero issues and the publication scan reports zero issues. The release verifier returns these counts under `privacy.official_trace_issues` and `privacy.public_scan_issues`. This result must be regenerated on the exact release tree before any GO statement; it is not a permanent guarantee for future commits.
+At public-release verification time, all currently published official trace schemas pass with zero issues and the publication scan reports zero issues. The release verifier returns these counts under `privacy.official_trace_issues` and `privacy.public_scan_issues`. This result must be regenerated on the exact release tree before any GO statement; it is not a permanent guarantee for future commits.
