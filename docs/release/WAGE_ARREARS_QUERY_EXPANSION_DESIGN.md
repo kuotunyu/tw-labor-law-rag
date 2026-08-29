@@ -210,3 +210,60 @@ offline evidence is committed and verified.
   change is introduced.
 - The complete offline verification chain passes before any completion or release
   claim.
+
+## Post-release Targeted Regression Evidence
+
+**Status:** Approved for implementation on 2026-08-30
+
+The first post-release evidence task adds a small, separately versioned offline
+regression suite for the v0.3.4 routing rule. It must not replace, edit, or
+relabel the historical 40-question formal dataset or the 60-question v0.3.1
+reliability dataset.
+
+### Selected approach
+
+Add one frozen JSONL dataset and one deterministic offline runner dedicated to
+the wage-arrears/immediate-exit boundary. This is preferred over rewriting the
+formal baseline because it preserves historical provenance, and it is preferred
+over unit tests alone because it exercises the actual local retrieval path.
+
+The dataset will contain 20 reviewed cases:
+
+- 10 positive cases combining a reviewed wage-nonpayment cue with a worker
+  immediate-termination cue. They cover colloquial Chinese, statute-like
+  phrasing, code switching, punctuation variation, and longer narrative wording.
+- 10 collision cases containing only one cue group or a misleading neighboring
+  topic, including wage recovery without resignation, ordinary resignation,
+  employer-initiated dismissal, and generic salary/notice questions.
+
+Every row has a stable identifier, question, expected expansion decision, and an
+optional expected source. Positive rows expect `勞動基準法` Article `第 14 條`;
+collision rows make no retrieval-quality claim and verify only that the special
+Article 14 expansion does not activate.
+
+### Execution and evidence boundary
+
+The runner reuses the repository's pinned local retrieval configuration and
+existing read-only corpus/index state. It performs no generation-provider call,
+uses no Gemini or OpenAI key, does not write to Qdrant Cloud, and does not rebuild
+or modify a collection. If the required local index or pinned model snapshot is
+unavailable, it fails with an explicit prerequisite message instead of silently
+substituting a live service.
+
+The committed result records dataset hash, code revision, retrieval configuration,
+per-case expansion decision, positive-case rank for Article 14, and aggregate
+counts. It excludes question text, secrets, endpoints, and machine-specific
+paths. Re-running the same inputs must produce the same normalized artifact.
+
+### Acceptance criteria
+
+1. All 10 positive rows activate the fixed Article 14 retrieval expansion.
+2. All 10 collision rows leave the query unchanged by that expansion rule.
+3. Article 14 appears in the top five retrieved candidates for every positive
+   row; top-one rate is reported as observation rather than a hard release gate.
+4. Unit tests cover dataset schema, hash/provenance recording, redacted output,
+   deterministic ordering, and failure when local prerequisites are absent.
+5. Existing formal and reliability datasets and their official result artifacts
+   remain byte-for-byte unchanged.
+6. The full offline verification chain passes without a provider call, Qdrant
+   mutation, paid hardware, owner-funded key, or public-metric rewrite.
