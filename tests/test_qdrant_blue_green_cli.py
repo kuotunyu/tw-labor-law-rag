@@ -147,6 +147,31 @@ def test_dry_run_rejects_uncommitted_indexable_files_before_any_cloud_action(
     }
 
 
+def test_dry_run_sanitizes_valid_json_with_wrong_article_field_types(
+    local_corpus, capsys
+):
+    broken = {
+        "name": "測試法",
+        "nature": "法律",
+        "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0000001",
+        "last_amended": "20260829",
+        "effective_date": "",
+        "articles": [{"no": 1, "chapter": None, "content": "測試內容。"}],
+    }
+    (local_corpus["laws_dir"] / "test-law.json").write_text(
+        json.dumps(broken, ensure_ascii=False), encoding="utf-8"
+    )
+
+    assert cli.main(_base_args(local_corpus)) == 2
+    captured = capsys.readouterr()
+    assert json.loads(captured.err) == {
+        "status": "error",
+        "code": "snapshot_drift",
+    }
+    assert "AttributeError" not in captured.err
+    assert str(local_corpus["laws_dir"]) not in captured.err
+
+
 def test_execute_requires_repeated_candidate_confirmation(local_corpus, capsys):
     args = [
         *_base_args(local_corpus),
@@ -388,6 +413,62 @@ def test_execute_uses_only_temporary_writer_key_and_writes_receipt(
     assert json.loads(output)["status"] == "candidate_ready"
     assert "temporary-writer-key" not in output
     assert "private.example.test" not in output
+
+
+def test_execute_binds_snapshot_digest_and_sources_to_one_read(
+    monkeypatch, local_corpus, capsys
+):
+    original_bytes = local_corpus["snapshot"].read_bytes()
+    original = json.loads(original_bytes)
+    original_sources = {
+        source["id"]: source["sha256"] for source in original["sources"]
+    }
+    monkeypatch.setenv("QDRANT_URL", "https://private.example.test")
+    monkeypatch.setenv("QDRANT_WRITER_API_KEY", "temporary-writer-key")
+
+    def mutate_after_verified_read():
+        changed = json.loads(original_bytes)
+        changed["sources"][0]["sha256"] = "f" * 64
+        local_corpus["snapshot"].write_text(json.dumps(changed), encoding="utf-8")
+        return True
+
+    captured = {}
+
+    class FakeStore:
+        def __init__(self, _settings):
+            pass
+
+        def close(self):
+            pass
+
+    def fake_build(request, _dependencies):
+        captured["request"] = request
+        return {"schema_version": "1.0"}
+
+    monkeypatch.setattr(cli, "_pinned_models_are_cached", mutate_after_verified_read)
+    monkeypatch.setattr(cli, "VectorStore", FakeStore)
+    monkeypatch.setattr(cli, "BGEM3Embedder", lambda **_kwargs: object())
+    monkeypatch.setattr(cli, "build_candidates", fake_build)
+    monkeypatch.setattr(
+        cli,
+        "write_receipt_atomic",
+        lambda _value, target, *, project_root: project_root / target,
+    )
+    candidate = "labor_laws_20260830_deadbeef"
+
+    assert cli.main(
+        [
+            *_base_args(local_corpus),
+            "--execute",
+            "--confirm-candidate-base",
+            candidate,
+        ]
+    ) == 0
+    assert captured["request"].snapshot_sha256 == hashlib.sha256(
+        original_bytes
+    ).hexdigest()
+    assert captured["request"].source_sha256 == original_sources
+    assert json.loads(capsys.readouterr().out)["status"] == "candidate_ready"
 
 
 def test_execute_closes_store_and_sanitizes_build_failure(

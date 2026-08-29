@@ -85,18 +85,15 @@ def _project_path(path: Path) -> Path:
     return path if path.is_absolute() else PROJECT_ROOT / path
 
 
-def _snapshot_sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def _build_verified_inputs(
     args: argparse.Namespace,
-) -> tuple[dict[str, object], AuditedCorpus]:
+) -> tuple[dict[str, object], AuditedCorpus, dict[str, str]]:
     """Validate local evidence once and retain the exact decoded source units."""
     validate_candidate_base(args.active_base, args.candidate_base)
     raw_dir = _project_path(args.raw_dir)
     snapshot_path = _project_path(args.snapshot)
-    committed = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    snapshot_bytes = snapshot_path.read_bytes()
+    committed = json.loads(snapshot_bytes.decode("utf-8"))
     source_archives = {
         source_id: (url, raw_dir / f"chlaw_{source_id}.zip")
         for source_id, (url, _targets) in DUMPS.items()
@@ -107,20 +104,24 @@ def _build_verified_inputs(
         snapshot_date=date.today().isoformat(),
     )
     validate_snapshot_match(committed, audited.snapshot)
+    source_sha256 = {
+        str(source["id"]): str(source["sha256"])
+        for source in committed["sources"]
+    }
     plan = {
         "status": "dry_run_ready",
         "active_base": args.active_base,
         "candidate_base": args.candidate_base,
         "collections": candidate_collections(args.candidate_base),
-        "snapshot_sha256": _snapshot_sha256(snapshot_path),
+        "snapshot_sha256": hashlib.sha256(snapshot_bytes).hexdigest(),
         "execution_required": True,
     }
-    return plan, audited
+    return plan, audited, source_sha256
 
 
 def build_dry_run_plan(args: argparse.Namespace) -> dict[str, object]:
     """Validate only local evidence and return the redacted execution plan."""
-    plan, _audited = _build_verified_inputs(args)
+    plan, _audited, _source_sha256 = _build_verified_inputs(args)
     return plan
 
 
@@ -162,6 +163,7 @@ def _execute(
     args: argparse.Namespace,
     plan: dict[str, object],
     audited: AuditedCorpus,
+    source_sha256: dict[str, str],
 ) -> int:
     store = None
     writer_settings = None
@@ -184,11 +186,6 @@ def _execute(
             openai_api_key="",
             gemini_api_key="",
         )
-        committed = json.loads(_project_path(args.snapshot).read_text(encoding="utf-8"))
-        source_sha256 = {
-            str(source["id"]): str(source["sha256"])
-            for source in committed["sources"]
-        }
         request = BuildRequest(
             active_base=args.active_base,
             candidate_base=args.candidate_base,
@@ -248,7 +245,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _emit_error("candidate_confirmation_mismatch")
 
     try:
-        plan, audited = _build_verified_inputs(args)
+        plan, audited, source_sha256 = _build_verified_inputs(args)
     except FileNotFoundError:
         return _emit_error("missing_local_corpus")
     except (json.JSONDecodeError, KeyError, TypeError):
@@ -267,7 +264,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _emit_error("receipt_exists")
     if not _pinned_models_are_cached():
         return _emit_error("missing_model_snapshot")
-    return _execute(args, plan, audited)
+    return _execute(args, plan, audited, source_sha256)
 
 
 if __name__ == "__main__":

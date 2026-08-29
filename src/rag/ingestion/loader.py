@@ -22,14 +22,31 @@ _DELETED_ARTICLE = re.compile(r"^[（(]\s*刪除\s*[）)]$")
 _MD_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 
 
+def _text_field(
+    value: Mapping[str, Any],
+    field: str,
+    *,
+    context: str,
+    required: bool = False,
+) -> str:
+    raw = value.get(field, "")
+    if not isinstance(raw, str):
+        raise ValueError(f"{context} {field} must be a string")
+    text = raw.strip()
+    if required and not text:
+        raise ValueError(f"{context} {field} is required")
+    return text
+
+
 def load_law_data(
     data: Mapping[str, Any], *, source_path: str = ""
 ) -> list[SourceUnit]:
     """Load one already-decoded law without reading it from disk again."""
-    title = data["name"]
-    source_url = str(data.get("url", "")).strip()
-    last_amended = str(data.get("last_amended", "")).strip()
-    effective_date = str(data.get("effective_date", "")).strip()
+    title = _text_field(data, "name", context="law", required=True)
+    _text_field(data, "nature", context="law")
+    source_url = _text_field(data, "url", context="law")
+    last_amended = _text_field(data, "last_amended", context="law")
+    effective_date = _text_field(data, "effective_date", context="law")
     units = []
     articles = data.get("articles", [])
     if not isinstance(articles, Sequence) or isinstance(
@@ -39,7 +56,9 @@ def load_law_data(
     for article in articles:
         if not isinstance(article, Mapping):
             raise ValueError("law article must be an object")
-        text = clean_text(article.get("content", ""))
+        article_no = _text_field(article, "no", context="law article")
+        chapter = _text_field(article, "chapter", context="law article")
+        text = clean_text(_text_field(article, "content", context="law article"))
         if not text or _DELETED_ARTICLE.match(text):
             continue
         units.append(
@@ -47,8 +66,8 @@ def load_law_data(
                 text=text,
                 doc_id=title,
                 doc_title=title,
-                article_no=normalize_label(article.get("no", "")),
-                chapter=normalize_label(article.get("chapter", "")),
+                article_no=normalize_label(article_no),
+                chapter=normalize_label(chapter),
                 source_path=source_path,
                 source_url=source_url,
                 last_amended=last_amended,
