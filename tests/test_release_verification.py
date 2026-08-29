@@ -152,6 +152,233 @@ def test_pending_provider_crosscheck_contract_is_explicit(tmp_path):
     }
 
 
+def write_completed_provider_crosscheck_fixture(root: Path) -> dict:
+    contract = {
+        "status": "complete",
+        "authorized_cap_usd_per_provider": "5.00",
+        "required_providers": ["gemini", "openai"],
+        "results_path": "eval/official/provider_crosscheck_results.json",
+        "trace_path": "eval/official/provider_crosscheck_trace.jsonl",
+        "dataset": {
+            "path": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+            "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f",
+        },
+    }
+    dataset_path = root / contract["dataset"]["path"]
+    dataset_path.parent.mkdir(parents=True, exist_ok=True)
+    dataset_path.write_bytes(
+        (PROJECT_ROOT / contract["dataset"]["path"]).read_bytes()
+    )
+    qids = ["stress-001", "stress-002", "stress-003", "stress-041", "stress-042"]
+    answerable = [True, True, True, False, False]
+    provider_rows = {
+        "gemini": {
+            "model": "gemini-3.5-flash-lite",
+            "inputs": [1308] * 5,
+            "outputs": [24] * 5,
+            "elapsed": [100.0, 101.0, 102.0, 103.0, 104.0],
+            "costs": ["0.0004524"] * 5,
+            "input_per_million": "0.30",
+            "output_per_million": "2.50",
+            "source": "https://ai.google.dev/gemini-api/docs/pricing",
+            "total_cost": "0.0022620",
+            "remaining_budget": "4.9977380",
+        },
+        "openai": {
+            "model": "gpt-5.6-luna",
+            "inputs": [2521, 2521, 2521, 2522, 2522],
+            "outputs": [20] * 5,
+            "elapsed": [110.0, 111.0, 112.0, 113.0, 114.0],
+            "costs": ["0.0005282", "0.0005282", "0.0005282", "0.0005284", "0.0005284"],
+            "input_per_million": "0.20",
+            "output_per_million": "1.20",
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "total_cost": "0.0026414",
+            "remaining_budget": "4.9973586",
+        },
+    }
+    trace_rows = []
+    for provider, values in provider_rows.items():
+        for index, qid in enumerate(qids):
+            trace_rows.append(
+                {
+                    "qid": qid,
+                    "answerable": answerable[index],
+                    "requested_provider": provider,
+                    "actual_provider": provider,
+                    "model": values["model"],
+                    "refused": not answerable[index],
+                    "citation_count": 1 if answerable[index] else 0,
+                    "input_tokens": values["inputs"][index],
+                    "output_tokens": values["outputs"][index],
+                    "estimated_cost_usd": values["costs"][index],
+                    "refusal_verdict": 1,
+                    "citation_verdict": 1,
+                    "elapsed_ms": values["elapsed"][index],
+                }
+            )
+    results = {
+        "schema_version": "1.0",
+        "run_date": "2026-08-29",
+        "dataset": contract["dataset"],
+        "corpus_snapshot": {
+            "path": "release/corpus_snapshot.json",
+            "snapshot_date": "2026-08-29",
+            "laws": 15,
+            "articles": 884,
+        },
+        "selection": {
+            "initial_per_provider": 5,
+            "maximum_per_provider": 5,
+            "generation_eligible_only": True,
+        },
+        "authorization": {
+            "per_provider_cap_usd": "5.00",
+            "max_input_tokens_per_request": 20_000,
+            "max_output_tokens_per_request": 1_024,
+        },
+        "pricing": {
+            provider: {
+                "model": values["model"],
+                "input_per_million_usd": values["input_per_million"],
+                "output_per_million_usd": values["output_per_million"],
+                "source": values["source"],
+            }
+            for provider, values in provider_rows.items()
+        },
+        "provider_status": {
+            provider: {"status": "complete", "reason": None}
+            for provider in provider_rows
+        },
+        "provider_metrics": {
+            provider: {
+                "requests": 5,
+                "refusal_accuracy": 1.0,
+                "citation_success_rate": 1.0,
+                "input_tokens": sum(values["inputs"]),
+                "output_tokens": sum(values["outputs"]),
+                "estimated_cost_usd": values["total_cost"],
+                "avg_latency_ms": sum(values["elapsed"]) / 5,
+            }
+            for provider, values in provider_rows.items()
+        },
+        "budget_ledgers": {
+            provider: {
+                "cap_usd": "5.00",
+                "spent_usd": values["total_cost"],
+                "remaining_usd": values["remaining_budget"],
+                "requests": 5,
+                "input_tokens": sum(values["inputs"]),
+                "output_tokens": sum(values["outputs"]),
+                "input_per_million_usd": values["input_per_million"],
+                "output_per_million_usd": values["output_per_million"],
+            }
+            for provider, values in provider_rows.items()
+        },
+        "privacy": {
+            "public_trace_contains_question_or_answer": False,
+            "public_trace_contains_provider_payload": False,
+            "public_trace_contains_credentials": False,
+            "raw_trace_path": "ignored eval/runs only",
+        },
+    }
+    results_path = root / contract["results_path"]
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    results_path.write_text(json.dumps(results), encoding="utf-8")
+    (root / contract["trace_path"]).write_text(
+        "".join(json.dumps(row) + "\n" for row in trace_rows),
+        encoding="utf-8",
+    )
+    return contract
+
+
+def test_completed_provider_crosscheck_recomputes_public_evidence(tmp_path):
+    module = release_module()
+    contract = write_completed_provider_crosscheck_fixture(tmp_path)
+
+    assert module._verify_provider_crosscheck_contract(tmp_path, contract) == {
+        "status": "complete",
+        "authorized_cap_usd_per_provider": "5.00",
+        "required_providers": ["gemini", "openai"],
+        "requests": {"gemini": 5, "openai": 5},
+        "estimated_cost_usd": {
+            "gemini": "0.0022620",
+            "openai": "0.0026414",
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("tamper", "message"),
+    [
+        ("unknown_trace_field", "provider cross-check trace fields"),
+        ("provider_fallback", "provider cross-check actual provider"),
+        ("model_name", "provider cross-check gemini model"),
+        ("request_count", "provider cross-check gemini.requests"),
+        ("aggregate_tokens", "provider cross-check gemini.input_tokens"),
+        ("cost", "provider cross-check gemini.estimated_cost_usd"),
+        ("privacy_flag", "provider cross-check privacy"),
+        ("dataset_hash", "provider cross-check dataset"),
+        ("input_limit", "provider cross-check input tokens maximum"),
+        ("dataset_qid", "provider cross-check dataset qids"),
+        ("dataset_answerable", "provider cross-check dataset answerable"),
+    ],
+)
+def test_completed_provider_crosscheck_rejects_tampered_public_evidence(
+    tmp_path,
+    tamper,
+    message,
+):
+    module = release_module()
+    contract = write_completed_provider_crosscheck_fixture(tmp_path)
+    results_path = tmp_path / contract["results_path"]
+    trace_path = tmp_path / contract["trace_path"]
+    results = json.loads(results_path.read_text(encoding="utf-8"))
+    trace_rows = [
+        json.loads(line)
+        for line in trace_path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+
+    if tamper == "unknown_trace_field":
+        trace_rows[0]["request_id"] = "forbidden"
+    elif tamper == "provider_fallback":
+        trace_rows[0]["actual_provider"] = "openai"
+    elif tamper == "model_name":
+        trace_rows[0]["model"] = "gemini-3.5-pro"
+    elif tamper == "request_count":
+        results["provider_metrics"]["gemini"]["requests"] = 4
+    elif tamper == "aggregate_tokens":
+        results["provider_metrics"]["gemini"]["input_tokens"] = 1
+    elif tamper == "cost":
+        results["provider_metrics"]["gemini"]["estimated_cost_usd"] = "0.01"
+    elif tamper == "privacy_flag":
+        results["privacy"]["public_trace_contains_credentials"] = True
+    elif tamper == "dataset_hash":
+        results["dataset"]["sha256"] = "0" * 64
+    elif tamper == "input_limit":
+        trace_rows[0]["input_tokens"] = 20_001
+    elif tamper == "dataset_qid":
+        trace_rows[0]["qid"] = "stress-999"
+        trace_rows[5]["qid"] = "stress-999"
+    elif tamper == "dataset_answerable":
+        for index in (0, 5):
+            trace_rows[index]["answerable"] = False
+            trace_rows[index]["refused"] = True
+            trace_rows[index]["citation_count"] = 0
+    else:  # pragma: no cover - parametrization is exhaustive.
+        raise AssertionError(f"unknown tamper case: {tamper}")
+
+    results_path.write_text(json.dumps(results), encoding="utf-8")
+    trace_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in trace_rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(module.ReleaseVerificationError, match=message):
+        module._verify_provider_crosscheck_contract(tmp_path, contract)
+
+
 def test_reliability_run_date_accepts_latest_global_civil_date():
     module = release_module()
 

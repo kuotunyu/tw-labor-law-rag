@@ -18,6 +18,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -57,6 +58,77 @@ E2E_FIELDS = frozenset(
 JUDGE_FIELDS = frozenset({"faithfulness", "relevancy"})
 CITED_SOURCE_FIELDS = frozenset({"article", "doc"})
 RELIABILITY_FIELDS = frozenset(PUBLIC_TRACE_FIELDS)
+PROVIDER_MODELS = {
+    "gemini": "gemini-3.5-flash-lite",
+    "openai": "gpt-5.6-luna",
+}
+PROVIDER_PRICING = {
+    "gemini": {
+        "input_per_million_usd": "0.30",
+        "output_per_million_usd": "2.50",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing",
+    },
+    "openai": {
+        "input_per_million_usd": "0.20",
+        "output_per_million_usd": "1.20",
+        "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+    },
+}
+PROVIDER_TRACE_FIELDS = frozenset(
+    {
+        "qid",
+        "answerable",
+        "requested_provider",
+        "actual_provider",
+        "model",
+        "refused",
+        "citation_count",
+        "input_tokens",
+        "output_tokens",
+        "estimated_cost_usd",
+        "refusal_verdict",
+        "citation_verdict",
+        "elapsed_ms",
+    }
+)
+PROVIDER_RESULT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "run_date",
+        "dataset",
+        "corpus_snapshot",
+        "selection",
+        "authorization",
+        "pricing",
+        "provider_status",
+        "provider_metrics",
+        "budget_ledgers",
+        "privacy",
+    }
+)
+PROVIDER_METRIC_FIELDS = frozenset(
+    {
+        "requests",
+        "refusal_accuracy",
+        "citation_success_rate",
+        "input_tokens",
+        "output_tokens",
+        "estimated_cost_usd",
+        "avg_latency_ms",
+    }
+)
+PROVIDER_LEDGER_FIELDS = frozenset(
+    {
+        "cap_usd",
+        "spent_usd",
+        "remaining_usd",
+        "requests",
+        "input_tokens",
+        "output_tokens",
+        "input_per_million_usd",
+        "output_per_million_usd",
+    }
+)
 
 RUNTIME_CONFIG_FIELDS = (
     "embedding_model",
@@ -204,6 +276,44 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 def _assert_equal(label: str, actual: Any, expected: Any) -> None:
     if actual != expected:
         raise ReleaseVerificationError(f"{label}: actual={actual!r}, expected={expected!r}")
+
+
+def _assert_public_equal(label: str, actual: Any, expected: Any) -> None:
+    """Reject public-evidence mismatches without reflecting artifact values into logs."""
+    expected_type = type(expected)
+    if (
+        actual != expected
+        or (expected_type in (bool, int, str) and type(actual) is not expected_type)
+    ):
+        raise ReleaseVerificationError(f"{label} mismatch")
+
+
+def _compare_public_tree(label: str, actual: Any, expected: Any) -> None:
+    if isinstance(expected, float):
+        try:
+            valid = (
+                isinstance(actual, (int, float))
+                and not isinstance(actual, bool)
+                and math.isfinite(float(actual))
+                and math.isclose(float(actual), expected, rel_tol=1e-12, abs_tol=1e-12)
+            )
+        except (TypeError, ValueError):
+            valid = False
+        _assert_public_equal(label, valid, True)
+        return
+    if isinstance(expected, dict):
+        _assert_public_equal(label, isinstance(actual, Mapping), True)
+        _assert_public_equal(f"{label} fields", set(actual), set(expected))
+        for key in expected:
+            _compare_public_tree(f"{label}.{key}", actual[key], expected[key])
+        return
+    if isinstance(expected, list):
+        _assert_public_equal(label, isinstance(actual, list), True)
+        _assert_public_equal(f"{label} length", len(actual), len(expected))
+        for index, item in enumerate(expected):
+            _compare_public_tree(f"{label}[{index}]", actual[index], item)
+        return
+    _assert_public_equal(label, actual, expected)
 
 
 def _assert_close(
@@ -1181,25 +1291,333 @@ def _verify_provider_crosscheck_contract(
     project_root: Path,
     contract: Mapping[str, Any],
 ) -> dict[str, Any]:
-    expected = {
+    pending_contract = {
         "status": "pending_credentials",
         "authorized_cap_usd_per_provider": "5.00",
         "required_providers": ["gemini", "openai"],
         "results_path": "eval/official/provider_crosscheck_results.json",
         "trace_path": "eval/official/provider_crosscheck_trace.jsonl",
     }
-    _assert_equal("provider cross-check pending contract", contract, expected)
-    for artifact_key in ("results_path", "trace_path"):
-        if (project_root / contract[artifact_key]).exists():
-            raise ReleaseVerificationError(
-                "pending provider cross-check must not publish unverified artifacts"
+    if contract.get("status") == "pending_credentials":
+        _assert_equal("provider cross-check pending contract", contract, pending_contract)
+        for artifact_key in ("results_path", "trace_path"):
+            if (project_root / contract[artifact_key]).exists():
+                raise ReleaseVerificationError(
+                    "pending provider cross-check must not publish unverified artifacts"
+                )
+        return {
+            "status": contract["status"],
+            "authorized_cap_usd_per_provider": contract[
+                "authorized_cap_usd_per_provider"
+            ],
+            "required_providers": contract["required_providers"],
+        }
+
+    complete_contract = {
+        **pending_contract,
+        "status": "complete",
+        "dataset": {
+            "path": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+            "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f",
+        },
+    }
+    _assert_equal("provider cross-check complete contract", contract, complete_contract)
+
+    results_path = project_root / contract["results_path"]
+    trace_path = project_root / contract["trace_path"]
+    _assert_equal("provider cross-check results exists", results_path.is_file(), True)
+    _assert_equal("provider cross-check trace exists", trace_path.is_file(), True)
+    results = _read_json(results_path)
+    rows = _read_jsonl(trace_path)
+    _assert_public_equal(
+        "provider cross-check results fields", set(results), PROVIDER_RESULT_FIELDS
+    )
+    _assert_public_equal(
+        "provider cross-check result schema", results["schema_version"], "1.0"
+    )
+    _verify_evidence_run_date(results["run_date"])
+    _assert_public_equal(
+        "provider cross-check dataset", results["dataset"], contract["dataset"]
+    )
+    dataset_path = project_root / contract["dataset"]["path"]
+    _assert_public_equal("provider cross-check dataset exists", dataset_path.is_file(), True)
+    _assert_public_equal(
+        "provider cross-check dataset SHA-256",
+        hashlib.sha256(dataset_path.read_bytes()).hexdigest(),
+        contract["dataset"]["sha256"],
+    )
+    dataset_rows = _read_jsonl(dataset_path)
+    dataset_by_qid = {row.get("qid"): row for row in dataset_rows}
+    _assert_public_equal(
+        "provider cross-check dataset unique qids",
+        len(dataset_by_qid),
+        len(dataset_rows),
+    )
+    _assert_public_equal(
+        "provider cross-check corpus snapshot",
+        results["corpus_snapshot"],
+        {
+            "path": "release/corpus_snapshot.json",
+            "snapshot_date": "2026-08-29",
+            "laws": 15,
+            "articles": 884,
+        },
+    )
+    _assert_public_equal(
+        "provider cross-check selection",
+        results["selection"],
+        {
+            "initial_per_provider": 5,
+            "maximum_per_provider": 5,
+            "generation_eligible_only": True,
+        },
+    )
+    _assert_public_equal(
+        "provider cross-check authorization",
+        results["authorization"],
+        {
+            "per_provider_cap_usd": "5.00",
+            "max_input_tokens_per_request": 20_000,
+            "max_output_tokens_per_request": 1_024,
+        },
+    )
+    expected_pricing = {
+        provider: {"model": PROVIDER_MODELS[provider], **PROVIDER_PRICING[provider]}
+        for provider in contract["required_providers"]
+    }
+    _assert_public_equal(
+        "provider cross-check pricing", results["pricing"], expected_pricing
+    )
+    _assert_public_equal(
+        "provider cross-check provider status",
+        results["provider_status"],
+        {
+            provider: {"status": "complete", "reason": None}
+            for provider in contract["required_providers"]
+        },
+    )
+    _assert_public_equal(
+        "provider cross-check privacy",
+        results["privacy"],
+        {
+            "public_trace_contains_question_or_answer": False,
+            "public_trace_contains_provider_payload": False,
+            "public_trace_contains_credentials": False,
+            "raw_trace_path": "ignored eval/runs only",
+        },
+    )
+    _assert_public_equal("provider cross-check trace rows", len(rows), 10)
+
+    grouped: dict[str, list[dict[str, Any]]] = {
+        provider: [] for provider in contract["required_providers"]
+    }
+    for row in rows:
+        _assert_public_equal(
+            "provider cross-check trace fields", set(row), PROVIDER_TRACE_FIELDS
+        )
+        provider = row["requested_provider"]
+        _assert_public_equal(
+            "provider cross-check requested provider",
+            provider in grouped,
+            True,
+        )
+        _assert_public_equal(
+            "provider cross-check actual provider", row["actual_provider"], provider
+        )
+        _assert_public_equal(
+            f"provider cross-check {provider} model",
+            row["model"],
+            PROVIDER_MODELS[provider],
+        )
+        _assert_public_equal(
+            "provider cross-check qid type",
+            isinstance(row["qid"], str)
+            and bool(re.fullmatch(r"stress-\d{3}", row["qid"])),
+            True,
+        )
+        for field in ("answerable", "refused"):
+            _assert_public_equal(
+                f"provider cross-check {field} type",
+                isinstance(row[field], bool),
+                True,
             )
+        for field in ("citation_count", "input_tokens", "output_tokens"):
+            _assert_public_equal(
+                f"provider cross-check {field} type",
+                type(row[field]) is int and row[field] >= 0,
+                True,
+            )
+        _assert_public_equal(
+            "provider cross-check refusal verdict type",
+            type(row["refusal_verdict"]) is int,
+            True,
+        )
+        _assert_public_equal(
+            "provider cross-check refusal verdict",
+            row["refusal_verdict"],
+            int(row["refused"] == (not row["answerable"])),
+        )
+        _assert_public_equal(
+            "provider cross-check citation verdict type",
+            type(row["citation_verdict"]) is int,
+            True,
+        )
+        _assert_public_equal(
+            "provider cross-check citation verdict",
+            row["citation_verdict"],
+            int(
+                (row["refused"] and row["citation_count"] == 0)
+                or (not row["refused"] and row["citation_count"] > 0)
+            ),
+        )
+        _assert_public_equal(
+            "provider cross-check latency",
+            isinstance(row["elapsed_ms"], (int, float))
+            and not isinstance(row["elapsed_ms"], bool)
+            and math.isfinite(float(row["elapsed_ms"]))
+            and row["elapsed_ms"] >= 0,
+            True,
+        )
+        _assert_public_equal(
+            "provider cross-check input tokens maximum",
+            row["input_tokens"] <= results["authorization"]["max_input_tokens_per_request"],
+            True,
+        )
+        _assert_public_equal(
+            "provider cross-check output tokens maximum",
+            row["output_tokens"] <= results["authorization"]["max_output_tokens_per_request"],
+            True,
+        )
+        _assert_public_equal(
+            "provider cross-check dataset qids", row["qid"] in dataset_by_qid, True
+        )
+        _assert_public_equal(
+            "provider cross-check dataset answerable",
+            row["answerable"],
+            dataset_by_qid[row["qid"]]["answerable"],
+        )
+        expected_cost = _provider_cost(
+            provider,
+            row["input_tokens"],
+            row["output_tokens"],
+        )
+        _assert_public_equal(
+            f"provider cross-check {provider} row cost",
+            row["estimated_cost_usd"],
+            str(expected_cost),
+        )
+        grouped[provider].append(row)
+
+    expected_qids: set[str] | None = None
+    requests: dict[str, int] = {}
+    estimated_costs: dict[str, str] = {}
+    for provider in contract["required_providers"]:
+        provider_rows = grouped[provider]
+        qids = {row["qid"] for row in provider_rows}
+        _assert_public_equal(
+            f"provider cross-check {provider} rows", len(provider_rows), 5
+        )
+        _assert_public_equal(
+            f"provider cross-check {provider} unique qids", len(qids), 5
+        )
+        if expected_qids is None:
+            expected_qids = qids
+        else:
+            _assert_public_equal("provider cross-check matched qids", qids, expected_qids)
+        metrics = _provider_metrics(provider, provider_rows)
+        _assert_public_equal(
+            "provider cross-check provider metrics mapping",
+            isinstance(results["provider_metrics"], Mapping),
+            True,
+        )
+        _assert_public_equal(
+            f"provider cross-check {provider} metric fields",
+            set(results["provider_metrics"].get(provider, {})),
+            PROVIDER_METRIC_FIELDS,
+        )
+        _compare_public_tree(
+            f"provider cross-check {provider}",
+            metrics,
+            results["provider_metrics"][provider],
+        )
+        ledger = {
+            "cap_usd": "5.00",
+            "spent_usd": metrics["estimated_cost_usd"],
+            "remaining_usd": str(Decimal("5.00") - Decimal(metrics["estimated_cost_usd"])),
+            "requests": metrics["requests"],
+            "input_tokens": metrics["input_tokens"],
+            "output_tokens": metrics["output_tokens"],
+            "input_per_million_usd": PROVIDER_PRICING[provider]["input_per_million_usd"],
+            "output_per_million_usd": PROVIDER_PRICING[provider]["output_per_million_usd"],
+        }
+        _assert_public_equal(
+            "provider cross-check budget ledgers mapping",
+            isinstance(results["budget_ledgers"], Mapping),
+            True,
+        )
+        _assert_public_equal(
+            f"provider cross-check {provider} ledger fields",
+            set(results["budget_ledgers"].get(provider, {})),
+            PROVIDER_LEDGER_FIELDS,
+        )
+        _assert_public_equal(
+            f"provider cross-check {provider} ledger",
+            results["budget_ledgers"][provider],
+            ledger,
+        )
+        _assert_public_equal(
+            f"provider cross-check {provider} budget cap",
+            Decimal(metrics["estimated_cost_usd"]) <= Decimal("5.00"),
+            True,
+        )
+        requests[provider] = metrics["requests"]
+        estimated_costs[provider] = metrics["estimated_cost_usd"]
+
+    _assert_public_equal(
+        "provider cross-check metrics providers",
+        set(results["provider_metrics"]),
+        set(contract["required_providers"]),
+    )
+    _assert_public_equal(
+        "provider cross-check ledger providers",
+        set(results["budget_ledgers"]),
+        set(contract["required_providers"]),
+    )
     return {
-        "status": contract["status"],
-        "authorized_cap_usd_per_provider": contract[
-            "authorized_cap_usd_per_provider"
-        ],
+        "status": "complete",
+        "authorized_cap_usd_per_provider": "5.00",
         "required_providers": contract["required_providers"],
+        "requests": requests,
+        "estimated_cost_usd": estimated_costs,
+    }
+
+
+def _provider_cost(provider: str, input_tokens: int, output_tokens: int) -> Decimal:
+    try:
+        input_rate = Decimal(PROVIDER_PRICING[provider]["input_per_million_usd"])
+        output_rate = Decimal(PROVIDER_PRICING[provider]["output_per_million_usd"])
+    except (KeyError, InvalidOperation) as exc:
+        raise ReleaseVerificationError("provider cross-check pricing configuration") from exc
+    return (Decimal(input_tokens) * input_rate + Decimal(output_tokens) * output_rate) / Decimal(1_000_000)
+
+
+def _provider_metrics(provider: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    count = len(rows)
+    if count == 0:
+        raise ReleaseVerificationError("provider cross-check provider rows must not be empty")
+    return {
+        "requests": count,
+        "refusal_accuracy": sum(row["refusal_verdict"] for row in rows) / count,
+        "citation_success_rate": sum(row["citation_verdict"] for row in rows) / count,
+        "input_tokens": sum(row["input_tokens"] for row in rows),
+        "output_tokens": sum(row["output_tokens"] for row in rows),
+        "estimated_cost_usd": str(
+            sum(
+                (_provider_cost(provider, row["input_tokens"], row["output_tokens"]) for row in rows),
+                Decimal(0),
+            )
+        ),
+        "avg_latency_ms": round(sum(float(row["elapsed_ms"]) for row in rows) / count, 1),
     }
 
 
