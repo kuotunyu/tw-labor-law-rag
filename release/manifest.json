@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "release_type": "public_source_only_portfolio_release",
-  "release_version": "v0.3.1",
+  "release_version": "v0.3.2",
   "formal_evidence_version": "v0.1.0",
   "base_commit": "24bd48f9a5ae0257f962e7401cbb3c759fbefe35",
   "evidence": {
@@ -78,14 +78,18 @@
       "decision": "retain_0.03"
     },
     "provider_crosscheck": {
-      "status": "pending_credentials",
+      "status": "complete",
       "authorized_cap_usd_per_provider": "5.00",
       "required_providers": [
         "gemini",
         "openai"
       ],
       "results_path": "eval/official/provider_crosscheck_results.json",
-      "trace_path": "eval/official/provider_crosscheck_trace.jsonl"
+      "trace_path": "eval/official/provider_crosscheck_trace.jsonl",
+      "dataset": {
+        "path": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f"
+      }
     }
   },
   "runtime_config": {

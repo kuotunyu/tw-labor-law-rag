@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0",
+  "run_date": "2026-08-29",
+  "dataset": {
+    "path": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+    "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f"
+  },
+  "corpus_snapshot": {
+    "path": "release/corpus_snapshot.json",
+    "snapshot_date": "2026-08-29",
+    "laws": 15,
+    "articles": 884
+  },
+  "selection": {
+    "initial_per_provider": 5,
+    "maximum_per_provider": 5,
+    "generation_eligible_only": true
+  },
+  "authorization": {
+    "per_provider_cap_usd": "5.00",
+    "max_input_tokens_per_request": 20000,
+    "max_output_tokens_per_request": 1024
+  },
+  "pricing": {
+    "gemini": {
+      "model": "gemini-3.5-flash-lite",
+      "input_per_million_usd": "0.30",
+      "output_per_million_usd": "2.50",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
+    "openai": {
+      "model": "gpt-5.6-luna",
+      "input_per_million_usd": "0.20",
+      "output_per_million_usd": "1.20",
+      "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna"
+    }
+  },
+  "provider_status": {
+    "gemini": {
+      "status": "complete",
+      "reason": null
+    },
+    "openai": {
+      "status": "complete",
+      "reason": null
+    }
+  },
+  "provider_metrics": {
+    "gemini": {
+      "requests": 5,
+      "refusal_accuracy": 0.8,
+      "citation_success_rate": 1.0,
+      "input_tokens": 5815,
+      "output_tokens": 207,
+      "estimated_cost_usd": "0.0022620",
+      "avg_latency_ms": 895.4
+    },
+    "openai": {
+      "requests": 5,
+      "refusal_accuracy": 1.0,
+      "citation_success_rate": 1.0,
+      "input_tokens": 6649,
+      "output_tokens": 1093,
+      "estimated_cost_usd": "0.0026414",
+      "avg_latency_ms": 2919.3
+    }
+  },
+  "budget_ledgers": {
+    "gemini": {
+      "cap_usd": "5.00",
+      "spent_usd": "0.0022620",
+      "remaining_usd": "4.9977380",
+      "requests": 5,
+      "input_tokens": 5815,
+      "output_tokens": 207,
+      "input_per_million_usd": "0.30",
+      "output_per_million_usd": "2.50"
+    },
+    "openai": {
+      "cap_usd": "5.00",
+      "spent_usd": "0.0026414",
+      "remaining_usd": "4.9973586",
+      "requests": 5,
+      "input_tokens": 6649,
+      "output_tokens": 1093,
+      "input_per_million_usd": "0.20",
+      "output_per_million_usd": "1.20"
+    }
+  },
+  "privacy": {
+    "public_trace_contains_question_or_answer": false,
+    "public_trace_contains_provider_payload": false,
+    "public_trace_contains_credentials": false,
+    "raw_trace_path": "ignored eval/runs only"
+  }
+}
