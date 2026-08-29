@@ -93,6 +93,7 @@ src/rag/ingestion/loader.py
 src/rag/models.py
 src/rag/provider_budget.py
 src/rag/provider_crosscheck.py
+src/rag/qdrant_maintenance.py
 src/rag/release_verification.py
 src/rag/reliability.py
 src/rag/retrieval/__init__.py
@@ -123,6 +124,7 @@ tests/test_packaging.py
 tests/test_pipeline.py
 tests/test_provider_budget.py
 tests/test_provider_crosscheck.py
+tests/test_qdrant_maintenance.py
 tests/test_refusal_labels.py
 tests/test_release_verification.py
 tests/test_reliability.py

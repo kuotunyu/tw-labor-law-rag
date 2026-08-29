@@ -203,8 +203,11 @@ Required automated coverage:
    before cloud access.
 5. Existing candidate collections block all mutation.
 6. Fixed and structure builds use create-only semantics and exact count checks.
-7. Payload validation requires `doc_title`, `article_label`, `source_url`,
-   `last_amended`, and `effective_date`, without recording law content.
+7. Payload validation requires the `doc_title`, `article_label`, `source_url`,
+   `last_amended`, and `effective_date` fields without recording law content.
+   `effective_date` may be empty only when the audited official source omits it;
+   a present date must use `YYYYMMDD`. The maintenance path never fabricates a
+   missing official date.
 8. Receipts contain only the documented field allowlist and portable paths.
 9. Failure paths never invoke collection deletion.
 10. The full test suite, Ruff, Bandit, dependency audit, and release verifier
