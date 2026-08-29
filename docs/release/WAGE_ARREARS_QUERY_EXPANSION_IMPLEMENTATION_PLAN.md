@@ -512,3 +512,395 @@ git status --short --branch
 ```
 
 Expected: the final verifier passes and the worktree is clean. Do not merge, tag, push, or deploy until the branch review is complete.
+
+---
+
+# v0.3.4 Wage-Arrears Targeted Regression Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Commit a privacy-reduced, reproducible 20-case offline regression that proves the v0.3.4 Article 14 expansion boundary and positive-case Hit@5 without rewriting historical formal metrics.
+
+**Architecture:** A small `rag.wage_arrears_regression` module owns dataset validation and normalized result construction. A dedicated eval entry point reuses the audited-corpus and isolated-index helpers from the reliability runner, rejects missing pinned model snapshots before any download, executes only structure/hybrid/rerank retrieval, and exports one deterministic public JSON result after the acceptance gates pass.
+
+**Tech Stack:** Python 3.11, pytest, Pydantic settings, Hugging Face local cache, FlagEmbedding, BM25, Qdrant local mode, Ruff, Bandit, pip-audit.
+
+## Global Constraints
+
+- Use exactly 20 reviewed rows: 10 positive and 10 collision cases.
+- Positive rows require `勞動基準法` Article `第 14 條` in the final top five.
+- Top-one rate is reported but is not a hard gate.
+- Do not call Gemini, OpenAI, Anthropic, Ollama, or any generation/judge provider.
+- Do not connect to or mutate Qdrant Cloud; any local index must live only under ignored `eval/runs/` state.
+- Require both pinned model snapshots to exist in the local Hugging Face cache before corpus or index work begins.
+- Never commit question text, raw hit text, secrets, endpoints, absolute paths, or raw local traces in the official result.
+- Keep `eval/dataset/eval_set.jsonl`, `eval/dataset/reliability_stress_v0.3.1.jsonl`, and all existing official result artifacts byte-for-byte unchanged.
+- Keep release/package version `v0.3.4` / `0.3.4`; this adds evidence, not runtime behavior.
+
+---
+
+### Task 1: Freeze and validate the targeted dataset
+
+**Files:**
+- Create: `eval/dataset/wage_arrears_regression_v0.3.4.jsonl`
+- Create: `src/rag/wage_arrears_regression.py`
+- Create: `tests/test_wage_arrears_regression.py`
+
+**Interfaces:**
+- Consumes: `rag.retrieval.pipeline._retrieval_query` as the shipped routing behavior.
+- Produces: `load_regression_dataset(path: Path) -> list[dict]`, `route_expansion_applied(question: str) -> bool`, and a frozen 20-row dataset.
+
+- [ ] **Step 1: Write failing schema and routing tests**
+
+Add tests that import the missing module, load the missing dataset, and assert literal expectations:
+
+```python
+def test_targeted_dataset_has_reviewed_shape_and_routes():
+    rows = load_regression_dataset(DATASET_PATH)
+    assert len(rows) == 20
+    assert [row["qid"] for row in rows] == [f"wage-reg-{i:03d}" for i in range(1, 21)]
+    assert sum(row["expect_expansion"] for row in rows) == 10
+    assert all(route_expansion_applied(row["question"]) is row["expect_expansion"] for row in rows)
+    assert all(
+        row["sources"] == [{"doc": "勞動基準法", "article": "第 14 條"}]
+        for row in rows[:10]
+    )
+    assert all(row["sources"] == [] for row in rows[10:])
+```
+
+Add a malformed temporary JSONL case and assert `ValueError` names its qid and invalid field. The production mutation these tests catch is accepting a duplicate id, a non-boolean decision, a positive row without Article 14, or a collision row with a gold source.
+
+- [ ] **Step 2: Run the tests and verify RED**
+
+Run:
+
+```powershell
+uv run pytest tests/test_wage_arrears_regression.py -q
+```
+
+Expected: collection fails because `rag.wage_arrears_regression` does not exist.
+
+- [ ] **Step 3: Add the 20 literal dataset rows and minimal validator**
+
+Implement strict JSONL parsing with these required keys:
+
+```python
+REQUIRED_FIELDS = {"qid", "question", "expect_expansion", "sources", "style_tags"}
+ARTICLE_14_SOURCE = [{"doc": "勞動基準法", "article": "第 14 條"}]
+
+def load_regression_dataset(path: Path) -> list[dict]:
+    rows = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    seen: set[str] = set()
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            raise ValueError(f"row {index}: expected object")
+        qid = row.get("qid", f"row {index}")
+        if set(row) != REQUIRED_FIELDS:
+            raise ValueError(f"{qid}: fields must equal {sorted(REQUIRED_FIELDS)}")
+        if not isinstance(row["qid"], str) or not row["qid"]:
+            raise ValueError(f"row {index}: qid must be a non-empty string")
+        if row["qid"] in seen:
+            raise ValueError(f"{row['qid']}: duplicate qid")
+        seen.add(row["qid"])
+        if not isinstance(row["question"], str) or not row["question"].strip():
+            raise ValueError(f"{row['qid']}: question must be a non-empty string")
+        if type(row["expect_expansion"]) is not bool:
+            raise ValueError(f"{row['qid']}: expect_expansion must be boolean")
+        expected_sources = ARTICLE_14_SOURCE if row["expect_expansion"] else []
+        if row["sources"] != expected_sources:
+            raise ValueError(f"{row['qid']}: sources do not match expansion decision")
+        if not isinstance(row["style_tags"], list) or not row["style_tags"]:
+            raise ValueError(f"{row['qid']}: style_tags must be a non-empty list")
+    expected_ids = [f"wage-reg-{index:03d}" for index in range(1, 21)]
+    if [row["qid"] for row in rows] != expected_ids:
+        raise ValueError("dataset qids must be wage-reg-001 through wage-reg-020")
+    return rows
+
+def route_expansion_applied(question: str) -> bool:
+    return _WAGE_ARREARS_LEGAL_TERMS in _retrieval_query(question)
+```
+
+Use qids `wage-reg-001` through `wage-reg-020`. Rows 1-10 cover colloquial Chinese, statutory Chinese, code switching, punctuation, and narratives. Rows 11-20 cover wage recovery only, ordinary resignation only, employer dismissal, notice-only, generic salary, severance-only, and unrelated Article 14 wording.
+
+- [ ] **Step 4: Run GREEN and the existing pipeline contract tests**
+
+Run:
+
+```powershell
+uv run pytest tests/test_wage_arrears_regression.py tests/test_pipeline.py -q
+```
+
+Expected: all tests pass and no provider is initialized.
+
+- [ ] **Step 5: Commit Task 1**
+
+```powershell
+git add eval/dataset/wage_arrears_regression_v0.3.4.jsonl src/rag/wage_arrears_regression.py tests/test_wage_arrears_regression.py
+git commit -m "test: add v0.3.4 wage arrears regression set"
+```
+
+---
+
+### Task 2: Build a fail-closed offline runner and normalized result contract
+
+**Files:**
+- Create: `eval/run_wage_arrears_regression.py`
+- Modify: `src/rag/wage_arrears_regression.py`
+- Modify: `tests/test_wage_arrears_regression.py`
+
+**Interfaces:**
+- Consumes: Task 1 dataset helpers, reliability runner corpus/index helpers, `lib.match_rank`, pinned `Settings` model revisions.
+- Produces: `require_cached_models(settings: Settings) -> dict[str, str]`, `build_public_result(...) -> dict`, and CLI exit code 0 only when all acceptance gates pass.
+
+- [ ] **Step 1: Write failing cache-preflight and privacy-result tests**
+
+Test a resolver that raises `LocalEntryNotFoundError` and assert the helper raises:
+
+```text
+missing pinned local model snapshot: BAAI/bge-m3@5617a9f61b028005a4858fdac845db406aefb181
+```
+
+Build 20 literal raw case summaries and assert `build_public_result` returns only stable qid, expected/applied decision, rank, and rounded score. Recursively serialize the result and assert the original questions, `https://`, `AIza`, `sk-`, and the worktree path are absent. The production mutations caught are allowing an implicit model download or leaking raw questions/hits into public evidence.
+
+- [ ] **Step 2: Run the focused tests and verify RED**
+
+```powershell
+uv run pytest tests/test_wage_arrears_regression.py -q
+```
+
+Expected: failures name the missing cache-preflight and result-builder functions.
+
+- [ ] **Step 3: Implement minimal helpers and runner**
+
+Use `huggingface_hub.snapshot_download(..., local_files_only=True)` for both pinned repositories before `_materialize_audited_corpus`. The runner must:
+
+```python
+def require_cached_models(settings: Settings, resolver=None) -> dict[str, str]:
+    resolve = resolver or snapshot_download
+    models = {
+        settings.embedding_model: settings.embedding_model_revision,
+        settings.reranker_model: settings.reranker_model_revision,
+    }
+    resolved = {}
+    for repo_id, revision in models.items():
+        try:
+            resolved[repo_id] = str(
+                resolve(repo_id=repo_id, revision=revision, local_files_only=True)
+            )
+        except LocalEntryNotFoundError as exc:
+            raise RuntimeError(
+                f"missing pinned local model snapshot: {repo_id}@{revision}"
+            ) from exc
+    return resolved
+
+def build_public_result(*, dataset_path, code_revision, configuration, cases):
+    public_cases = [
+        {
+            "qid": case["qid"],
+            "expected_expansion": case["expected_expansion"],
+            "expansion_applied": case["expansion_applied"],
+            "rank": case["rank"],
+            "top_score": round(case["top_score"], 4),
+        }
+        for case in sorted(cases, key=lambda item: item["qid"])
+    ]
+    positives = [case for case in public_cases if case["expected_expansion"]]
+    collisions = [case for case in public_cases if not case["expected_expansion"]]
+    summary = {
+        "positive_routes": sum(case["expansion_applied"] for case in positives),
+        "collision_routes_avoided": sum(
+            not case["expansion_applied"] for case in collisions
+        ),
+        "positive_hit_at_5": sum(
+            case["rank"] is not None and case["rank"] <= 5 for case in positives
+        ),
+        "positive_hit_at_1": sum(case["rank"] == 1 for case in positives),
+    }
+    summary["passed"] = (
+        summary["positive_routes"] == 10
+        and summary["collision_routes_avoided"] == 10
+        and summary["positive_hit_at_5"] == 10
+    )
+    return {
+        "schema_version": "1.0",
+        "dataset": {
+            "path": "eval/dataset/wage_arrears_regression_v0.3.4.jsonl",
+            "sha256": hashlib.sha256(dataset_path.read_bytes()).hexdigest(),
+            "questions": len(public_cases),
+        },
+        "code_revision": code_revision,
+        "configuration": configuration,
+        "summary": summary,
+        "cases": public_cases,
+    }
+```
+
+The runner must then follow this exact sequence:
+
+```text
+parse args -> validate dataset -> require cached models -> create empty ignored run dir
+-> materialize audited corpus -> build isolated local indexes
+-> build structure/hybrid/rerank pipeline -> execute 20 questions
+-> write raw trace only inside run dir -> build normalized public result
+-> optionally export official JSON -> return 0 only when 10/10 routes, 10/10 collisions,
+   and 10/10 positive Hit@5 pass
+```
+
+Do not import or construct an LLM, answerer, judge, or provider router. Write JSON with UTF-8, `sort_keys=True`, stable qid ordering, two-space indentation, and one trailing newline.
+
+- [ ] **Step 4: Run GREEN and CLI help smoke**
+
+```powershell
+uv run pytest tests/test_wage_arrears_regression.py -q
+uv run python eval/run_wage_arrears_regression.py --help
+```
+
+Expected: tests pass; help lists `--dataset`, `--snapshot`, `--work-dir`, `--device`, and `--export-official` without loading a model.
+
+- [ ] **Step 5: Commit Task 2**
+
+```powershell
+git add eval/run_wage_arrears_regression.py src/rag/wage_arrears_regression.py tests/test_wage_arrears_regression.py
+git commit -m "feat: add offline wage arrears regression runner"
+```
+
+---
+
+### Task 3: Produce and verify official targeted evidence
+
+**Files:**
+- Create: `eval/official/wage_arrears_regression_v0.3.4.json`
+- Modify: `release/manifest.json`
+- Modify: `release/public-files.txt`
+- Modify: `src/rag/release_verification.py`
+- Modify: `tests/test_release_verification.py`
+- Modify: `tests/test_official_artifacts.py`
+
+**Interfaces:**
+- Consumes: committed Task 1-2 code, local pinned model snapshots, audited corpus snapshot.
+- Produces: public manifest section `evidence.wage_arrears_regression`, verified 138-file publication boundary, deterministic official result.
+
+- [ ] **Step 1: Write failing release-contract tests before generating evidence**
+
+Add a test requiring the official JSON and literal invariants:
+
+```python
+assert result["schema_version"] == "1.0"
+assert result["dataset"]["questions"] == 20
+assert result["summary"] == {
+    "positive_routes": 10,
+    "collision_routes_avoided": 10,
+    "positive_hit_at_5": 10,
+    "positive_hit_at_1": result["summary"]["positive_hit_at_1"],
+    "passed": True,
+}
+assert 0 <= result["summary"]["positive_hit_at_1"] <= 10
+assert result["summary"]["positive_hit_at_1"] == sum(
+    case["rank"] == 1 for case in result["cases"] if case["expected_expansion"]
+)
+assert all("question" not in case and "hits" not in case for case in result["cases"])
+```
+
+Extend the release-verifier fixture so a wrong dataset hash, case count, qid order, route count, rank, or `passed` flag raises `VerificationError`. Change the expected public file count from 133 to 138 only in the same RED commit.
+
+- [ ] **Step 2: Run the release tests and verify RED**
+
+```powershell
+uv run pytest tests/test_wage_arrears_regression.py tests/test_official_artifacts.py tests/test_release_verification.py -q
+```
+
+Expected: tests fail because the official artifact and manifest contract are absent.
+
+- [ ] **Step 3: Commit executable code state and run the real local evaluation**
+
+First commit any verifier code needed to validate the forthcoming artifact, then run:
+
+```powershell
+uv run python eval/run_wage_arrears_regression.py --device auto --export-official
+```
+
+Expected: both pinned models resolve locally before network corpus access; all route/collision gates are 10/10; every positive Article 14 rank is 1-5; the process exits zero. The isolated local Qdrant and raw traces remain only under ignored `eval/runs/`.
+
+- [ ] **Step 4: Register the evidence and make the tests GREEN**
+
+Add dataset path/hash, code revision, configuration, counts, and official result path to `release/manifest.json`. Add all five newly tracked paths in sorted order to `release/public-files.txt`. Implement semantic verifier checks against the dataset and official JSON rather than trusting the summary fields.
+
+Run:
+
+```powershell
+uv run pytest tests/test_wage_arrears_regression.py tests/test_official_artifacts.py tests/test_release_verification.py -q
+uv run python scripts/verify_release.py
+```
+
+Expected: all focused tests and release verification pass with 138 public files.
+
+- [ ] **Step 5: Commit Task 3**
+
+```powershell
+git add eval/official/wage_arrears_regression_v0.3.4.json release/manifest.json release/public-files.txt src/rag/release_verification.py tests/test_release_verification.py tests/test_official_artifacts.py
+git commit -m "eval: record v0.3.4 wage arrears regression"
+```
+
+---
+
+### Task 4: Document the evidence boundary and run complete verification
+
+**Files:**
+- Modify: `docs/release/WAGE_ARREARS_QUERY_EXPANSION_DESIGN.md`
+- Modify: `docs/release/WAGE_ARREARS_QUERY_EXPANSION_IMPLEMENTATION_PLAN.md`
+- Modify: `EVAL_REPORT.md`
+- Verify: entire tracked source tree
+
+**Interfaces:**
+- Consumes: verified Task 3 official result and manifest.
+- Produces: auditable report language and a clean review-ready branch.
+
+- [ ] **Step 1: Update only the post-release evidence paragraph**
+
+Record the exact route, collision, Hit@5, and observed Hit@1 counts from the official artifact. State explicitly that the formal 40-question and v0.3.1 reliability metrics were not recomputed or replaced, no generation provider was called, and Qdrant Cloud was not accessed.
+
+- [ ] **Step 2: Run immutable-history checks**
+
+Use `git show 3ec5ade:<path>` and SHA-256 to assert these paths are unchanged from v0.3.4:
+
+```text
+eval/dataset/eval_set.jsonl
+eval/dataset/reliability_stress_v0.3.1.jsonl
+eval/official/ablation_results.json
+eval/official/e2e_results.json
+eval/official/reliability_results.json
+eval/official/reliability_trace.jsonl
+eval/official/reliability_formal_trace.jsonl
+```
+
+- [ ] **Step 3: Run the complete offline verification chain**
+
+```powershell
+uv run pytest -q
+uv run ruff check .
+uv lock --check
+uv run bandit -r src scripts eval -ll
+$env:PYTHONUTF8='1'
+uv run pip-audit --local
+Remove-Item Env:PYTHONUTF8
+uv run python scripts/verify_release.py
+uv build
+uv run pytest tests/test_packaging.py -q
+```
+
+Expected: every command exits zero; no new security ignore is added; source/wheel artifacts exclude `.env`, local indexes, raw traces, and worktree paths.
+
+- [ ] **Step 4: Commit documentation and inspect branch**
+
+```powershell
+git add docs/release/WAGE_ARREARS_QUERY_EXPANSION_DESIGN.md docs/release/WAGE_ARREARS_QUERY_EXPANSION_IMPLEMENTATION_PLAN.md EVAL_REPORT.md
+git commit -m "docs: report v0.3.4 targeted regression"
+git diff --check main...HEAD
+git status --short --branch
+```
+
+Expected: no whitespace errors, the branch is clean, and no merge, tag, push, deployment, or remote mutation has occurred.
