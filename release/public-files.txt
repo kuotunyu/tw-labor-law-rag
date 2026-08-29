@@ -94,6 +94,7 @@ src/rag/ingestion/loader.py
 src/rag/models.py
 src/rag/provider_budget.py
 src/rag/provider_crosscheck.py
+src/rag/qdrant_blue_green.py
 src/rag/qdrant_maintenance.py
 src/rag/release_verification.py
 src/rag/reliability.py
@@ -125,6 +126,7 @@ tests/test_packaging.py
 tests/test_pipeline.py
 tests/test_provider_budget.py
 tests/test_provider_crosscheck.py
+tests/test_qdrant_blue_green.py
 tests/test_qdrant_blue_green_cli.py
 tests/test_qdrant_maintenance.py
 tests/test_refusal_labels.py
