@@ -6,6 +6,7 @@ import subprocess
 import tarfile
 import tomllib
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -14,14 +15,35 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_NAME = "kuotunyu"
 PUBLIC_EMAIL = "61350295+kuotunyu@users.noreply.github.com"
 CURRENT_PROVIDER_EVIDENCE_RELEASE = "v0.3.2 provider safety cross-check"
-CURRENT_PROVIDER_EVIDENCE_DOCUMENTS = (
-    "README.md",
-    "README.en.md",
-    "DESIGN.md",
-    "EVAL_REPORT.md",
-    "docs/release/CLAIM_MATRIX.md",
-    "docs/release/PUBLICATION_BOUNDARY.md",
-    "docs/release/REVIEWER_GUIDE.md",
+CURRENT_PROVIDER_EVIDENCE_DOCUMENTS = {
+    "README.md": 2,
+    "README.en.md": 2,
+    "DESIGN.md": 1,
+    "EVAL_REPORT.md": 1,
+    "docs/release/CLAIM_MATRIX.md": 2,
+    "docs/release/PUBLICATION_BOUNDARY.md": 1,
+    "docs/release/REVIEWER_GUIDE.md": 2,
+    "eval/official/README.md": 1,
+}
+PROVIDER_EVIDENCE_FULL_CLAIM = re.compile(
+    r"Gemini(?: `gemini-3\.5-flash-lite`)?(?: observed)? "
+    r"refusal(?: accuracy)? `(?P<gemini_refusal>[^`]+)`.{0,80}?"
+    r"citation(?: success)? `(?P<gemini_citation>[^`]+)`.{0,80}?"
+    r"(?:estimated )?cost `US\$(?P<gemini_cost>[^`]+)`.{0,80}?"
+    r"OpenAI(?: `gpt-5\.6-luna`)?(?: observed)? "
+    r"refusal(?: accuracy)? `(?P<openai_refusal>[^`]+)`.{0,80}?"
+    r"citation(?: success)? `(?P<openai_citation>[^`]+)`.{0,80}?"
+    r"(?:estimated )?cost `US\$(?P<openai_cost>[^`]+)`",
+    re.DOTALL,
+)
+PROVIDER_EVIDENCE_COMPACT_CLAIM = re.compile(
+    r"Gemini refusal/citation `(?P<gemini_refusal>[^`]+)`/"
+    r"`(?P<gemini_citation>[^`]+)`[、,]\s*cost "
+    r"`US\$(?P<gemini_cost>[^`]+)`[；;].{0,40}?"
+    r"OpenAI `(?P<openai_refusal>[^`]+)`/"
+    r"`(?P<openai_citation>[^`]+)`[、,]\s*"
+    r"`US\$(?P<openai_cost>[^`]+)`",
+    re.DOTALL,
 )
 
 
@@ -94,6 +116,75 @@ def git_tracked_paths() -> set[str]:
     }
 
 
+def provider_evidence_metric_claims(content: str) -> list[dict[str, str]]:
+    matches = [
+        (match.start(), match.groupdict())
+        for pattern in (
+            PROVIDER_EVIDENCE_FULL_CLAIM,
+            PROVIDER_EVIDENCE_COMPACT_CLAIM,
+        )
+        for match in pattern.finditer(content)
+    ]
+    return [claim for _, claim in sorted(matches)]
+
+
+def assert_provider_evidence_doc_contract(relative_path: str, content: str) -> None:
+    claims = provider_evidence_metric_claims(content)
+
+    assert len(claims) == CURRENT_PROVIDER_EVIDENCE_DOCUMENTS[relative_path], (
+        relative_path
+    )
+    assert "gemini-3.5-flash-lite" in content, relative_path
+    assert "gpt-5.6-luna" in content, relative_path
+    assert re.search(
+        r"(?:five requests(?: per provider| each)?|五筆(?: safety cross-check|請求)?)",
+        content,
+        re.IGNORECASE,
+    ), relative_path
+    for claim in claims:
+        assert claim == {
+            "gemini_refusal": "0.8",
+            "gemini_citation": "1.0",
+            "gemini_cost": "0.0022620",
+            "openai_refusal": "1.0",
+            "openai_citation": "1.0",
+            "openai_cost": "0.0026414",
+        }, relative_path
+        assert Decimal(claim["gemini_cost"]) + Decimal(claim["openai_cost"]) == Decimal(
+            "0.0049034"
+        ), relative_path
+    assert "safety cross-check" in content, relative_path
+    assert "v0.1.0" in content, relative_path
+    assert re.search(r"content-free|嚴格不含", content), relative_path
+    assert "question/answer" in content, relative_path
+    assert "provider payload" in content, relative_path
+    assert re.search(r"credentials|憑證", content), relative_path
+
+
+@pytest.mark.parametrize("relative_path", CURRENT_PROVIDER_EVIDENCE_DOCUMENTS)
+def test_current_provider_evidence_docs_pin_completed_release_claims(relative_path):
+    content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+
+    assert_provider_evidence_doc_contract(relative_path, content)
+
+
+def test_current_provider_evidence_docs_validate_every_matching_claim(
+):
+    content = (PROJECT_ROOT / "README.en.md").read_text(encoding="utf-8")
+    canonical_claim = next(
+        paragraph
+        for paragraph in re.split(r"\n\s*\n", content)
+        if "US$0.0022620" in paragraph and "US$0.0026414" in paragraph
+    )
+    drifted_claim = canonical_claim.replace("US$0.0026414", "US$0.0099999")
+
+    with pytest.raises(AssertionError):
+        assert_provider_evidence_doc_contract(
+            "README.en.md",
+            f"{canonical_claim}\n\n{drifted_claim}\n",
+        )
+
+
 def test_current_provider_evidence_docs_publish_completed_release_contract():
     for relative_path in CURRENT_PROVIDER_EVIDENCE_DOCUMENTS:
         content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
@@ -102,13 +193,6 @@ def test_current_provider_evidence_docs_publish_completed_release_contract():
         current_section = content.split(CURRENT_PROVIDER_EVIDENCE_RELEASE, 1)[1]
         current_section = current_section.split("\n## ", 1)[0]
         assert "pending_credentials" not in current_section, relative_path
-
-    official_artifacts_readme = (
-        PROJECT_ROOT / "eval/official/README.md"
-    ).read_text(encoding="utf-8")
-    assert CURRENT_PROVIDER_EVIDENCE_RELEASE in official_artifacts_readme
-    assert "pending_credentials" not in official_artifacts_readme
-
 
 def test_official_provider_trace_documentation_has_token_usage_carve_out():
     content = (PROJECT_ROOT / "eval/official/README.md").read_text(encoding="utf-8")
@@ -206,7 +290,12 @@ def write_completed_provider_crosscheck_fixture(root: Path) -> dict:
     dataset_path.write_bytes(
         (PROJECT_ROOT / contract["dataset"]["path"]).read_bytes()
     )
-    qids = ["stress-001", "stress-002", "stress-003", "stress-041", "stress-042"]
+    reliability_path = root / "eval/official/reliability_trace.jsonl"
+    reliability_path.parent.mkdir(parents=True, exist_ok=True)
+    reliability_path.write_bytes(
+        (PROJECT_ROOT / "eval/official/reliability_trace.jsonl").read_bytes()
+    )
+    qids = ["stress-001", "stress-002", "stress-003", "stress-042", "stress-043"]
     answerable = [True, True, True, False, False]
     provider_rows = {
         "gemini": {
@@ -343,6 +432,141 @@ def test_completed_provider_crosscheck_recomputes_public_evidence(tmp_path):
             "openai": "0.0026414",
         },
     }
+
+
+def test_completed_provider_crosscheck_contract_mismatch_never_reflects_values(tmp_path):
+    module = release_module()
+    contract = write_completed_provider_crosscheck_fixture(tmp_path)
+    marker = "SENSITIVE-MARKER-NEVER-REFLECT"
+    contract["unexpected_private_field"] = marker
+
+    with pytest.raises(module.ReleaseVerificationError) as error:
+        module._verify_provider_crosscheck_contract(tmp_path, contract)
+
+    assert "provider cross-check complete contract fields" in str(error.value)
+    assert marker not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "requested_provider",
+    [
+        ["gemini", "SENSITIVE-LIST-MARKER"],
+        {"provider": "gemini", "marker": "SENSITIVE-OBJECT-MARKER"},
+    ],
+)
+def test_completed_provider_crosscheck_rejects_non_string_requested_provider(
+    tmp_path,
+    requested_provider,
+):
+    module = release_module()
+    contract = write_completed_provider_crosscheck_fixture(tmp_path)
+    trace_path = tmp_path / contract["trace_path"]
+    trace_rows = [json.loads(line) for line in trace_path.read_text().splitlines()]
+    trace_rows[0]["requested_provider"] = requested_provider
+    trace_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in trace_rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        module.ReleaseVerificationError,
+        match="provider cross-check requested provider type",
+    ) as error:
+        module._verify_provider_crosscheck_contract(tmp_path, contract)
+
+    assert "SENSITIVE" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("replacement_qid", "message"),
+    [
+        ("stress-037", "provider cross-check generation eligibility"),
+        ("stress-004", "provider cross-check gemini selected qids"),
+    ],
+)
+def test_completed_provider_crosscheck_rejects_non_selected_qids(
+    tmp_path,
+    replacement_qid,
+    message,
+):
+    module = release_module()
+    contract = write_completed_provider_crosscheck_fixture(tmp_path)
+    trace_path = tmp_path / contract["trace_path"]
+    trace_rows = [json.loads(line) for line in trace_path.read_text().splitlines()]
+    for row in trace_rows:
+        if row["qid"] == "stress-001":
+            row["qid"] = replacement_qid
+    trace_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in trace_rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(module.ReleaseVerificationError, match=message):
+        module._verify_provider_crosscheck_contract(tmp_path, contract)
+
+
+def test_completed_provider_crosscheck_pins_qids_if_reliability_is_co_tampered(
+    tmp_path,
+):
+    module = release_module()
+    contract = write_completed_provider_crosscheck_fixture(tmp_path)
+    reliability_path = tmp_path / "eval/official/reliability_trace.jsonl"
+    reliability_rows = [
+        json.loads(line) for line in reliability_path.read_text().splitlines()
+    ]
+    for row in reliability_rows:
+        if row["qid"] == "stress-001":
+            row["threshold_refused"] = True
+    reliability_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in reliability_rows),
+        encoding="utf-8",
+    )
+
+    trace_path = tmp_path / contract["trace_path"]
+    trace_rows = [json.loads(line) for line in trace_path.read_text().splitlines()]
+    reordered_rows = []
+    for provider in ("gemini", "openai"):
+        rows_by_qid = {
+            row["qid"]: row
+            for row in trace_rows
+            if row["requested_provider"] == provider
+        }
+        replacement = rows_by_qid.pop("stress-001")
+        replacement["qid"] = "stress-004"
+        reordered_rows.extend(
+            [
+                rows_by_qid["stress-002"],
+                rows_by_qid["stress-003"],
+                replacement,
+                rows_by_qid["stress-042"],
+                rows_by_qid["stress-043"],
+            ]
+        )
+    trace_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in reordered_rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        module.ReleaseVerificationError,
+        match="provider cross-check deterministic selected qids",
+    ):
+        module._verify_provider_crosscheck_contract(tmp_path, contract)
+
+
+def test_completed_provider_crosscheck_pins_run_date_to_snapshot(tmp_path):
+    module = release_module()
+    contract = write_completed_provider_crosscheck_fixture(tmp_path)
+    results_path = tmp_path / contract["results_path"]
+    results = json.loads(results_path.read_text(encoding="utf-8"))
+    results["run_date"] = "2026-08-28"
+    results_path.write_text(json.dumps(results), encoding="utf-8")
+
+    with pytest.raises(
+        module.ReleaseVerificationError,
+        match="provider cross-check run date",
+    ):
+        module._verify_provider_crosscheck_contract(tmp_path, contract)
 
 
 @pytest.mark.parametrize(

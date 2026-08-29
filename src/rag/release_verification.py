@@ -62,6 +62,15 @@ PROVIDER_MODELS = {
     "gemini": "gemini-3.5-flash-lite",
     "openai": "gpt-5.6-luna",
 }
+PROVIDER_CROSSCHECK_SNAPSHOT_DATE = "2026-08-29"
+PROVIDER_CROSSCHECK_QIDS = (
+    "stress-001",
+    "stress-002",
+    "stress-003",
+    "stress-042",
+    "stress-043",
+)
+PROVIDER_RELIABILITY_TRACE_PATH = "eval/official/reliability_trace.jsonl"
 PROVIDER_PRICING = {
     "gemini": {
         "input_per_million_usd": "0.30",
@@ -1299,7 +1308,7 @@ def _verify_provider_crosscheck_contract(
         "trace_path": "eval/official/provider_crosscheck_trace.jsonl",
     }
     if contract.get("status") == "pending_credentials":
-        _assert_equal("provider cross-check pending contract", contract, pending_contract)
+        _compare_public_tree("provider cross-check pending contract", contract, pending_contract)
         for artifact_key in ("results_path", "trace_path"):
             if (project_root / contract[artifact_key]).exists():
                 raise ReleaseVerificationError(
@@ -1321,7 +1330,7 @@ def _verify_provider_crosscheck_contract(
             "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f",
         },
     }
-    _assert_equal("provider cross-check complete contract", contract, complete_contract)
+    _compare_public_tree("provider cross-check complete contract", contract, complete_contract)
 
     results_path = project_root / contract["results_path"]
     trace_path = project_root / contract["trace_path"]
@@ -1336,6 +1345,11 @@ def _verify_provider_crosscheck_contract(
         "provider cross-check result schema", results["schema_version"], "1.0"
     )
     _verify_evidence_run_date(results["run_date"])
+    _assert_public_equal(
+        "provider cross-check run date",
+        results["run_date"],
+        PROVIDER_CROSSCHECK_SNAPSHOT_DATE,
+    )
     _assert_public_equal(
         "provider cross-check dataset", results["dataset"], contract["dataset"]
     )
@@ -1353,12 +1367,66 @@ def _verify_provider_crosscheck_contract(
         len(dataset_by_qid),
         len(dataset_rows),
     )
+    reliability_path = project_root / PROVIDER_RELIABILITY_TRACE_PATH
+    _assert_public_equal(
+        "provider cross-check reliability trace exists",
+        reliability_path.is_file(),
+        True,
+    )
+    reliability_rows = _read_jsonl(reliability_path)
+    reliability_by_qid = {row.get("qid"): row for row in reliability_rows}
+    _assert_public_equal(
+        "provider cross-check reliability unique qids",
+        len(reliability_by_qid),
+        len(reliability_rows),
+    )
+    _assert_public_equal(
+        "provider cross-check reliability qid coverage",
+        set(reliability_by_qid),
+        set(dataset_by_qid),
+    )
+    eligible_answerable_qids: list[str] = []
+    eligible_unanswerable_qids: list[str] = []
+    for dataset_row in dataset_rows:
+        qid = dataset_row["qid"]
+        reliability_row = reliability_by_qid[qid]
+        _assert_public_equal(
+            "provider cross-check reliability answerable",
+            reliability_row.get("answerable"),
+            dataset_row["answerable"],
+        )
+        _assert_public_equal(
+            "provider cross-check reliability threshold type",
+            isinstance(reliability_row.get("threshold_refused"), bool),
+            True,
+        )
+        if not reliability_row["threshold_refused"]:
+            target = (
+                eligible_answerable_qids
+                if dataset_row["answerable"]
+                else eligible_unanswerable_qids
+            )
+            target.append(qid)
+    expected_qids = [
+        *eligible_answerable_qids[:3],
+        *eligible_unanswerable_qids[:2],
+    ]
+    _assert_public_equal(
+        "provider cross-check deterministic selection size",
+        len(expected_qids),
+        5,
+    )
+    _assert_public_equal(
+        "provider cross-check deterministic selected qids",
+        expected_qids,
+        list(PROVIDER_CROSSCHECK_QIDS),
+    )
     _assert_public_equal(
         "provider cross-check corpus snapshot",
         results["corpus_snapshot"],
         {
             "path": "release/corpus_snapshot.json",
-            "snapshot_date": "2026-08-29",
+            "snapshot_date": PROVIDER_CROSSCHECK_SNAPSHOT_DATE,
             "laws": 15,
             "articles": 884,
         },
@@ -1416,6 +1484,11 @@ def _verify_provider_crosscheck_contract(
             "provider cross-check trace fields", set(row), PROVIDER_TRACE_FIELDS
         )
         provider = row["requested_provider"]
+        _assert_public_equal(
+            "provider cross-check requested provider type",
+            type(provider) is str,
+            True,
+        )
         _assert_public_equal(
             "provider cross-check requested provider",
             provider in grouped,
@@ -1496,6 +1569,11 @@ def _verify_provider_crosscheck_contract(
             row["answerable"],
             dataset_by_qid[row["qid"]]["answerable"],
         )
+        _assert_public_equal(
+            "provider cross-check generation eligibility",
+            reliability_by_qid[row["qid"]]["threshold_refused"],
+            False,
+        )
         expected_cost = _provider_cost(
             provider,
             row["input_tokens"],
@@ -1508,22 +1586,32 @@ def _verify_provider_crosscheck_contract(
         )
         grouped[provider].append(row)
 
-    expected_qids: set[str] | None = None
     requests: dict[str, int] = {}
     estimated_costs: dict[str, str] = {}
     for provider in contract["required_providers"]:
         provider_rows = grouped[provider]
-        qids = {row["qid"] for row in provider_rows}
+        qids = [row["qid"] for row in provider_rows]
         _assert_public_equal(
             f"provider cross-check {provider} rows", len(provider_rows), 5
         )
         _assert_public_equal(
-            f"provider cross-check {provider} unique qids", len(qids), 5
+            f"provider cross-check {provider} unique qids", len(set(qids)), 5
         )
-        if expected_qids is None:
-            expected_qids = qids
-        else:
-            _assert_public_equal("provider cross-check matched qids", qids, expected_qids)
+        _assert_public_equal(
+            f"provider cross-check {provider} answerable rows",
+            sum(row["answerable"] for row in provider_rows),
+            3,
+        )
+        _assert_public_equal(
+            f"provider cross-check {provider} unanswerable rows",
+            sum(not row["answerable"] for row in provider_rows),
+            2,
+        )
+        _assert_public_equal(
+            f"provider cross-check {provider} selected qids",
+            qids,
+            expected_qids,
+        )
         metrics = _provider_metrics(provider, provider_rows)
         _assert_public_equal(
             "provider cross-check provider metrics mapping",
