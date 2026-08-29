@@ -9,6 +9,10 @@
 - **historical-observation**:來自保留在本機、不公開的 raw run 或實際使用觀察;公開文件保留明確邊界,不宣稱可重生。
 - **configuration**:可由 committed defaults、script target list、lock、workflow 或 package artifact 核對。
 
+## v0.3.2 provider safety cross-check
+
+Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 都已完成五筆請求。Gemini observed refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI observed refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。這是 safety cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估；公開 trace 嚴格 content-free，不含 question/answer text、provider payload 或 credentials。
+
 ## Matrix
 
 | Public claim / location | Class | Config / source | Trace | Result | Test / verifier | Boundary |
@@ -29,7 +33,7 @@
 | Faithfulness 4.90/5、relevancy 5.00/5;README、README.en、DESIGN、EVAL_REPORT | archived-provider/re-aggregated | generator `openai/gpt-5.1`;judge `openai/gpt-5-mini` recorded in result | e2e trace 29 numeric judge objects | e2e results | `compute_e2e_metrics`;official tests;release verifier | 無完整答案、judge reason/provider response,不可公開重生或獨立複判 |
 | eval-10 正解未進主設定 top-5,LLM 誤拒;EVAL_REPORT case 1 | offline-recomputed outcome + historical interpretation | dataset ground truth | ablation/e2e traces | official results | release verifier validates rank/refusal grids | 原因是文件中的 interpretation,不當作因果證明 |
 | 逐引用帶法規來源 URL、最後修正日與生效日，legacy payload 仍可讀;README、API/UI | configuration + executable verification | corpus metadata、chunk payload、API schema、UI renderer | — | — | loader/chunker/vector-store/API/UI tests | UI 只把 `https://law.moj.gov.tw/` 來源渲染成連結；既有雲端 payload 未重建前只顯示原有欄位 |
-| Gemini 3.5 Flash-Lite／GPT-5.6 Luna cross-check 各 US$5 硬帽且目前 `pending_credentials`;README、EVAL_REPORT、DESIGN | configuration + fail-closed contract | `src/rag/provider_budget.py`;`src/rag/provider_crosscheck.py`;`eval/run_provider_crosscheck.py`;manifest | 正式 trace 不應存在 | 正式 result 不應存在 | provider budget/cross-check tests；release verifier 拒絕 pending 狀態下出現 artifact | 實際 prompt 在 I/O 前以 UTF-8 byte 上界檢查，maxima ≤20k/1,024，raw path 限於 ignored `eval/runs/`；未使用其他專案金鑰、替代模型或 placeholder |
+| Gemini 3.5 Flash-Lite／GPT-5.6 Luna safety cross-check 各五筆、US$5 硬帽；Gemini refusal/citation `0.8`/`1.0`、cost `US$0.0022620`；OpenAI `1.0`/`1.0`、`US$0.0026414`;README、EVAL_REPORT、DESIGN | offline-recomputed + fail-closed contract | `src/rag/provider_budget.py`;`src/rag/provider_crosscheck.py`;`eval/run_provider_crosscheck.py`;manifest | `eval/official/provider_crosscheck_trace.jsonl`（strict content-free） | `eval/official/provider_crosscheck_results.json` | provider budget/cross-check tests；release verifier 重算 completed contract | safety cross-check 不是正式模型品質評估；trace 不含 question/answer text、provider payload 或 credentials，raw path 限於 ignored `eval/runs/` |
 | Official traces 無 prompt/provider response/API metadata/private path/PII;README、official README、PUBLICATION_BOUNDARY | offline-verified schema/privacy | strict field allowlists | ablation、e2e、reliability traces | — | `tests/test_release_verification.py`;`tests/test_official_artifacts.py`;release verifier | Scanner 回報只含 path/category/location,不回傳命中值 |
 | Publishable Git history 只涵蓋 heads/tags/remotes，並逐 commit 掃描 path/content/binary/identity；PUBLICATION_BOUNDARY、REVIEWER_GUIDE | offline-verified publication boundary | `release/manifest.json:publication.history` | — | verifier 的 `publication.history_commits` 與 `history_ref_namespaces` | `tests/test_release_verification.py`;`scripts/verify_release.py` | 本機 `refs/archive/*` recovery evidence 不屬 publication graph；一般 `archive/*` branch 仍須稽核 |
 | 兩份 sample 可隨 source archive 再散布;README、README.en、OGDL_ATTRIBUTION | configuration + official license | dataset 18290、OGDL 1.0、sample source URLs | — | `release/manifest.json` snapshot hashes | release verifier核對 hash/last-amended/provider URL | 必須保留 attribution;sample 不改授權為 MIT |
@@ -40,6 +44,6 @@
 
 適合履歷或 portfolio 的一句話:
 
-> Built a Traditional-Chinese hybrid RAG system and shipped a source-only public portfolio release with an auditable 15-law/884-article snapshot, per-citation legal-source provenance, a 40-question formal baseline, a 60-question reliability stress suite, eight retrieval ablations, offline-recomputed Hit@5/MRR/refusal evidence, privacy-reduced traces, and explicit archived/pending provider-evidence boundaries.
+> Built a Traditional-Chinese hybrid RAG system and shipped a source-only public portfolio release with an auditable 15-law/884-article snapshot, per-citation legal-source provenance, a 40-question formal baseline, a 60-question reliability stress suite, eight retrieval ablations, offline-recomputed Hit@5/MRR/refusal evidence, privacy-reduced traces, and an explicitly limited dual-provider safety cross-check.
 
 不應寫成「fully reproducible LLM evaluation」或「100% answerability classifier」;前者缺少可公開重生的 provider judgments,後者被 eval-32 的 0.9797 與正式集外 0.0146 誤拒共同否定。

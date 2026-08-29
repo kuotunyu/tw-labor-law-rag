@@ -6,6 +6,10 @@
 
 40 題資料集、8 組 ablation、Hit@5、MRR、latency 算術、answer/refusal counts 與設定一致性,可由 `scripts/verify_release.py` 從 committed privacy-reduced traces 離線重算。Faithfulness/relevancy 則是 archived provider evidence:公開 repository 只保留 numeric verdicts 供再聚合,沒有完整生成答案、judge reason 或 provider response,因此不能宣稱可從公開 evidence 重新產生 judge 決定。逐項映射見 [docs/release/CLAIM_MATRIX.md](docs/release/CLAIM_MATRIX.md)。
 
+## v0.3.2 provider safety cross-check
+
+Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 都完成五筆 safety cross-check：Gemini observed refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI observed refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 維持嚴格 content-free：不含 question/answer text、provider payload 或 credentials。這是執行器安全邊界的 cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。
+
 ## 1. 為什麼是 Hybrid Search,不是純向量?
 
 **選擇**:BM25(關鍵字)+ BGE-M3(向量),用 RRF 融合。
@@ -64,7 +68,7 @@
 
 **理由**:RAGAS 的內建 prompt 是英文優先設計,套在繁體中文法律文本上,經驗上常出現評分標準與語言習慣對不齊的問題(例如對「精簡但正確」的中文法律用語誤判為資訊不足)。這兩個指標的定義其實不複雜,自己刻一個中文 rubric、附上 1–5 分的具體錨點描述(而不是讓模型自由發揮),反而更容易掌控評分標準、也更容易在 EVAL_REPORT.md 裡向讀者交代「這個分數是怎麼打出來的」。一次呼叫評兩個指標也把 judge 的 API 呼叫量減半,在免費/低額度方案上很有感。
 
-**Tradeoff**:自建 judge 需要自己驗證評分穩定性(RAGAS 有社群驗證過的 prompt),且既有 `v0.1.0` 正式評分只用單一 provider(gpt-5-mini)。`v0.3.1` 已加入 Gemini／OpenAI 各 US$5 硬上限的 cross-check 執行器，但本機沒有本專案專用金鑰，因此狀態明確維持 `pending_credentials`，不以其他專案金鑰或替代模型補數字。
+**Tradeoff**:自建 judge 需要自己驗證評分穩定性(RAGAS 有社群驗證過的 prompt),且既有 `v0.1.0` 正式評分只用單一 provider(gpt-5-mini)。`v0.3.2` 已完成 Gemini／OpenAI 各 US$5 硬上限的五筆 safety cross-check；這些 observed safety metrics 不以其他專案金鑰、替代模型或 placeholder 補數字，也不改寫 formal baseline。
 
 ## 7. Qdrant:為什麼 local/server 雙模式?
 
@@ -115,7 +119,7 @@
 
 **理由**:事後統計只能描述已經花掉的錢，不能限制下一次呼叫。先各跑 5 題、確認模型與 usage 完整後才擴張，可同時驗證指定模型沒有 fallback，並把故障半徑限制在很小的初始批次。
 
-**Tradeoff**:保守 maxima 會提早停止而留下未使用額度；這是刻意的安全偏向。公開 trace 只留 qid、provider/model、拒答、引用數、token、成本與 0/1 verdict，完整問題／答案只能進 ignored `eval/runs/`，任意 `--work-dir` 若逃出該目錄會在呼叫前被拒絕。目前因缺本專案專用金鑰而沒有正式 trace，release contract 明確標記 `pending_credentials`。
+**Tradeoff**:保守 maxima 會提早停止而留下未使用額度；這是刻意的安全偏向。公開 trace 只留 qid、provider/model、拒答、引用數、token、成本與 0/1 verdict，完整問題／答案只能進 ignored `eval/runs/`，任意 `--work-dir` 若逃出該目錄會在呼叫前被拒絕。`v0.3.2` 已完成兩家各五筆的 safety batch；公開 trace 仍嚴格不留 question/answer text、provider payload 或 credentials。
 
 ## 13. 為什麼升級 Transformers 5.x 但保留 FlagEmbedding？
 

@@ -28,9 +28,11 @@ The 60-row stress trace and 40-row formal-guard reliability trace each permit ex
 
 `qid`, `answerable`, `rank`, `top_score`, `threshold_refused`, `elapsed_ms`.
 
-The provider cross-check is currently `pending_credentials`, so neither of its official result/trace files may exist. If credentials are supplied later, only the reducer's content-free allowlist may be exported after both providers complete the initial safety batch; raw output must remain inside ignored `eval/runs/`, and the release contract must then be deliberately revised and re-verified rather than silently replacing the pending state.
+## v0.3.2 provider safety cross-check
 
-The official result files also record the model identifiers needed to interpret historical evidence. Model identifiers such as `openai/gpt-5.1` are evaluation provenance; request IDs, headers, endpoints, token usage, credentials, or provider response payloads are not retained.
+Both providers completed five requests: Gemini observed refusal accuracy `0.8`, citation success `1.0`, and estimated cost `US$0.0022620`; OpenAI observed refusal accuracy `1.0`, citation success `1.0`, and estimated cost `US$0.0026414`. This is a safety cross-check, not a replacement for the `v0.1.0` formal evidence baseline or a formal model-quality evaluation. Its public trace is strictly content-free: it contains no question/answer text, provider payload, or credentials. Only the reducer's content-free allowlist is exported; raw output remains inside ignored `eval/runs/`.
+
+The official result files also record the model identifiers needed to interpret historical evidence. Model identifiers such as `openai/gpt-5.1` are evaluation provenance; request IDs, headers, endpoints, token usage, credentials, or provider response payloads are not retained. Provider cross-check traces retain only their strict allowlisted metadata and do not include question/answer text.
 
 ## Explicit exclusions
 
