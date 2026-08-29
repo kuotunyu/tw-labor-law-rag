@@ -1,6 +1,6 @@
 # Wage-Arrears Query Expansion Design
 
-**Status:** Approved for implementation on 2026-08-30
+**Status:** Implemented and verified on 2026-08-30
 
 **Target branch:** `feat/v0.3.4-wage-arrears`
 
