@@ -109,6 +109,31 @@ def test_answerer_parses_citations():
     assert llm.calls[0]["temperature"] == 0.0
 
 
+def test_answerer_expands_retrieval_but_keeps_original_generation_question():
+    captured = {}
+
+    class RecordingRetriever:
+        def retrieve(self, query, top_k):
+            captured["query"] = query
+            return [make_hit("c1", "勞動基準法", "第 14 條", "證據內容")]
+
+    question = "公司一直拖欠薪水，我可以直接離職嗎？"
+    legal_terms = (
+        "勞動基準法 第十四條 不依勞動契約給付工作報酬 "
+        "勞工得不經預告終止契約"
+    )
+    llm = FakeLLM("依 [1] 回答。")
+    pipeline = RetrievalPipeline(
+        RecordingRetriever(), reranker=None, top_k_retrieve=20, top_k_final=5
+    )
+
+    Answerer(pipeline, llm).answer(question)
+
+    assert captured["query"] == f"{question} {legal_terms}"
+    assert question in llm.calls[0]["user"]
+    assert legal_terms not in llm.calls[0]["user"]
+
+
 def test_answerer_exposes_provenance_and_accepts_legacy_payloads():
     current = make_hit("c1", "勞動基準法", "第 24 條", "加班費規定...")
     current.payload.update(
