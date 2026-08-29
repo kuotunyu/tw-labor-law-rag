@@ -244,11 +244,14 @@ Article 14 expansion does not activate.
 ### Execution and evidence boundary
 
 The runner reuses the repository's pinned local retrieval configuration and
-existing read-only corpus/index state. It performs no generation-provider call,
-uses no Gemini or OpenAI key, does not write to Qdrant Cloud, and does not rebuild
-or modify a collection. If the required local index or pinned model snapshot is
-unavailable, it fails with an explicit prerequisite message instead of silently
-substituting a live service.
+audited corpus snapshot. It performs no generation-provider call, uses no Gemini
+or OpenAI key, and never connects to or writes Qdrant Cloud. Because the canonical
+checkout intentionally retains no reusable local vector index, the runner may
+construct an isolated, disposable local Qdrant under its ignored `eval/runs/`
+work directory. It must verify both pinned model snapshots are already cached
+before corpus materialization or index construction; a missing snapshot fails
+with an explicit prerequisite message instead of downloading a replacement.
+The disposable index and raw question traces are never committed or exported.
 
 The committed result records dataset hash, code revision, retrieval configuration,
 per-case expansion decision, positive-case rank for Article 14, and aggregate
