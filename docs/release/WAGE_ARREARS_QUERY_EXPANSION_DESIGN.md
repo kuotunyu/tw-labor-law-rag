@@ -213,7 +213,7 @@ offline evidence is committed and verified.
 
 ## Post-release Targeted Regression Evidence
 
-**Status:** Approved for implementation on 2026-08-30
+**Status:** Implemented and verified on 2026-08-30
 
 The first post-release evidence task adds a small, separately versioned offline
 regression suite for the v0.3.4 routing rule. It must not replace, edit, or
@@ -257,6 +257,20 @@ The committed result records dataset hash, code revision, retrieval configuratio
 per-case expansion decision, positive-case rank for Article 14, and aggregate
 counts. It excludes question text, secrets, endpoints, and machine-specific
 paths. Re-running the same inputs must produce the same normalized artifact.
+
+### Verified result
+
+The committed v0.3.4 targeted artifact records 20/20 correct route decisions:
+all 10 positives received the Article 14 expansion, and all 10 collision cases
+avoided it. Labor Standards Act Article 14 ranked first for every positive case,
+so both Hit@5 and the observational Hit@1 count are 10/10. The release verifier
+recomputes these counts from the frozen dataset and privacy-reduced per-case rows.
+
+This run used the audited 15-law, 884-article snapshot, pinned local BGE-M3 and
+bge-reranker-v2-m3 snapshots, and an isolated local Qdrant. It made no generation
+provider call and never accessed Qdrant Cloud. The historical 40-question formal
+dataset, 60-question reliability dataset, and all earlier official artifacts were
+not recomputed or replaced.
 
 ### Acceptance criteria
 

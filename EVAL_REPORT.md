@@ -97,6 +97,8 @@ fixed 的 hit@5 略高(1.000 vs 0.967),但 structure 的 MRR 明顯較好(0.906 
 
 > **v0.3.4 緩解邊界**：runtime 現在只在「欠薪」與「勞工立即離職」兩組已審閱 cue 同時命中時，套用決定論式第 14 條檢索擴展。這是經測試的路由契約，不是對上述歷史 `eval-10` 結果或整體指標的重新計算。
 
+> **v0.3.4 專項離線回歸**：另以 20 題凍結資料集驗證上述邊界；10/10 正例均觸發第 14 條擴展、10/10 碰撞例均未誤觸發，且正例的《勞動基準法》第 14 條 Hit@5 與觀察性 Hit@1 都是 10/10。此結果由 pinned 本機 BGE-M3／bge-reranker-v2-m3、15 部法規的已稽核 snapshot 與一次性 local Qdrant 產生，未呼叫生成模型或 Qdrant Cloud。它是獨立的 v0.3.4 regression evidence，不取代本節歷史 `eval-10` 數字，也未改寫 40 題 formal 或 60 題 reliability 指標。
+
 ### 案例 2:eval-17「病假」— BM25 詞彙不匹配 + RRF 稀釋,reranker 救回
 
 「病假」在法規中叫「普通傷病假」,BM25 完全比對不到(structure/bm25 漏掉);純向量有撈到,但 structure/hybrid 的 RRF 把 BM25 的雜訊候選混入後,正解被擠出 top-5;加 reranker 後救回。單一案例完整走過「發現 2」的機制,也是 rubric 上「hybrid 不是免費午餐」的證據。
