@@ -36,7 +36,70 @@ def test_server_store_uses_secret_api_key_and_public_byok_blocks_writes(monkeypa
     with pytest.raises(RuntimeError, match="read-only Qdrant runtime"):
         store.recreate_collection("labor_laws_structure", 1024)
     with pytest.raises(RuntimeError, match="read-only Qdrant runtime"):
+        store.create_collection("labor_laws_candidate_structure", 1024)
+    with pytest.raises(RuntimeError, match="read-only Qdrant runtime"):
         store.upsert_chunks("labor_laws_structure", [], np.empty((0, 1024)))
+
+
+def test_create_collection_refuses_existing_without_delete(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        def collection_exists(self, name):
+            calls.append(("exists", name))
+            return True
+
+        def create_collection(self, **kwargs):
+            calls.append(("create", kwargs))
+
+        def delete_collection(self, name):
+            calls.append(("delete", name))
+
+    monkeypatch.setattr(vector_store, "QdrantClient", FakeClient)
+    store = vector_store.VectorStore(
+        Settings(_env_file=None, qdrant_mode="server", qdrant_url="https://example.test")
+    )
+
+    with pytest.raises(ValueError, match="already exists"):
+        store.create_collection("labor_laws_candidate_structure", dim=1024)
+
+    assert calls == [("exists", "labor_laws_candidate_structure")]
+
+
+def test_create_collection_creates_absent_target_without_delete(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        def collection_exists(self, name):
+            calls.append(("exists", name))
+            return False
+
+        def create_collection(self, **kwargs):
+            calls.append(("create", kwargs))
+
+        def delete_collection(self, name):
+            calls.append(("delete", name))
+
+    monkeypatch.setattr(vector_store, "QdrantClient", FakeClient)
+    store = vector_store.VectorStore(
+        Settings(_env_file=None, qdrant_mode="server", qdrant_url="https://example.test")
+    )
+
+    store.create_collection("labor_laws_candidate_structure", dim=1024)
+
+    assert calls[0] == ("exists", "labor_laws_candidate_structure")
+    operation, kwargs = calls[1]
+    assert operation == "create"
+    assert kwargs["collection_name"] == "labor_laws_candidate_structure"
+    assert kwargs["vectors_config"].size == 1024
+    assert kwargs["vectors_config"].distance == vector_store.qm.Distance.COSINE
+    assert len(calls) == 2
 
 
 def test_upsert_rejects_chunk_vector_count_mismatch_when_assertions_are_disabled(
