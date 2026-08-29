@@ -55,6 +55,10 @@ Streamlit 側邊欄的「回答模型」只顯示 API `/models` 回傳的已設�
 
 Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.json` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，最多保留 1,000 個未過期的匿名工作階段。公開前已完成 Key 隔離、唯讀權限與免費 `cpu-basic` 驗收；完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
 
+### 人工更新 Qdrant 法規索引
+
+雲端法規索引只接受有人值守的 blue-green 更新。先用 `scripts/rebuild_qdrant_blue_green.py` dry-run 驗證本機 official archives、normalized corpus 與 committed snapshot 完全一致；execute mode 另要求 temporary writer key 與重複 candidate 名稱，且只建立新 pair，不覆寫、重建或刪除正式 collections。完整指令、private cutover 與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)；安全邊界與失敗模型見 [blue-green Qdrant maintenance design](docs/release/BLUE_GREEN_QDRANT_MAINTENANCE_DESIGN.md)。
+
 ## 架構
 
 ```mermaid

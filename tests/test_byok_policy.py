@@ -131,3 +131,36 @@ def test_hugging_face_runbook_requires_zero_cost_cpu_and_forbids_paid_fallback()
     assert "replica" in runbook
     assert "`t4-small`" not in runbook
     assert "3600 秒" not in runbook
+
+
+def test_runbook_requires_blue_green_and_forbids_in_place_cloud_rebuild():
+    runbook = (PROJECT_ROOT / "docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "rebuild_qdrant_blue_green.py" in runbook
+    assert "QDRANT_WRITER_API_KEY" in runbook
+    assert "--confirm-candidate-base" in runbook
+    assert "不得對正式 collection 執行 build_index.py" in runbook
+    assert "撤銷 temporary writer key" in runbook
+    assert "舊 COLLECTION_NAME" in runbook
+    assert "rollback" in runbook
+
+
+def test_runbook_keeps_refresh_manual_and_free():
+    runbook = (PROJECT_ROOT / "docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "不建立排程" in runbook
+    assert "CPU Basic" in runbook
+    assert "Qdrant Free" in runbook
+    assert "不自動刪除" in runbook
+
+
+def test_readme_links_safe_manual_qdrant_maintenance():
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "### 人工更新 Qdrant 法規索引" in readme
+    assert "scripts/rebuild_qdrant_blue_green.py" in readme
+    assert "BLUE_GREEN_QDRANT_MAINTENANCE_DESIGN.md" in readme

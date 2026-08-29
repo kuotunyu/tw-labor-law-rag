@@ -885,7 +885,7 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
-    assert report["publication"]["files"] == 138
+    assert report["publication"]["files"] == 146
     expected_history = len(
         {
             line
@@ -938,6 +938,14 @@ def test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions():
     assert "docs/release/HUGGINGFACE_ZERO_COST_IMPLEMENTATION_PLAN.md" in tracked
     assert "docs/release/RELEASE_EVOLUTION_DESIGN.md" in tracked
     assert "docs/release/RELEASE_EVOLUTION_IMPLEMENTATION_PLAN.md" in tracked
+    assert "docs/release/BLUE_GREEN_QDRANT_MAINTENANCE_DESIGN.md" in tracked
+    assert "docs/release/BLUE_GREEN_QDRANT_MAINTENANCE_IMPLEMENTATION_PLAN.md" in tracked
+    assert "scripts/rebuild_qdrant_blue_green.py" in tracked
+    assert "src/rag/qdrant_blue_green.py" in tracked
+    assert "src/rag/qdrant_maintenance.py" in tracked
+    assert "tests/test_qdrant_blue_green.py" in tracked
+    assert "tests/test_qdrant_blue_green_cli.py" in tracked
+    assert "tests/test_qdrant_maintenance.py" in tracked
     forbidden_prefixes = (
         ".claude/",
         ".worktrees/",

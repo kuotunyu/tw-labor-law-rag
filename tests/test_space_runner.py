@@ -149,9 +149,10 @@ def test_docker_build_does_not_retain_uv_download_cache():
     assert "uv sync --frozen --no-dev --no-cache" in dockerfile
 
 
-def test_byok_runbook_passes_the_private_corpus_path_to_index_builder():
+def test_byok_runbook_uses_create_only_blue_green_builder():
     runbook = (
         Path(__file__).parents[1] / "docs" / "deployment" / "BYOK_HUGGINGFACE_RUNBOOK.md"
     ).read_text(encoding="utf-8")
 
-    assert "scripts/build_index.py --strategy all --corpus $env:DATA_DIR" in runbook
+    assert "scripts/rebuild_qdrant_blue_green.py --execute" in runbook
+    assert "scripts/build_index.py --strategy all --corpus $env:DATA_DIR" not in runbook
