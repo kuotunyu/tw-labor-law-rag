@@ -15,6 +15,7 @@ data/sample/勞工請假規則.json
 docker-compose.yml
 docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md
 docs/release/BLUE_GREEN_QDRANT_MAINTENANCE_DESIGN.md
+docs/release/BLUE_GREEN_QDRANT_MAINTENANCE_IMPLEMENTATION_PLAN.md
 docs/release/CLAIM_MATRIX.md
 docs/release/HUGGINGFACE_ZERO_COST_DESIGN.md
 docs/release/HUGGINGFACE_ZERO_COST_IMPLEMENTATION_PLAN.md
