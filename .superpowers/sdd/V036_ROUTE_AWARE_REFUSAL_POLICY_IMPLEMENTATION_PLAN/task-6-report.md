@@ -202,3 +202,234 @@ rg -n 'build_answerer|build_llm|LLMAdapter|RoutedLLM|Gemini|OpenAI' eval/run_sev
 ```
 
 Result: official artifact absent; the runner scan returned no matches.
+
+---
+
+## Review fix round 1/5 — authoritative rerun evidence
+
+This section supersedes the initial run above for review and provenance. The
+controller approved a narrow contract amendment: Task 5 schema `1.2` and
+`eval/dataset/README.md` supersede the stale Task 6 instructions to reaggregate
+rounded v0.3.1 trace scores and publish schema `1.0`. All 130 rows below came
+from one fresh offline pipeline with unrounded scores. The v0.3.1 values were
+used only as metric baselines, never as decision inputs.
+
+### Additional RED evidence
+
+Each review fix began with a focused failing test:
+
+1. The Hugging Face import-order subprocess test detected model-library import
+   before the offline environment existed.
+2. The reranker cache-only test observed that snapshot resolution omitted
+   `local_files_only=True`.
+3. The local pipeline test observed that index/reranker construction did not
+   explicitly force local-only resolution and did not bind the resolved device.
+4. The guard-route disagreement test showed that planned routes replaced the
+   pipeline's returned routes rather than failing closed.
+5. The zero-hit target test exposed the hard-coded `has_hits=True` decision.
+6. The provenance test lacked decision-relevant `rrf_k` and an exact resolved
+   execution device; the dirty-tree test lacked a clean-revision precondition.
+7. The NO-GO envelope test failed because no durable diagnostic builder or
+   offline replay function existed.
+8. The real-main persistence test failed with argparse exit `2` because
+   `--diagnostics-output` did not exist:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py::test_runner_main_persists_replayable_no_go_without_official_export -q -p no:cacheprovider
+```
+
+```text
+1 failed in 1.05s
+```
+
+### GREEN and mutation evidence
+
+The fixed focused policy suite:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py -q -p no:cacheprovider
+```
+
+```text
+89 passed in 4.12s
+```
+
+The cache-only/import-order, independent no-LLM construction, real-main NO-GO,
+and replay-mutation checks were then rerun together:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py::test_offline_flag_precedes_every_hugging_face_import_snapshot tests/test_embedding_cache.py::test_offline_reranker_resolves_snapshot_local_only tests/test_severance_refusal_policy.py::test_local_pipeline_forces_both_model_loaders_local_only_without_llm tests/test_severance_refusal_policy.py::test_runner_main_persists_replayable_no_go_without_official_export tests/test_severance_refusal_policy.py::test_no_go_replay_rejects_mutated_candidate_aggregate -q -p no:cacheprovider
+```
+
+```text
+5 passed in 3.50s
+```
+
+The mutation test changes a retained candidate aggregate and proves replay
+rejects it with `NO-GO evidence replay mismatch`.
+
+Broader pre-run verification:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py tests/test_embedding_cache.py tests/test_reliability.py tests/test_reliability_dataset.py tests/test_pipeline.py tests/test_refusal_policy.py tests/test_config.py tests/test_answerer.py tests/test_factory.py -q -p no:cacheprovider
+```
+
+```text
+267 passed in 9.66s
+```
+
+```powershell
+uv run ruff check .
+```
+
+```text
+All checks passed!
+```
+
+### Clean implementation revision
+
+The implementation and amended contract were committed before calibration:
+
+```text
+192fb7081132d1de5eed52d5b29ad84737f951f2
+fix: preserve replayable refusal no-go evidence
+```
+
+Immediately before the official calibration command,
+`git status --porcelain --untracked-files=all` returned no output, and both the
+official artifact and diagnostic output were absent. The diagnostic provenance
+now binds that clean implementation SHA, resolved `execution_device: cuda`,
+`rrf_k: 60`, pinned model revisions, input hashes, and zero provider counters.
+
+### Fresh 130-query official calibration rerun
+
+Exact command:
+
+```powershell
+$env:TRANSFORMERS_OFFLINE = '1'
+$env:HF_HUB_OFFLINE = '1'
+uv run python eval/run_severance_refusal_policy.py --offline --device auto --export-official
+```
+
+Observed result:
+
+- exit code `1`, the deliberate NO-GO status;
+- corpus snapshot audit passed;
+- structure index: `884 chunks, 884 points, 191.5s`;
+- fixed index: `481 chunks, 481 points, 50.6s`;
+- fresh target `30/30`, stress `60/60`, and formal `40/40` completed;
+- every returned guard route matched its separately planned route;
+- `selected_threshold: null`;
+- all seven candidates list only `target` in `failed_gates`;
+- `eval/official/severance_refusal_policy_v0.3.6.json` remained absent;
+- `eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json` was written.
+
+The diagnostic is `40,358` bytes with SHA-256
+`508b1e8e0d176153f08fc6ba80a89bc2ee0c5a3d54fb3ad9081de4ff6462d46f`.
+It contains exactly 30 raw target observations, 60 fresh stress rows, 40 fresh
+formal rows, and seven candidate aggregates. Provider adapters and requests are
+both exactly zero.
+
+### Reproduced gates and diagnosis
+
+The review rerun reproduced the original diagnosis exactly for all candidates
+`0`, `0.005`, `0.01`, `0.015`, `0.02`, `0.025`, and `0.03`:
+
+| Gate | Fresh result | Required | Status |
+|---|---:|---:|:---:|
+| Target contracts | 27/30 | 30/30 | fail |
+| Stress false refusals | 0/40 | 0/40 | pass |
+| Stress direct unanswerable | 17/20 (`0.85`) | at least 17/20 | pass |
+| Formal Hit@5 | `1.0` | at least `1.0` | pass |
+| Formal MRR@10 | `0.9388888888888888` | at least `0.9388888888888888` | pass |
+| Formal false refusals | 0/30 | 0/30 | pass |
+
+The exact retained target failures also reproduced:
+
+```text
+severance-policy-010 hit_count=5 routes=[severance_comparison]
+  勞工退休金條例|第 12 條 rank=1; second required source absent
+  top_score=0.5001251697514135
+severance-policy-014 hit_count=5 routes=[severance_comparison]
+  勞工退休金條例|第 12 條 rank=1; second required source absent
+  top_score=0.9620363047907355
+severance-policy-027 hit_count=5 routes=[] source_ranks={}
+  top_score=0.02350945240753301
+```
+
+The first two failures remain retrieval-quality/root-cause work: the second
+required authority misses Top 5 despite five returned hits. The third is a
+reviewed target-contract/global-policy interaction: no special route applies,
+so the unchanged global `0.03` refuses its `0.02350945240753301` score. None is
+repairable by calibrating the severance-route threshold grid. The conservative
+NO-GO therefore remains correct; no dataset, gate, score, global/route
+threshold, expected `0.015`, or production setting was changed.
+
+### Replay, privacy, and publication boundary
+
+Exact replay command and result:
+
+```powershell
+uv run python -c "import json; from pathlib import Path; from eval import _bootstrap; from rag.severance_refusal_policy import replay_no_go_evidence; p=Path('eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json'); e=json.loads(p.read_text(encoding='utf-8')); assert replay_no_go_evidence(e)==e; print('replay_ok=True rows=130 candidates=7')"
+```
+
+```text
+replay_ok=True rows=130 candidates=7
+```
+
+JSON parsing and the exact-key privacy scan both passed:
+
+```powershell
+uv run python -m json.tool eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json > $null
+rg -n '"(question|content|answer|endpoint|url|credential|secret|api_key)"|Users[/\\]|AI-Portfolio' eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json
+```
+
+The scan returned no matches. The diagnostic is explicitly absent from
+`release/public-files.txt`, while the accepted official path remains absent.
+It is durable non-release evidence, not authority to publish `0.015`.
+
+### Post-rerun broader verification
+
+The broader suite including the current release verifier was run after writing
+the diagnostic:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py tests/test_embedding_cache.py tests/test_reliability.py tests/test_reliability_dataset.py tests/test_pipeline.py tests/test_refusal_policy.py tests/test_config.py tests/test_answerer.py tests/test_factory.py tests/test_official_artifacts.py tests/test_release_verification.py -q -p no:cacheprovider
+```
+
+```text
+389 passed, 2 failed in 15.39s
+```
+
+Both failures are the same expected current-branch publication-boundary check:
+the v0.3.6 Task 1–6 tracked files are not in the still-v0.3.5
+`release/public-files.txt`. That set already included the Task 2/Task 6 reports,
+dataset, runner, source, tests, and plan before the new diagnostic README was
+considered. Task 6 deliberately does not mutate Task 7's release allowlist,
+and this NO-GO diagnostic is intentionally non-release. The failures do not
+indicate a policy, replay, privacy, retrieval, or official-artifact regression;
+they accurately prevent this NO-GO branch from being treated as a releasable
+public tree.
+
+The proportional Task 6/retrieval/official suite excluding that known Task 7
+publication binding passed cleanly:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py tests/test_embedding_cache.py tests/test_reliability.py tests/test_reliability_dataset.py tests/test_pipeline.py tests/test_refusal_policy.py tests/test_config.py tests/test_answerer.py tests/test_factory.py tests/test_official_artifacts.py -q -p no:cacheprovider
+```
+
+```text
+285 passed in 8.04s
+```
+
+Final Ruff and diff checks:
+
+```powershell
+uv run ruff check .
+git diff --check
+```
+
+```text
+All checks passed!
+git diff --check: exit 0, no output
+```

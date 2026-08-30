@@ -1,0 +1,1639 @@
+{
+  "candidate_thresholds": [
+    0.0,
+    0.005,
+    0.01,
+    0.015,
+    0.02,
+    0.025,
+    0.03
+  ],
+  "candidates": [
+    {
+      "candidate_threshold": 0.0,
+      "formal": {
+        "answerable": 30,
+        "direct_false_refusals": 0,
+        "hit_at_5": 1.0,
+        "mrr_at_10": 0.9388888888888888,
+        "passed": true,
+        "questions": 40,
+        "unanswerable": 10
+      },
+      "passed": false,
+      "stress": {
+        "answerable": 40,
+        "direct_false_refusals": 0,
+        "direct_unanswerable_coverage": 0.85,
+        "direct_unanswerable_refusals": 17,
+        "passed": true,
+        "questions": 60,
+        "unanswerable": 20
+      },
+      "target": {
+        "collision_contracts": 14,
+        "passed": false,
+        "passed_cases": 27,
+        "positive_generation_allowed": 15,
+        "positive_routes": 15,
+        "positive_sources_at_5": 13,
+        "total": 30
+      }
+    },
+    {
+      "candidate_threshold": 0.005,
+      "formal": {
+        "answerable": 30,
+        "direct_false_refusals": 0,
+        "hit_at_5": 1.0,
+        "mrr_at_10": 0.9388888888888888,
+        "passed": true,
+        "questions": 40,
+        "unanswerable": 10
+      },
+      "passed": false,
+      "stress": {
+        "answerable": 40,
+        "direct_false_refusals": 0,
+        "direct_unanswerable_coverage": 0.85,
+        "direct_unanswerable_refusals": 17,
+        "passed": true,
+        "questions": 60,
+        "unanswerable": 20
+      },
+      "target": {
+        "collision_contracts": 14,
+        "passed": false,
+        "passed_cases": 27,
+        "positive_generation_allowed": 15,
+        "positive_routes": 15,
+        "positive_sources_at_5": 13,
+        "total": 30
+      }
+    },
+    {
+      "candidate_threshold": 0.01,
+      "formal": {
+        "answerable": 30,
+        "direct_false_refusals": 0,
+        "hit_at_5": 1.0,
+        "mrr_at_10": 0.9388888888888888,
+        "passed": true,
+        "questions": 40,
+        "unanswerable": 10
+      },
+      "passed": false,
+      "stress": {
+        "answerable": 40,
+        "direct_false_refusals": 0,
+        "direct_unanswerable_coverage": 0.85,
+        "direct_unanswerable_refusals": 17,
+        "passed": true,
+        "questions": 60,
+        "unanswerable": 20
+      },
+      "target": {
+        "collision_contracts": 14,
+        "passed": false,
+        "passed_cases": 27,
+        "positive_generation_allowed": 15,
+        "positive_routes": 15,
+        "positive_sources_at_5": 13,
+        "total": 30
+      }
+    },
+    {
+      "candidate_threshold": 0.015,
+      "formal": {
+        "answerable": 30,
+        "direct_false_refusals": 0,
+        "hit_at_5": 1.0,
+        "mrr_at_10": 0.9388888888888888,
+        "passed": true,
+        "questions": 40,
+        "unanswerable": 10
+      },
+      "passed": false,
+      "stress": {
+        "answerable": 40,
+        "direct_false_refusals": 0,
+        "direct_unanswerable_coverage": 0.85,
+        "direct_unanswerable_refusals": 17,
+        "passed": true,
+        "questions": 60,
+        "unanswerable": 20
+      },
+      "target": {
+        "collision_contracts": 14,
+        "passed": false,
+        "passed_cases": 27,
+        "positive_generation_allowed": 15,
+        "positive_routes": 15,
+        "positive_sources_at_5": 13,
+        "total": 30
+      }
+    },
+    {
+      "candidate_threshold": 0.02,
+      "formal": {
+        "answerable": 30,
+        "direct_false_refusals": 0,
+        "hit_at_5": 1.0,
+        "mrr_at_10": 0.9388888888888888,
+        "passed": true,
+        "questions": 40,
+        "unanswerable": 10
+      },
+      "passed": false,
+      "stress": {
+        "answerable": 40,
+        "direct_false_refusals": 0,
+        "direct_unanswerable_coverage": 0.85,
+        "direct_unanswerable_refusals": 17,
+        "passed": true,
+        "questions": 60,
+        "unanswerable": 20
+      },
+      "target": {
+        "collision_contracts": 14,
+        "passed": false,
+        "passed_cases": 27,
+        "positive_generation_allowed": 15,
+        "positive_routes": 15,
+        "positive_sources_at_5": 13,
+        "total": 30
+      }
+    },
+    {
+      "candidate_threshold": 0.025,
+      "formal": {
+        "answerable": 30,
+        "direct_false_refusals": 0,
+        "hit_at_5": 1.0,
+        "mrr_at_10": 0.9388888888888888,
+        "passed": true,
+        "questions": 40,
+        "unanswerable": 10
+      },
+      "passed": false,
+      "stress": {
+        "answerable": 40,
+        "direct_false_refusals": 0,
+        "direct_unanswerable_coverage": 0.85,
+        "direct_unanswerable_refusals": 17,
+        "passed": true,
+        "questions": 60,
+        "unanswerable": 20
+      },
+      "target": {
+        "collision_contracts": 14,
+        "passed": false,
+        "passed_cases": 27,
+        "positive_generation_allowed": 15,
+        "positive_routes": 15,
+        "positive_sources_at_5": 13,
+        "total": 30
+      }
+    },
+    {
+      "candidate_threshold": 0.03,
+      "formal": {
+        "answerable": 30,
+        "direct_false_refusals": 0,
+        "hit_at_5": 1.0,
+        "mrr_at_10": 0.9388888888888888,
+        "passed": true,
+        "questions": 40,
+        "unanswerable": 10
+      },
+      "passed": false,
+      "stress": {
+        "answerable": 40,
+        "direct_false_refusals": 0,
+        "direct_unanswerable_coverage": 0.85,
+        "direct_unanswerable_refusals": 17,
+        "passed": true,
+        "questions": 60,
+        "unanswerable": 20
+      },
+      "target": {
+        "collision_contracts": 14,
+        "passed": false,
+        "passed_cases": 27,
+        "positive_generation_allowed": 15,
+        "positive_routes": 15,
+        "positive_sources_at_5": 13,
+        "total": 30
+      }
+    }
+  ],
+  "evidence_class": "non_release_no_go",
+  "expected_threshold": 0.015,
+  "failed_gates": [
+    {
+      "candidate_threshold": 0.0,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.005,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.01,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.015,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.02,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.025,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.03,
+      "gates": [
+        "target"
+      ]
+    }
+  ],
+  "global_threshold": 0.03,
+  "guard_evidence": {
+    "formal": [
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-01",
+        "rank": 3,
+        "reranker_enabled": true,
+        "top_score": 0.10194652082730637
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-02",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9893062422638245
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "severance_comparison"
+        ],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-03",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9640516782107567
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-04",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.976535343307368
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-05",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9835338249524974
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-06",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9873262643069669
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-07",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9834704434423458
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-08",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.995336345047618
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-09",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9940659331606164
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "wage_arrears_termination"
+        ],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-10",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.978508235226327
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-11",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8700461860351454
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-12",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.06681232582952595
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-13",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9844563520692292
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-14",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8944211564084097
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-15",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9980732653366725
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-16",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8104789086703224
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-17",
+        "rank": 2,
+        "reranker_enabled": true,
+        "top_score": 0.5806493135526113
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-18",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8682692948106071
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-19",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9918437513730266
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-20",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8994751304753559
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-21",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9827572224423471
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-22",
+        "rank": 3,
+        "reranker_enabled": true,
+        "top_score": 0.679178699175393
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-23",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9979088937475938
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-24",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.987711402470298
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-25",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.4861485645874417
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-26",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9600626857930734
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-27",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9807288620802312
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-28",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9609517072737735
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-29",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.2596378731521501
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-30",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8358858292978949
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-31",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.012288597529701977
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-32",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.979745309435261
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-33",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.026708464501444845
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-34",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.004297938879407239
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-35",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.003930085574505153
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-36",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.00131472456761498
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-37",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.0005172813339721952
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-38",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.001727458626729702
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-39",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.008577485413711984
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-40",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.0026522597057856566
+      }
+    ],
+    "stress": [
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-001",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.51355411251103
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-002",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9284088005554476
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "severance_comparison"
+        ],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-003",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.4316440795211361
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-004",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8873999002546609
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-005",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.4642031950580839
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-006",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.7348812825926613
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-007",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9076402020521152
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-008",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9908389730779061
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-009",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9888849862785224
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "wage_arrears_termination"
+        ],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-010",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9808759632491112
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-011",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.09252365778158944
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-012",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.16224725549485666
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-013",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9777138144607745
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-014",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.6141047625012857
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-015",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9716716880201136
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-016",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.5865228501684575
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-017",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.6445607764067608
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-018",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9884026381763671
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-019",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.3933850186356973
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-020",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8381505627344117
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-021",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9512329045230109
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-022",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9512329045230109
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-023",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8293538355884482
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-024",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9491062801381662
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-025",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.995207683326861
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-026",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9365176378735215
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-027",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.982151261550011
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-028",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9590776971835221
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-029",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9931760452132232
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-030",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8456877265587688
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-031",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.8415654047865821
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-032",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9771538025943493
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-033",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9926541734255229
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-034",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9616780264794544
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-035",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9931228923417693
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-036",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.039564555132237354
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "severance_comparison"
+        ],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-037",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.3114268601959007
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "wage_arrears_termination"
+        ],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-038",
+        "rank": 2,
+        "reranker_enabled": true,
+        "top_score": 0.7568970420586438
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-039",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.3192274889800458
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-040",
+        "rank": 1,
+        "reranker_enabled": true,
+        "top_score": 0.9259027388218735
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-041",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.02816747285727831
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-042",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.40609627788073277
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-043",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.06979492650638747
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-044",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.01652955655765428
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-045",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.01337660322737745
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-046",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.0544998743411987
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-047",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.0018675659778932803
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-048",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.012241275291807161
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-049",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.006615392678327908
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-050",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.007547923375900623
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-051",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.0006337125082498781
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-052",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.006744989542092038
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-053",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.005322535451112772
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-054",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.013902058625059315
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-055",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.019719128107346592
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-056",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.0062170781422503756
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-057",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.0017140384791880215
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-058",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.0015247863912257493
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-059",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 2.9083440990898244e-05
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-060",
+        "rank": null,
+        "reranker_enabled": true,
+        "top_score": 0.01518904880798395
+      }
+    ]
+  },
+  "official_export_allowed": false,
+  "outcome": "no_go",
+  "provenance": {
+    "code_revision": "192fb7081132d1de5eed52d5b29ad84737f951f2",
+    "corpus_snapshot_sha256": "947af07298c559a0f64511c24be0582b5d3b96a53d67f228d23de62de70e61ce",
+    "dataset_sha256": "7114bb52299c21372e25e8b26813cf5a3fd7154343b2e55e8503003ed408b5c8",
+    "embedding_model": "BAAI/bge-m3",
+    "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "execution_device": "cuda",
+    "provider_adapters": 0,
+    "provider_requests": 0,
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "reranker_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "retrieval_configuration": {
+      "chunking": "structure",
+      "reranker": true,
+      "retrieval": "hybrid",
+      "rrf_k": 60,
+      "top_k_final": 5,
+      "top_k_retrieve": 20
+    },
+    "run_origin": "fresh_offline_retrieval",
+    "source_artifact_sha256": {
+      "formal_dataset": "760e33eaa0821001d37ff974bc037043d019fc670b8f3621b6e713030274ca07",
+      "stress_dataset": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f"
+    }
+  },
+  "schema_version": "1.0",
+  "selected_threshold": null,
+  "target_observations": [
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-001",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 5,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9723097416304984
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-002",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9425067211996143
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-003",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 5,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.6030555313007994
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-004",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.33567742400801664
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-005",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.7360212969973179
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-006",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 3,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.8079157084225214
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-007",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.8998277813740775
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-008",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 3,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9022656804095371
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-009",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 4,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.7356416417389247
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-010",
+      "source_ranks": {
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.5001251697514135
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-011",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 5,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.8703770745957927
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-012",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 4,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9322068610768112
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-013",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 3,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.5526906062999501
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-014",
+      "source_ranks": {
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9620363047907355
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-015",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 5,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.4659342051083993
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-016",
+      "source_ranks": {
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.8782098334256662
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-017",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 1
+      },
+      "top_score": 0.9440738263146949
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-018",
+      "source_ranks": {
+        "勞動基準法|第 11 條": 2
+      },
+      "top_score": 0.991554373058874
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-019",
+      "source_ranks": {
+        "勞動基準法|第 16 條": 1
+      },
+      "top_score": 0.6833138323067802
+    },
+    {
+      "applied_routes": [
+        "wage_arrears_termination"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-020",
+      "source_ranks": {
+        "勞動基準法|第 14 條": 1
+      },
+      "top_score": 0.9837225390872865
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-021",
+      "source_ranks": {
+        "勞工退休金條例|第 24 條": 1
+      },
+      "top_score": 0.9814534354878828
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-022",
+      "source_ranks": {
+        "勞動基準法|第 54 條": 1
+      },
+      "top_score": 0.9935868362586746
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-023",
+      "source_ranks": {},
+      "top_score": 0.00012931563954607947
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-024",
+      "source_ranks": {},
+      "top_score": 0.06766981098181626
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-025",
+      "source_ranks": {
+        "勞工退休金條例|第 12 條": 2
+      },
+      "top_score": 0.14092635684691474
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-026",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 3
+      },
+      "top_score": 0.6983294529100605
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-027",
+      "source_ranks": {},
+      "top_score": 0.02350945240753301
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-028",
+      "source_ranks": {
+        "勞動基準法|第 16 條": 1
+      },
+      "top_score": 0.1133831008552511
+    },
+    {
+      "applied_routes": [],
+      "hit_count": 5,
+      "qid": "severance-policy-029",
+      "source_ranks": {
+        "勞動基準法|第 30 條": 1
+      },
+      "top_score": 0.5326986261750428
+    },
+    {
+      "applied_routes": [
+        "severance_comparison",
+        "wage_arrears_termination"
+      ],
+      "hit_count": 5,
+      "qid": "severance-policy-030",
+      "source_ranks": {
+        "勞動基準法|第 17 條": 3,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.7708100121686987
+    }
+  ]
+}
