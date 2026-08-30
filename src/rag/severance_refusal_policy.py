@@ -6,6 +6,7 @@ import ast
 import hashlib
 import json
 import math
+import symtable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -427,228 +428,482 @@ def _imported_local_paths(
     return imported
 
 
-_SAFE_BINDING = "safe"
-_IMPORTLIB_BINDING = "importlib"
-_BUILTINS_BINDING = "builtins"
-_GETATTR_BINDING = "getattr"
-_DYNAMIC_IMPORT_BINDING = "dynamic_import"
-_DYNAMIC_CODE_BINDING = "dynamic_code"
-_DYNAMIC_BINDINGS = {_DYNAMIC_IMPORT_BINDING, _DYNAMIC_CODE_BINDING}
-_BUILTIN_DYNAMIC_BINDINGS = {
-    "__import__": _DYNAMIC_IMPORT_BINDING,
-    "eval": _DYNAMIC_CODE_BINDING,
-    "exec": _DYNAMIC_CODE_BINDING,
-    "compile": _DYNAMIC_CODE_BINDING,
+_PROVEN_SAFE = "safe"
+_PROVEN_CLASS = "class"
+_UNKNOWN_BINDING = "unknown"
+_UNBOUND = "unbound"
+_DYNAMIC_API_NAMES = {
+    "__import__",
+    "import_module",
+    "eval",
+    "exec",
+    "compile",
 }
+_DYNAMIC_BUILTINS_IMPORTS = {*_DYNAMIC_API_NAMES, "getattr", "*"}
 
 
-class _DynamicExecutionVisitor(ast.NodeVisitor):
-    """Conservatively resolve aliases of Python's dynamic execution APIs."""
+def _join_binding_environments(
+    environments: list[dict[str, set[str]]],
+) -> dict[str, set[str]]:
+    names = set().union(*(environment for environment in environments))
+    return {
+        name: set().union(
+            *(environment.get(name, {_UNBOUND}) for environment in environments)
+        )
+        for name in names
+    }
 
-    def __init__(self) -> None:
-        self._scopes: list[dict[str, str]] = [{}]
-        self.reason: str | None = None
 
-    def _bind(self, name: str, binding: str) -> None:
-        self._scopes[-1][name] = binding
+class _AccessScope:
+    """Scope-wide runtime bindings paired with Python's symbol table."""
 
-    def _lookup(self, name: str) -> str:
-        for scope in reversed(self._scopes):
-            if name in scope:
-                return scope[name]
-        if name == "import_module":
-            return _DYNAMIC_IMPORT_BINDING
-        if name == "getattr":
-            return _GETATTR_BINDING
-        if name in {"builtins", "__builtins__"}:
-            return _BUILTINS_BINDING
-        return _BUILTIN_DYNAMIC_BINDINGS.get(name, _SAFE_BINDING)
+    def __init__(
+        self,
+        node: ast.AST,
+        table: symtable.SymbolTable,
+        parent: _AccessScope | None,
+    ) -> None:
+        self.node = node
+        self.table = table
+        self.parent = parent
+        self._used_children: set[int] = set()
+        self.final_bindings = self._final_bindings()
 
-    @staticmethod
-    def _literal_attribute(node: ast.AST) -> str | None:
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            return node.value
-        return None
+    def _is_local_target(self, name: str) -> bool:
+        if self.table.get_type() == "module":
+            return True
+        try:
+            symbol = self.table.lookup(name)
+        except KeyError:
+            return False
+        return symbol.is_local() or symbol.is_parameter()
 
-    def _attribute_binding(self, base: str, attribute: str | None) -> str:
-        if base == _IMPORTLIB_BINDING:
-            if attribute is None or attribute == "import_module":
-                return _DYNAMIC_IMPORT_BINDING
-            return _SAFE_BINDING
-        if base == _BUILTINS_BINDING:
-            if attribute is None:
-                return _DYNAMIC_CODE_BINDING
-            if attribute == "getattr":
-                return _GETATTR_BINDING
-            return _BUILTIN_DYNAMIC_BINDINGS.get(attribute, _SAFE_BINDING)
-        if base in _DYNAMIC_BINDINGS and (
-            attribute is None or attribute == "__call__"
-        ):
-            return base
-        return _SAFE_BINDING
-
-    def _expression_binding(self, node: ast.AST) -> str:
-        if isinstance(node, ast.Name):
-            return self._lookup(node.id)
-        if isinstance(node, ast.Attribute):
-            return self._attribute_binding(
-                self._expression_binding(node.value), node.attr
-            )
-        if isinstance(node, ast.Subscript):
-            return self._attribute_binding(
-                self._expression_binding(node.value),
-                self._literal_attribute(node.slice),
-            )
-        if isinstance(node, ast.Call):
-            if self._expression_binding(node.func) != _GETATTR_BINDING:
-                return _SAFE_BINDING
-            if len(node.args) < 2:
-                return _SAFE_BINDING
-            return self._attribute_binding(
-                self._expression_binding(node.args[0]),
-                self._literal_attribute(node.args[1]),
-            )
-        return _SAFE_BINDING
-
-    def _bind_target(self, target: ast.AST, binding: str) -> None:
-        if isinstance(target, ast.Name):
-            self._bind(target.id, binding)
+    def _bind_target(
+        self,
+        environment: dict[str, set[str]],
+        target: ast.AST,
+        bindings: set[str],
+    ) -> None:
+        if isinstance(target, ast.Name) and self._is_local_target(target.id):
+            environment[target.id] = set(bindings)
         elif isinstance(target, (ast.Tuple, ast.List)):
             for element in target.elts:
-                self._bind_target(element, _SAFE_BINDING)
+                self._bind_target(environment, element, {_UNKNOWN_BINDING})
+        elif isinstance(target, ast.Starred):
+            self._bind_target(environment, target.value, {_UNKNOWN_BINDING})
+
+    def _expression_bindings(
+        self, node: ast.AST, environment: dict[str, set[str]]
+    ) -> set[str]:
+        if isinstance(node, (ast.Constant, ast.Lambda)):
+            return {_PROVEN_SAFE}
+        if isinstance(node, ast.Name):
+            return set(environment.get(node.id, {_UNKNOWN_BINDING}))
+        if isinstance(node, ast.IfExp):
+            return self._expression_bindings(
+                node.body, environment
+            ) | self._expression_bindings(node.orelse, environment)
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set, ast.Dict)):
+            return {_PROVEN_SAFE}
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if environment.get(node.func.id) == {_PROVEN_CLASS}:
+                return {_PROVEN_SAFE}
+        return {_UNKNOWN_BINDING}
+
+    def _bind_assignment(
+        self,
+        environment: dict[str, set[str]],
+        target: ast.AST,
+        value: ast.AST,
+    ) -> None:
+        if isinstance(target, (ast.Tuple, ast.List)) and isinstance(
+            value, (ast.Tuple, ast.List)
+        ):
+            if len(target.elts) == len(value.elts):
+                for element, item in zip(target.elts, value.elts, strict=True):
+                    self._bind_assignment(environment, element, item)
+                return
+        self._bind_target(
+            environment, target, self._expression_bindings(value, environment)
+        )
+
+    def _analyze_statements(
+        self,
+        statements: list[ast.stmt],
+        initial: dict[str, set[str]],
+    ) -> dict[str, set[str]]:
+        environment = {name: set(kinds) for name, kinds in initial.items()}
+        for statement in statements:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self._bind_target(
+                    environment,
+                    ast.Name(id=statement.name, ctx=ast.Store()),
+                    {_PROVEN_SAFE},
+                )
+            elif isinstance(statement, ast.ClassDef):
+                self._bind_target(
+                    environment,
+                    ast.Name(id=statement.name, ctx=ast.Store()),
+                    {_PROVEN_CLASS},
+                )
+            elif isinstance(statement, ast.Assign):
+                for target in statement.targets:
+                    self._bind_assignment(environment, target, statement.value)
+            elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
+                self._bind_assignment(environment, statement.target, statement.value)
+            elif isinstance(statement, ast.AugAssign):
+                self._bind_target(
+                    environment, statement.target, {_UNKNOWN_BINDING}
+                )
+            elif isinstance(statement, (ast.Import, ast.ImportFrom)):
+                aliases = statement.names
+                for alias in aliases:
+                    name = alias.asname or alias.name.split(".", maxsplit=1)[0]
+                    if isinstance(statement, ast.Import):
+                        module = alias.name.split(".", maxsplit=1)[0]
+                        binding = (
+                            _UNKNOWN_BINDING
+                            if module in {"importlib", "builtins"}
+                            else _PROVEN_SAFE
+                        )
+                    else:
+                        module = (statement.module or "").split(
+                            ".", maxsplit=1
+                        )[0]
+                        binding = (
+                            _UNKNOWN_BINDING
+                            if module == "importlib"
+                            or (
+                                module == "builtins"
+                                and alias.name in _DYNAMIC_BUILTINS_IMPORTS
+                            )
+                            else _PROVEN_SAFE
+                        )
+                    self._bind_target(
+                        environment,
+                        ast.Name(id=name, ctx=ast.Store()),
+                        {binding},
+                    )
+            elif isinstance(statement, ast.Delete):
+                for target in statement.targets:
+                    self._bind_target(environment, target, {_UNBOUND})
+            elif isinstance(statement, ast.If):
+                environment = _join_binding_environments(
+                    [
+                        self._analyze_statements(statement.body, environment),
+                        self._analyze_statements(statement.orelse, environment),
+                    ]
+                )
+            elif isinstance(statement, (ast.For, ast.AsyncFor)):
+                loop_environment = {
+                    name: set(kinds) for name, kinds in environment.items()
+                }
+                self._bind_target(
+                    loop_environment, statement.target, {_UNKNOWN_BINDING}
+                )
+                loop_environment = self._analyze_statements(
+                    statement.body, loop_environment
+                )
+                environment = _join_binding_environments(
+                    [
+                        environment,
+                        loop_environment,
+                        self._analyze_statements(statement.orelse, environment),
+                    ]
+                )
+            elif isinstance(statement, (ast.Try, ast.TryStar)):
+                normal = self._analyze_statements(statement.body, environment)
+                normal = self._analyze_statements(statement.orelse, normal)
+                paths = [normal]
+                for handler in statement.handlers:
+                    handler_environment = {
+                        name: set(kinds) for name, kinds in environment.items()
+                    }
+                    if handler.name:
+                        self._bind_target(
+                            handler_environment,
+                            ast.Name(id=handler.name, ctx=ast.Store()),
+                            {_UNKNOWN_BINDING},
+                        )
+                    paths.append(
+                        self._analyze_statements(handler.body, handler_environment)
+                    )
+                environment = self._analyze_statements(
+                    statement.finalbody, _join_binding_environments(paths)
+                )
+            elif isinstance(statement, (ast.With, ast.AsyncWith)):
+                with_environment = {
+                    name: set(kinds) for name, kinds in environment.items()
+                }
+                for item in statement.items:
+                    if item.optional_vars is not None:
+                        self._bind_target(
+                            with_environment,
+                            item.optional_vars,
+                            {_UNKNOWN_BINDING},
+                        )
+                environment = self._analyze_statements(
+                    statement.body, with_environment
+                )
+        return environment
+
+    def _final_bindings(self) -> dict[str, set[str]]:
+        environment = self._initial_bindings()
+        return self._analyze_statements(self._statements(), environment)
+
+    def _initial_bindings(self) -> dict[str, set[str]]:
+        return {
+            symbol.get_name(): {_PROVEN_SAFE}
+            for symbol in self.table.get_symbols()
+            if symbol.is_parameter()
+        }
+
+    def _statements(self) -> list[ast.stmt]:
+        if isinstance(self.node, ast.Module):
+            return self.node.body
+        if isinstance(
+            self.node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        ):
+            return self.node.body
+        return []
+
+    def bindings_before(self, name: str, node: ast.AST) -> set[str]:
+        line = getattr(node, "lineno", -1)
+        column = getattr(node, "col_offset", -1)
+        preceding = [
+            statement
+            for statement in self._statements()
+            if getattr(statement, "end_lineno", statement.lineno) < line
+            or (
+                getattr(statement, "end_lineno", statement.lineno) == line
+                and getattr(statement, "end_col_offset", -1) <= column
+            )
+        ]
+        environment = self._analyze_statements(
+            preceding, self._initial_bindings()
+        )
+        return environment.get(name, {_UNBOUND})
+
+    def child(self, node: ast.AST) -> _AccessScope:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            expected_type, expected_name = "function", node.name
+        elif isinstance(node, ast.Lambda):
+            expected_type, expected_name = "function", "lambda"
+        elif isinstance(node, ast.ClassDef):
+            expected_type, expected_name = "class", node.name
+        else:
+            raise ValueError(f"unsupported decision scope: {type(node).__name__}")
+        for child in self.table.get_children():
+            if id(child) in self._used_children:
+                continue
+            if (
+                child.get_type() == expected_type
+                and child.get_name() == expected_name
+                and child.get_lineno() == node.lineno
+            ):
+                self._used_children.add(id(child))
+                return _AccessScope(node, child, self)
+        raise ValueError(
+            f"cannot resolve decision scope {expected_name!r} at line {node.lineno}"
+        )
+
+
+class _DynamicAccessVisitor(ast.NodeVisitor):
+    """Reject acquisition or access to dynamic execution APIs."""
+
+    def __init__(self, scope: _AccessScope) -> None:
+        self.scope = scope
+        self.reason: str | None = None
+
+    def _reject(self, node: ast.AST, reason: str) -> None:
+        if self.reason is None:
+            self.reason = f"line {getattr(node, 'lineno', '?')}: {reason}"
+
+    def _module_scope(self) -> _AccessScope:
+        scope = self.scope
+        while scope.parent is not None:
+            scope = scope.parent
+        return scope
+
+    def _enclosing_bindings(self, name: str) -> set[str]:
+        scope = self.scope.parent
+        while scope is not None:
+            if scope.table.get_type() == "class":
+                scope = scope.parent
+                continue
+            try:
+                symbol = scope.table.lookup(name)
+            except KeyError:
+                scope = scope.parent
+                continue
+            if symbol.is_local() or symbol.is_parameter():
+                return scope.final_bindings.get(name, {_UNBOUND})
+            scope = scope.parent
+        return {_UNBOUND}
+
+    def _resolved_bindings(self, name: str, node: ast.AST) -> set[str]:
+        try:
+            symbol = self.scope.table.lookup(name)
+        except KeyError:
+            return {_UNBOUND}
+        scope_type = self.scope.table.get_type()
+        if scope_type == "module" or symbol.is_local() or symbol.is_parameter():
+            return self.scope.bindings_before(name, node)
+        if symbol.is_free() or symbol.is_nonlocal():
+            return self._enclosing_bindings(name)
+        if symbol.is_global():
+            module = self._module_scope()
+            return module.final_bindings.get(name, {_UNBOUND})
+        return {_UNKNOWN_BINDING}
+
+    def _name_is_proven_safe(self, name: str, node: ast.AST) -> bool:
+        bindings = self._resolved_bindings(name, node)
+        return bool(bindings) and bindings <= {_PROVEN_SAFE, _PROVEN_CLASS}
+
+    def _expression_is_proven_safe(self, node: ast.AST) -> bool:
+        if isinstance(node, (ast.Constant, ast.Lambda)):
+            return True
+        if isinstance(node, ast.Name):
+            return self._name_is_proven_safe(node.id, node)
+        return False
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
-            bound_name = alias.asname or alias.name.split(".", maxsplit=1)[0]
-            root_module = alias.name.split(".", maxsplit=1)[0]
-            if root_module == "importlib":
-                binding = _IMPORTLIB_BINDING
-            elif root_module == "builtins":
-                binding = _BUILTINS_BINDING
-            else:
-                binding = _SAFE_BINDING
-            self._bind(bound_name, binding)
+            if alias.name.split(".", maxsplit=1)[0] in {"importlib", "builtins"}:
+                self._reject(node, f"forbidden dynamic API import {alias.name!r}")
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        for alias in node.names:
-            bound_name = alias.asname or alias.name
-            if node.module == "importlib" and alias.name == "import_module":
-                binding = _DYNAMIC_IMPORT_BINDING
-            elif node.module == "builtins" and alias.name == "getattr":
-                binding = _GETATTR_BINDING
-            elif node.module == "builtins":
-                binding = _BUILTIN_DYNAMIC_BINDINGS.get(
-                    alias.name, _SAFE_BINDING
+        module = (node.module or "").split(".", maxsplit=1)[0]
+        imported = {alias.name for alias in node.names}
+        if module == "importlib" or (
+            module == "builtins" and imported & _DYNAMIC_BUILTINS_IMPORTS
+        ):
+            self._reject(
+                node,
+                f"forbidden dynamic API import from {(node.module or '')!r}",
+            )
+
+    def visit_Name(self, node: ast.Name) -> None:
+        if not isinstance(node.ctx, ast.Load):
+            return
+        if node.id == "__builtins__":
+            self._reject(node, "access to the builtin namespace is forbidden")
+        elif node.id in _DYNAMIC_API_NAMES and not self._name_is_proven_safe(
+            node.id, node
+        ):
+            self._reject(
+                node,
+                f"{node.id!r} does not resolve to a proven-safe user binding",
+            )
+        elif node.id == "getattr" and not self._name_is_proven_safe(
+            node.id, node
+        ):
+            self._reject(node, "builtin getattr may only perform literal safe access")
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        if node.attr in _DYNAMIC_API_NAMES and not self._expression_is_proven_safe(
+            node.value
+        ):
+            self._reject(
+                node,
+                f"cannot prove {node.attr!r} attribute acquisition is safe",
+            )
+        self.generic_visit(node)
+
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        if isinstance(node.value, ast.Name) and node.value.id == "__builtins__":
+            self._reject(node, "builtin namespace subscription is forbidden")
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id == "getattr"
+            and not self._name_is_proven_safe("getattr", node.func)
+        ):
+            attribute = (
+                node.args[1].value
+                if len(node.args) >= 2
+                and isinstance(node.args[1], ast.Constant)
+                and isinstance(node.args[1].value, str)
+                else None
+            )
+            if attribute is None:
+                self._reject(node, "dynamic getattr attribute is not a literal string")
+            elif attribute in _DYNAMIC_API_NAMES and (
+                not node.args or not self._expression_is_proven_safe(node.args[0])
+            ):
+                self._reject(
+                    node,
+                    f"cannot prove getattr acquisition of {attribute!r} is safe",
                 )
-            else:
-                binding = _SAFE_BINDING
-            self._bind(bound_name, binding)
+            for argument in node.args:
+                self.visit(argument)
+            for keyword in node.keywords:
+                self.visit(keyword.value)
+            return
+        self.generic_visit(node)
 
-    def visit_Assign(self, node: ast.Assign) -> None:
-        self.visit(node.value)
-        binding = self._expression_binding(node.value)
-        for target in node.targets:
-            self._bind_target(target, binding)
-
-    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
-        self.visit(node.annotation)
-        if node.value is not None:
-            self.visit(node.value)
-            binding = self._expression_binding(node.value)
-        else:
-            binding = _SAFE_BINDING
-        self._bind_target(node.target, binding)
-
-    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
-        self.visit(node.value)
-        self._bind_target(node.target, self._expression_binding(node.value))
-
-    def _visit_function(
+    def _visit_function_header(
         self, node: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> None:
-        self._bind(node.name, _SAFE_BINDING)
         for decorator in node.decorator_list:
             self.visit(decorator)
         for default in (*node.args.defaults, *node.args.kw_defaults):
             if default is not None:
                 self.visit(default)
-        annotated_arguments = (
+        arguments = (
             *node.args.posonlyargs,
             *node.args.args,
             *node.args.kwonlyargs,
             node.args.vararg,
             node.args.kwarg,
         )
-        for argument in annotated_arguments:
+        for argument in arguments:
             if argument is not None and argument.annotation is not None:
                 self.visit(argument.annotation)
         if node.returns is not None:
             self.visit(node.returns)
-        self._scopes.append({})
-        arguments = (
-            *node.args.posonlyargs,
-            *node.args.args,
-            *node.args.kwonlyargs,
-        )
-        for argument in arguments:
-            self._bind(argument.arg, _SAFE_BINDING)
-        if node.args.vararg is not None:
-            self._bind(node.args.vararg.arg, _SAFE_BINDING)
-        if node.args.kwarg is not None:
-            self._bind(node.args.kwarg.arg, _SAFE_BINDING)
-        for statement in node.body:
-            self.visit(statement)
-        self._scopes.pop()
+
+    def _visit_nested_scope(self, node: ast.AST, body: list[ast.stmt]) -> None:
+        child_visitor = _DynamicAccessVisitor(self.scope.child(node))
+        for statement in body:
+            child_visitor.visit(statement)
+        if self.reason is None:
+            self.reason = child_visitor.reason
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self._visit_function(node)
+        self._visit_function_header(node)
+        self._visit_nested_scope(node, node.body)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self._visit_function(node)
+        self._visit_function_header(node)
+        self._visit_nested_scope(node, node.body)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        for expression in (*node.decorator_list, *node.bases):
+            self.visit(expression)
+        for keyword in node.keywords:
+            self.visit(keyword.value)
+        self._visit_nested_scope(node, node.body)
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
         for default in (*node.args.defaults, *node.args.kw_defaults):
             if default is not None:
                 self.visit(default)
-        self._scopes.append({})
-        arguments = (
-            *node.args.posonlyargs,
-            *node.args.args,
-            *node.args.kwonlyargs,
-        )
-        for argument in arguments:
-            self._bind(argument.arg, _SAFE_BINDING)
-        if node.args.vararg is not None:
-            self._bind(node.args.vararg.arg, _SAFE_BINDING)
-        if node.args.kwarg is not None:
-            self._bind(node.args.kwarg.arg, _SAFE_BINDING)
-        self.visit(node.body)
-        self._scopes.pop()
-
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        self._bind(node.name, _SAFE_BINDING)
-        for expression in (*node.decorator_list, *node.bases, *node.keywords):
-            self.visit(expression)
-        self._scopes.append({})
-        for statement in node.body:
-            self.visit(statement)
-        self._scopes.pop()
-
-    def visit_Call(self, node: ast.Call) -> None:
-        binding = self._expression_binding(node.func)
-        if binding in _DYNAMIC_BINDINGS and self.reason is None:
-            self.reason = (
-                "dynamic import"
-                if binding == _DYNAMIC_IMPORT_BINDING
-                else "dynamic code execution"
-            )
-        self.generic_visit(node)
+        child_visitor = _DynamicAccessVisitor(self.scope.child(node))
+        child_visitor.visit(node.body)
+        if self.reason is None:
+            self.reason = child_visitor.reason
 
 
-def _dynamic_execution_reason(tree: ast.AST) -> str | None:
-    # Deliberately no file-level allowlist: a future exception must resolve and
-    # bind an exact target rather than exempting an importer wholesale.
-    visitor = _DynamicExecutionVisitor()
+def _dynamic_execution_reason(
+    tree: ast.Module, source: str, filename: str
+) -> str | None:
+    # No file-level allowlist exists. A future exception must resolve and bind
+    # an exact target rather than exempting an importer wholesale.
+    table = symtable.symtable(source, filename, "exec")
+    visitor = _DynamicAccessVisitor(_AccessScope(tree, table, None))
     visitor.visit(tree)
     return visitor.reason
 
@@ -672,8 +927,9 @@ def validate_decision_import_closure(
         if relative in discovered:
             continue
         discovered.add(relative)
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
-        dynamic_reason = _dynamic_execution_reason(tree)
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=relative)
+        dynamic_reason = _dynamic_execution_reason(tree, source, relative)
         if dynamic_reason is not None:
             raise ValueError(
                 "dynamic import or code execution in "

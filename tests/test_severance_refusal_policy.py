@@ -2674,6 +2674,164 @@ def test_static_local_import_closure_allows_clearly_user_bound_similar_names(
 
 
 @pytest.mark.parametrize(
+    "source",
+    [
+        (
+            "def run():\n"
+            "    return loader('rag.hidden')\n"
+            "from importlib import import_module as loader\n"
+            "run()\n"
+        ),
+        (
+            "def outer():\n"
+            "    def inner():\n"
+            "        return loader('rag.hidden')\n"
+            "    from importlib import import_module as loader\n"
+            "    return inner()\n"
+            "outer()\n"
+        ),
+        (
+            "import importlib as loader\n"
+            "class C:\n"
+            "    loader = object()\n"
+            "    def run(self):\n"
+            "        return loader.import_module('rag.hidden')\n"
+            "C().run()\n"
+        ),
+        (
+            "import importlib as il\n"
+            "flag = True\n"
+            "if flag:\n"
+            "    load = il.import_module\n"
+            "else:\n"
+            "    load = lambda value: value\n"
+            "load('rag.hidden')\n"
+        ),
+        (
+            "try:\n"
+            "    from importlib import import_module as load\n"
+            "except ImportError:\n"
+            "    load = lambda value: value\n"
+            "load('rag.hidden')\n"
+        ),
+        (
+            "def eval(value):\n"
+            "    return value\n"
+            "del eval\n"
+            "eval(\"__import__('rag.hidden')\")\n"
+        ),
+        (
+            "import importlib as il\n"
+            "flag = True\n"
+            "load = il.import_module if flag else (lambda value: value)\n"
+            "load('rag.hidden')\n"
+        ),
+        (
+            "import importlib as il\n"
+            "load, = (il.import_module,)\n"
+            "load('rag.hidden')\n"
+        ),
+        "eval: object\neval(\"__import__('rag.hidden')\")\n",
+    ],
+    ids=(
+        "late-module-alias",
+        "late-enclosing-alias",
+        "class-namespace-not-method-closure",
+        "branch-join",
+        "try-join",
+        "delete-restores-builtin",
+        "conditional-expression-alias",
+        "destructured-alias",
+        "value-less-annotation",
+    ),
+)
+def test_static_local_import_closure_rejects_exact_reviewed_scope_bypasses(
+    tmp_path, source
+) -> None:
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(source, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="dynamic import or code execution"):
+        policy.validate_decision_import_closure(
+            tmp_path,
+            roots=("runner.py",),
+            manifest={"runner": "runner.py"},
+        )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        (
+            "def run():\n"
+            "    return import_module('harmless')\n"
+            "def import_module(value):\n"
+            "    return value\n"
+            "run()\n"
+        ),
+        (
+            "def run():\n"
+            "    return eval('harmless')\n"
+            "def eval(value):\n"
+            "    return value\n"
+            "run()\n"
+        ),
+    ],
+    ids=("forward-user-import-module", "forward-user-eval"),
+)
+def test_static_local_import_closure_allows_exact_reviewed_forward_bindings(
+    tmp_path, source
+) -> None:
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(source, encoding="utf-8")
+
+    assert policy.validate_decision_import_closure(
+        tmp_path,
+        roots=("runner.py",),
+        manifest={"runner": "runner.py"},
+    ) == frozenset({"runner.py"})
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import importlib as loader\n",
+        "from importlib import import_module as loader\n",
+        "import builtins as loader\n",
+        "from builtins import eval as loader\n",
+        "dangerous = eval\n",
+        "dangerous = getattr(__builtins__, 'eval')\n",
+        (
+            "dangerous = eval\n"
+            "def eval(value):\n"
+            "    return value\n"
+        ),
+    ],
+    ids=(
+        "importlib-module",
+        "importlib-from",
+        "builtins-module",
+        "builtins-from",
+        "builtin-reference",
+        "dynamic-getattr-acquisition",
+        "direct-reference-before-user-binding",
+    ),
+)
+def test_static_local_import_closure_rejects_dynamic_api_acquisition_without_call(
+    tmp_path, source
+) -> None:
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(source, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="dynamic import or code execution"):
+        policy.validate_decision_import_closure(
+            tmp_path,
+            roots=("runner.py",),
+            manifest={"runner": "runner.py"},
+        )
+
+
+@pytest.mark.parametrize(
     "changed_dependency",
     [
         "retrieval_refusal_policy",
