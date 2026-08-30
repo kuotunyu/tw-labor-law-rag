@@ -40,6 +40,7 @@ eval/ablation.py
 eval/dataset/README.md
 eval/dataset/eval_set.jsonl
 eval/dataset/mini_eval.jsonl
+eval/dataset/portfolio_demo_v0.3.5.jsonl
 eval/dataset/reliability_stress_v0.3.1.jsonl
 eval/dataset/wage_arrears_regression_v0.3.4.jsonl
 eval/export_official.py
@@ -99,6 +100,7 @@ src/rag/ingestion/chunkers.py
 src/rag/ingestion/cleaner.py
 src/rag/ingestion/loader.py
 src/rag/models.py
+src/rag/portfolio_demo_regression.py
 src/rag/provider_budget.py
 src/rag/provider_crosscheck.py
 src/rag/qdrant_blue_green.py
@@ -131,6 +133,7 @@ tests/test_loader.py
 tests/test_official_artifacts.py
 tests/test_packaging.py
 tests/test_pipeline.py
+tests/test_portfolio_demo_regression.py
 tests/test_provider_budget.py
 tests/test_provider_crosscheck.py
 tests/test_qdrant_blue_green.py

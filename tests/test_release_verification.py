@@ -885,7 +885,7 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
-    assert report["publication"]["files"] == 158
+    assert report["publication"]["files"] == 161
     expected_history = len(
         {
             line
