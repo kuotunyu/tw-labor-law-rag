@@ -12,9 +12,11 @@ import pytest
 import rag.severance_refusal_policy as policy
 from eval import run_severance_refusal_policy as runner
 from rag import factory
+from rag.generation import llm as llm_module
+from rag.generation import router as router_module
 from rag.indexing import embedder as embedder_module
 from rag.retrieval import reranker as reranker_module
-from rag.retrieval.pipeline import plan_retrieval_query
+from rag.retrieval.pipeline import RetrievalPipeline, plan_retrieval_query
 from rag.severance_refusal_policy import (
     build_case_observation,
     build_official_artifact,
@@ -363,6 +365,24 @@ def test_runner_retrieves_each_target_once_and_records_unrounded_observation(
         "hit_count": 2,
         "top_score": 0.0150004,
     }
+
+
+def test_runner_rejects_target_route_disagreement_instead_of_recording_it(
+    cases,
+) -> None:
+    case = cases[0]
+    retrieval = SimpleNamespace(
+        hits=[SimpleNamespace(payload={"doc_title": "other", "articles": []})],
+        applied_routes=(),
+        top_score=0.5000004,
+    )
+
+    with pytest.raises(
+        RuntimeError, match="route mismatch.*severance-policy-001"
+    ):
+        runner._run_target_cases(
+            SimpleNamespace(run=lambda _question: retrieval), [case]
+        )
 
 
 def test_runner_builds_guard_rows_from_fresh_scores_and_authoritative_routes() -> None:
@@ -873,6 +893,124 @@ def test_runner_main_persists_replayable_no_go_without_official_export(
     envelope = json.loads(diagnostic.read_text(encoding="utf-8"))
     assert policy.replay_no_go_evidence(envelope) == envelope
     assert envelope["provenance"]["code_revision"] == "a" * 40
+
+
+def test_runner_main_no_go_keeps_real_retrieval_factory_provider_free(
+    monkeypatch,
+    tmp_path,
+    cases,
+) -> None:
+    target = tmp_path / "target.jsonl"
+    stress = tmp_path / "stress.jsonl"
+    formal = tmp_path / "formal.jsonl"
+    snapshot = tmp_path / "snapshot.json"
+    for path in (target, stress, formal):
+        path.write_text("{}\n", encoding="utf-8")
+    snapshot.write_text("{}\n", encoding="utf-8")
+    work_dir = tmp_path / "run"
+    diagnostic = tmp_path / "diagnostics" / "no_go.json"
+    official = tmp_path / "official.json"
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    observations = _observations(cases)
+    observations[0] = {**observations[0], "source_ranks": {}}
+    stress_evidence = _stress_rows()
+    formal_evidence = _formal_rows()
+    closed = []
+    embedder = SimpleNamespace(close=lambda: closed.append("embedder"))
+    store = SimpleNamespace(close=lambda: closed.append("store"))
+    seen_pipelines = []
+
+    def forbidden_provider_construction(*_args, **_kwargs):
+        pytest.fail("LLM/provider construction is forbidden in calibration main")
+
+    for name in (
+        "AnthropicAdapter",
+        "OpenAIAdapter",
+        "GeminiAdapter",
+        "OllamaAdapter",
+        "build_llm",
+    ):
+        monkeypatch.setattr(llm_module, name, forbidden_provider_construction)
+    monkeypatch.setattr(
+        router_module, "RoutedLLM", forbidden_provider_construction
+    )
+    monkeypatch.setattr(factory, "build_llm", forbidden_provider_construction)
+    monkeypatch.setattr(factory, "build_answerer", forbidden_provider_construction)
+    monkeypatch.setattr(factory, "RoutedLLM", forbidden_provider_construction)
+    monkeypatch.setattr(runner, "OFFICIAL_RESULT", official)
+    monkeypatch.setattr(runner, "require_cached_models", lambda _settings: None)
+    monkeypatch.setattr(runner, "_clean_git_revision", lambda: "a" * 40)
+    monkeypatch.setattr(
+        runner,
+        "_materialize_audited_corpus",
+        lambda _work, _snapshot: corpus,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_build_indexes",
+        lambda _settings, _corpus, *, local_files_only: (embedder, store),
+    )
+    monkeypatch.setattr(
+        reranker_module,
+        "Reranker",
+        lambda **_kwargs: SimpleNamespace(rerank=lambda *_args, **_kwargs: []),
+    )
+    monkeypatch.setattr(
+        factory.BM25Index,
+        "load",
+        lambda _path: SimpleNamespace(search=lambda *_args, **_kwargs: []),
+    )
+    monkeypatch.setattr(runner, "load_cases", lambda _path: cases)
+    monkeypatch.setattr(
+        runner,
+        "_load_dataset",
+        lambda path: stress_evidence if path == stress else formal_evidence,
+    )
+
+    def collect_targets(pipeline, actual_cases):
+        assert isinstance(pipeline, RetrievalPipeline)
+        seen_pipelines.append(pipeline)
+        assert actual_cases is cases
+        return observations
+
+    def collect_guards(pipeline, rows):
+        assert isinstance(pipeline, RetrievalPipeline)
+        seen_pipelines.append(pipeline)
+        return rows
+
+    monkeypatch.setattr(runner, "_run_target_cases", collect_targets)
+    monkeypatch.setattr(runner, "_run_guard_cases", collect_guards)
+
+    exit_code = runner.main(
+        [
+            "--dataset",
+            str(target),
+            "--stress-dataset",
+            str(stress),
+            "--formal-dataset",
+            str(formal),
+            "--snapshot",
+            str(snapshot),
+            "--work-dir",
+            str(work_dir),
+            "--diagnostics-output",
+            str(diagnostic),
+            "--offline",
+            "--device",
+            "cpu",
+            "--export-official",
+        ]
+    )
+
+    assert exit_code == 1
+    assert len(seen_pipelines) == 3
+    assert len({id(pipeline) for pipeline in seen_pipelines}) == 1
+    assert closed == ["store", "embedder"]
+    assert not official.exists()
+    assert policy.replay_no_go_evidence(
+        json.loads(diagnostic.read_text(encoding="utf-8"))
+    )
 
 
 def _source_key(source: dict[str, str]) -> str:

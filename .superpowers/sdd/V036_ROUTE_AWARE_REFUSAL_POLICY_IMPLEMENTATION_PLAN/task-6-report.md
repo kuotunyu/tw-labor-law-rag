@@ -108,6 +108,10 @@ produced the same result:
 | 0.025 | 27/30 | 0/40 | 17/20 (`0.85`) | `1.0` | `0.9388888888888888` | 0/30 | fail |
 | 0.03 | 27/30 | 0/40 | 17/20 (`0.85`) | `1.0` | `0.9388888888888888` | 0/30 | fail |
 
+The two formal columns are fresh achieved metrics. Their committed pass
+baselines are Hit@5 at least `0.9666666666666667` and MRR@10 at least
+`0.9055555555555554`; the achieved values exceed both baselines.
+
 Target aggregates for every candidate:
 
 ```text
@@ -335,13 +339,13 @@ both exactly zero.
 The review rerun reproduced the original diagnosis exactly for all candidates
 `0`, `0.005`, `0.01`, `0.015`, `0.02`, `0.025`, and `0.03`:
 
-| Gate | Fresh result | Required | Status |
+| Gate | Fresh achieved | Committed requirement | Status |
 |---|---:|---:|:---:|
 | Target contracts | 27/30 | 30/30 | fail |
 | Stress false refusals | 0/40 | 0/40 | pass |
 | Stress direct unanswerable | 17/20 (`0.85`) | at least 17/20 | pass |
-| Formal Hit@5 | `1.0` | at least `1.0` | pass |
-| Formal MRR@10 | `0.9388888888888888` | at least `0.9388888888888888` | pass |
+| Formal Hit@5 | `1.0` | at least `0.9666666666666667` | pass |
+| Formal MRR@10 | `0.9388888888888888` | at least `0.9055555555555554` | pass |
 | Formal false refusals | 0/30 | 0/30 | pass |
 
 The exact retained target failures also reproduced:

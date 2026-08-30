@@ -110,6 +110,9 @@ def _run_target_cases(
     observations = []
     for index, case in enumerate(cases, start=1):
         retrieval = pipeline.run(case.question)
+        planned_routes = plan_retrieval_query(case.question).routes
+        if retrieval.applied_routes != planned_routes:
+            raise RuntimeError(f"route mismatch for {case.qid}")
         observations.append(
             build_case_observation(
                 case,
