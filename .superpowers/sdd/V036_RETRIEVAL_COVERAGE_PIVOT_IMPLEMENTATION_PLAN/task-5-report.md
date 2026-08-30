@@ -275,6 +275,8 @@ artifact-integrity checks and the Task 6/Task 7 handoff remain unchanged.
 
 Review-fix implementation commit:
 `b8a87be91f4bbb72b34cec2881b11b62e612f5a3`.
+Stable symtable-child matching follow-up:
+`05cb5f76d2cea01c44375b8c8be58ae9d7549ac8`.
 
 ### Root cause and RED evidence
 
@@ -291,6 +293,11 @@ failed`. All nine reviewed unsafe programs escaped, both reviewed harmless
 forward-bound programs were rejected, and six unused dynamic-API acquisition
 forms were accepted. A further self-audit added and RED-proved direct access to
 builtin `eval` before a later module definition (`1 failed, 6 passed`).
+The first clean-commit broad run then exposed unstable identity tracking for
+the wrapper objects returned by `symtable.get_children()`: one copied-repository
+release-verifier case failed to resolve a lambda scope (`1 failed, 389 passed,
+2 skipped`). Caching the child list and tracking stable indices fixed that
+nondeterministic lookup; the isolated failing case then passed.
 
 ### Simplified policy
 
