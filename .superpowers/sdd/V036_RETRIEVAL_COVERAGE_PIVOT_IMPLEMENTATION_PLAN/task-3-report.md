@@ -111,3 +111,27 @@ model inference was run for this fix.
 - `top_k_retrieve > 20` fails at construction before retrieval.
 - A retriever that violates the 20-candidate contract fails after its one
   retrieval but before any reranker call.
+
+## Review-fix round 2
+
+The replay fixture is now independently integrity-bound by constants outside
+the fixture itself. The test verifies its SHA-256 against
+`f3cf753cb90680a083591f7a8a5a783c573dbc5db613ebe06cd9a889fc545b2d`, so a
+change to rank arrays and colocated expected ranks cannot silently pass.
+
+It also verifies the fixture's source revision against the external commit
+constant `9890c78538176c5338f6a31232a615f8d970fdd2`, resolves the source
+artifact's expected Git blob
+`2cdb13b36d98b5ebfbfcd2cec877e571f3ab2dd4`, and checks the working artifact
+bytes exactly equal that source blob. The fixture's source-artifact SHA-256,
+corpus snapshot hash, embedding revision, and reranker revision are then
+cross-checked against the provenance inside that independently hashed source
+artifact.
+
+### RED/GREEN evidence
+
+With an intentionally incorrect external fixture SHA constant, the three
+per-qid replay tests failed as expected: `3 failed, 76 passed`. Restoring the
+recorded fixture SHA made the focused pipeline suite pass. This closes the
+prior gap where changing fixture provenance or rankings together with expected
+ranks could remain self-consistent.

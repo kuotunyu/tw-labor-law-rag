@@ -1,5 +1,6 @@
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -422,6 +423,11 @@ _STAGE_REPLAY_PATH = (
     Path(__file__).parent / "fixtures" / "v036_severance_retrieval_stage_replay.json"
 )
 _STAGE_REPLAY = json.loads(_STAGE_REPLAY_PATH.read_text(encoding="utf-8"))
+_EXPECTED_STAGE_REPLAY_SHA256 = (
+    "f3cf753cb90680a083591f7a8a5a783c573dbc5db613ebe06cd9a889fc545b2d"
+)
+_EXPECTED_SOURCE_REVISION = "9890c78538176c5338f6a31232a615f8d970fdd2"
+_EXPECTED_SOURCE_ARTIFACT_BLOB = "2cdb13b36d98b5ebfbfcd2cec877e571f3ab2dd4"
 
 
 def _replay_authority(chunk_id, authority_chunk_ids):
@@ -453,14 +459,48 @@ def _ranks_for_authorities(items, authority_chunk_ids):
 @pytest.mark.parametrize("case", _STAGE_REPLAY["cases"], ids=lambda case: case["qid"])
 def test_pipeline_replays_provenance_bound_severance_stage_evidence(case):
     provenance = _STAGE_REPLAY["provenance"]
-    dataset = Path(__file__).parents[1] / provenance["current_dataset"]
-    source_artifact = Path(__file__).parents[1] / provenance["source_artifact"]
+    repository = Path(__file__).parents[1]
+    dataset = repository / provenance["current_dataset"]
+    source_artifact = repository / provenance["source_artifact"]
+    source_ref = f"{provenance['source_revision']}:{provenance['source_artifact']}"
+    source_blob = subprocess.run(
+        ["git", "rev-parse", source_ref],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    source_bytes = subprocess.run(
+        ["git", "show", source_ref],
+        cwd=repository,
+        capture_output=True,
+        check=True,
+    ).stdout
+    source_provenance = json.loads(source_bytes)["provenance"]
+
+    assert hashlib.sha256(_STAGE_REPLAY_PATH.read_bytes()).hexdigest() == (
+        _EXPECTED_STAGE_REPLAY_SHA256
+    )
+    assert provenance["source_revision"] == _EXPECTED_SOURCE_REVISION
+    assert source_blob == _EXPECTED_SOURCE_ARTIFACT_BLOB
+    assert source_artifact.read_bytes() == source_bytes
     assert hashlib.sha256(dataset.read_bytes()).hexdigest() == provenance[
         "current_dataset_sha256"
     ]
-    assert hashlib.sha256(source_artifact.read_bytes()).hexdigest() == provenance[
+    assert hashlib.sha256(source_bytes).hexdigest() == provenance[
         "source_artifact_sha256"
     ]
+    assert provenance["corpus_snapshot_sha256"] == source_provenance[
+        "corpus_snapshot_sha256"
+    ]
+    assert provenance["embedding_model"] == (
+        f"{source_provenance['embedding_model']}@"
+        f"{source_provenance['embedding_revision']}"
+    )
+    assert provenance["reranker_model"] == (
+        f"{source_provenance['reranker_model']}@"
+        f"{source_provenance['reranker_revision']}"
+    )
     assert _STAGE_REPLAY["fixture_kind"] == "deterministic_stage_replay"
     assert _STAGE_REPLAY["purpose"].startswith("Offline pipeline integration")
 
