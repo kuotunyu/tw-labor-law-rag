@@ -1,4 +1,11 @@
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
+import run_reliability_eval  # noqa: E402
 
 from rag.reliability import (
     compute_reliability_metrics,
@@ -49,7 +56,7 @@ def test_privacy_reduced_trace_has_exact_public_fields():
             "question": "must not survive",
             "hits": [{"content": "must not survive"}],
         },
-        threshold=0.03,
+        threshold_refused=True,
     )
 
     assert reduced == {
@@ -60,6 +67,90 @@ def test_privacy_reduced_trace_has_exact_public_fields():
         "threshold_refused": True,
         "elapsed_ms": 12.3,
     }
+
+
+def test_privacy_reduced_trace_uses_the_precomputed_threshold_decision():
+    reduced = privacy_reduced_trace(
+        trace("stress-001", True, rank=2, score=0.01),
+        threshold_refused=False,
+    )
+
+    assert reduced["threshold_refused"] is False
+
+
+@pytest.mark.parametrize("threshold_refused", [None, 0, 1, "false"])
+def test_privacy_reduced_trace_requires_a_boolean_decision(threshold_refused):
+    with pytest.raises(ValueError, match="threshold_refused must be a boolean"):
+        privacy_reduced_trace(
+            trace("stress-001", True, rank=2, score=0.01),
+            threshold_refused=threshold_refused,
+        )
+
+
+def test_reliability_runner_reduces_with_shared_route_aware_decision(monkeypatch):
+    calls = []
+
+    def decide(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(refusal_stage=None)
+
+    monkeypatch.setattr(run_reliability_eval, "decide_retrieval_refusal", decide)
+    settings = SimpleNamespace(
+        rerank_score_threshold=0.9,
+        severance_comparison_score_threshold=0.2,
+    )
+    row = {
+        **trace("stress-001", True, rank=2, score=0.1),
+        "hits": [{"chunk_id": "c1"}],
+        "applied_routes": ["severance_comparison"],
+    }
+
+    reduced = run_reliability_eval._reduce_trace(row, settings)
+
+    assert reduced["threshold_refused"] is False
+    assert calls == [
+        {
+            "has_hits": True,
+            "reranker_enabled": True,
+            "applied_routes": ("severance_comparison",),
+            "top_score": 0.1,
+            "global_threshold": 0.9,
+            "severance_comparison_threshold": 0.2,
+        }
+    ]
+
+
+def test_reliability_runner_records_routes_only_in_private_raw_row():
+    retrieval = SimpleNamespace(
+        hits=[],
+        top_score=0.0,
+        applied_routes=("off_hours_employer_message",),
+    )
+    pipeline = SimpleNamespace(run=lambda _question: retrieval)
+
+    rows = run_reliability_eval._run_rows(
+        pipeline,
+        [
+            {
+                "qid": "stress-001",
+                "question": "private question",
+                "answerable": False,
+                "sources": [],
+            }
+        ],
+    )
+
+    assert rows[0]["applied_routes"] == ["off_hours_employer_message"]
+    reduced = privacy_reduced_trace(rows[0], threshold_refused=True)
+    assert tuple(reduced) == (
+        "qid",
+        "answerable",
+        "rank",
+        "top_score",
+        "threshold_refused",
+        "elapsed_ms",
+    )
+    assert "applied_routes" not in reduced
 
 
 @pytest.mark.parametrize(

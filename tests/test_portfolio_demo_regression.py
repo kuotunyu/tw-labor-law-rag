@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from eval import run_portfolio_demo_regression
 from eval.run_portfolio_demo_regression import run_cases, write_public_json
 from rag.portfolio_demo_regression import (
     build_artifact,
@@ -226,3 +228,53 @@ def test_runner_with_fake_retrieval_is_content_free_and_deterministic(
     ).read_text(encoding="utf-8")
     assert "rag.generation" not in runner_source
     assert "provider_crosscheck" not in runner_source
+
+
+def test_portfolio_runner_uses_retrieval_routes_and_shared_decision(
+    monkeypatch,
+    cases,
+) -> None:
+    calls = []
+
+    def decide(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(refusal_stage=None)
+
+    monkeypatch.setattr(
+        run_portfolio_demo_regression,
+        "decide_retrieval_refusal",
+        decide,
+    )
+    retrieval = SimpleNamespace(
+        hits=[],
+        top_score=0.01,
+        applied_routes=("route_from_retrieval",),
+    )
+    settings = SimpleNamespace(
+        rerank_score_threshold=0.03,
+        severance_comparison_score_threshold=0.015,
+    )
+
+    observation = run_portfolio_demo_regression._evaluate_retrieval(
+        cases[0],
+        retrieval,
+        settings,
+        reranker_enabled=True,
+    )
+
+    assert observation == {
+        "retrieved": [],
+        "applied_routes": ["route_from_retrieval"],
+        "threshold_refused": False,
+        "top_score": 0.01,
+    }
+    assert calls == [
+        {
+            "has_hits": False,
+            "reranker_enabled": True,
+            "applied_routes": ("route_from_retrieval",),
+            "top_score": 0.01,
+            "global_threshold": 0.03,
+            "severance_comparison_threshold": 0.015,
+        }
+    ]

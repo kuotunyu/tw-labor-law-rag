@@ -30,6 +30,7 @@ from rag.reliability import (  # noqa: E402
     pareto_better_thresholds,
     privacy_reduced_trace,
 )
+from rag.retrieval.refusal_policy import decide_retrieval_refusal  # noqa: E402
 from rag.retrieval.reranker import Reranker  # noqa: E402
 from rag.retrieval.retriever import bm25_path_for, collection_for  # noqa: E402
 from scripts.audit_corpus import download_bytes  # noqa: E402
@@ -164,6 +165,7 @@ def _run_rows(pipeline, dataset_rows: list[dict]) -> list[dict]:
                 "answerable": row["answerable"],
                 "rank": rank,
                 "top_score": result.top_score,
+                "applied_routes": list(result.applied_routes),
                 "elapsed_ms": elapsed_ms,
                 "hits": [
                     {
@@ -177,6 +179,23 @@ def _run_rows(pipeline, dataset_rows: list[dict]) -> list[dict]:
         )
         print(f"[query] {index}/{len(dataset_rows)} {row['qid']}", flush=True)
     return traces
+
+
+def _reduce_trace(row: dict, settings: Settings) -> dict:
+    decision = decide_retrieval_refusal(
+        has_hits=bool(row["hits"]),
+        reranker_enabled=True,
+        applied_routes=tuple(row["applied_routes"]),
+        top_score=row["top_score"],
+        global_threshold=settings.rerank_score_threshold,
+        severance_comparison_threshold=(
+            settings.severance_comparison_score_threshold
+        ),
+    )
+    return privacy_reduced_trace(
+        row,
+        threshold_refused=decision.refusal_stage == "threshold",
+    )
 
 
 def main() -> int:
@@ -235,9 +254,7 @@ def main() -> int:
         production_threshold = settings.rerank_score_threshold
         stress_metrics = compute_reliability_metrics(stress_raw, THRESHOLDS)
         formal_metrics = compute_reliability_metrics(formal_raw, THRESHOLDS)
-        public_trace = [
-            privacy_reduced_trace(row, threshold=production_threshold) for row in stress_raw
-        ]
+        public_trace = [_reduce_trace(row, settings) for row in stress_raw]
         candidates = pareto_better_thresholds(
             stress_metrics,
             formal_metrics,
@@ -288,8 +305,7 @@ def main() -> int:
             _write_jsonl(
                 OFFICIAL_DIR / "reliability_formal_trace.jsonl",
                 [
-                    privacy_reduced_trace(row, threshold=production_threshold)
-                    for row in formal_raw
+                    _reduce_trace(row, settings) for row in formal_raw
                 ],
             )
         print(json.dumps(results, ensure_ascii=False, indent=2), flush=True)

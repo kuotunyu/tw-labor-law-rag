@@ -25,10 +25,7 @@ from rag.portfolio_demo_regression import (  # noqa: E402
     build_result,
     load_cases,
 )
-from rag.retrieval.pipeline import (  # noqa: E402
-    _WAGE_ARREARS_LEGAL_TERMS,
-    _retrieval_query,
-)
+from rag.retrieval.refusal_policy import decide_retrieval_refusal  # noqa: E402
 from rag.wage_arrears_regression import require_cached_models  # noqa: E402
 
 DEFAULT_DATASET = PROJECT_ROOT / "eval/dataset/portfolio_demo_v0.3.5.jsonl"
@@ -79,11 +76,6 @@ def _git_revision() -> str:
     return completed.stdout.strip()
 
 
-def _applied_routes(question: str) -> list[str]:
-    expanded = _retrieval_query(question)
-    return ["wage_arrears"] if _WAGE_ARREARS_LEGAL_TERMS in expanded else []
-
-
 def _retrieved_identities(hits) -> list[tuple[str, str, int]]:
     ranks: dict[tuple[str, str], int] = {}
     for rank, hit in enumerate(hits, 1):
@@ -93,6 +85,31 @@ def _retrieved_identities(hits) -> list[tuple[str, str, int]]:
             if all(identity) and identity not in ranks:
                 ranks[identity] = rank
     return [(law, article, rank) for (law, article), rank in ranks.items()]
+
+
+def _evaluate_retrieval(
+    case: PortfolioCase,
+    retrieval,
+    settings: Settings,
+    *,
+    reranker_enabled: bool,
+) -> Observation:
+    decision = decide_retrieval_refusal(
+        has_hits=bool(retrieval.hits),
+        reranker_enabled=reranker_enabled,
+        applied_routes=retrieval.applied_routes,
+        top_score=retrieval.top_score,
+        global_threshold=settings.rerank_score_threshold,
+        severance_comparison_threshold=(
+            settings.severance_comparison_score_threshold
+        ),
+    )
+    return {
+        "retrieved": _retrieved_identities(retrieval.hits),
+        "applied_routes": list(retrieval.applied_routes),
+        "threshold_refused": decision.refusal_stage == "threshold",
+        "top_score": retrieval.top_score,
+    }
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -165,15 +182,12 @@ def _run_with_local_index(args: argparse.Namespace) -> tuple[list[dict], dict]:
 
             def evaluate(case: PortfolioCase) -> Observation:
                 retrieval = pipeline.run(case.question)
-                return {
-                    "retrieved": _retrieved_identities(retrieval.hits),
-                    "applied_routes": _applied_routes(case.question),
-                    "threshold_refused": (
-                        not retrieval.hits
-                        or retrieval.top_score < settings.rerank_score_threshold
-                    ),
-                    "top_score": retrieval.top_score,
-                }
+                return _evaluate_retrieval(
+                    case,
+                    retrieval,
+                    settings,
+                    reranker_enabled=pipeline.reranker is not None,
+                )
 
             results = run_cases(cases, evaluate)
         finally:

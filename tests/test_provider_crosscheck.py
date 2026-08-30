@@ -1,9 +1,13 @@
 """Provider cross-check evidence must be useful without leaking content."""
 
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
+import run_provider_crosscheck  # noqa: E402
 
 from rag.provider_budget import BudgetLedger
 from rag.provider_crosscheck import (
@@ -239,3 +243,65 @@ def test_run_directory_must_remain_under_ignored_runs_root(tmp_path: Path) -> No
         resolve_private_run_dir(tmp_path / "public-output", runs_root, "ignored")
     with pytest.raises(ValueError, match="child directory"):
         resolve_private_run_dir(runs_root, runs_root, "ignored")
+
+
+def test_provider_runner_uses_shared_decision_for_generation_admission(monkeypatch):
+    calls = []
+
+    def decide(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(refusal_stage=None)
+
+    monkeypatch.setattr(run_provider_crosscheck, "decide_retrieval_refusal", decide)
+    retrieval = SimpleNamespace(
+        hits=[],
+        top_score=0.01,
+        applied_routes=("severance_comparison",),
+    )
+    settings = SimpleNamespace(
+        rerank_score_threshold=0.03,
+        severance_comparison_score_threshold=0.015,
+    )
+
+    run_provider_crosscheck._require_generation_admission(
+        retrieval,
+        settings,
+        qid="stress-001",
+        reranker_enabled=True,
+    )
+
+    assert calls == [
+        {
+            "has_hits": False,
+            "reranker_enabled": True,
+            "applied_routes": ("severance_comparison",),
+            "top_score": 0.01,
+            "global_threshold": 0.03,
+            "severance_comparison_threshold": 0.015,
+        }
+    ]
+
+
+def test_provider_runner_rejects_when_shared_decision_refuses(monkeypatch):
+    monkeypatch.setattr(
+        run_provider_crosscheck,
+        "decide_retrieval_refusal",
+        lambda **_kwargs: SimpleNamespace(refusal_stage="threshold"),
+    )
+    retrieval = SimpleNamespace(
+        hits=[object()],
+        top_score=0.9,
+        applied_routes=(),
+    )
+    settings = SimpleNamespace(
+        rerank_score_threshold=0.03,
+        severance_comparison_score_threshold=0.015,
+    )
+
+    with pytest.raises(RuntimeError, match="stress-001"):
+        run_provider_crosscheck._require_generation_admission(
+            retrieval,
+            settings,
+            qid="stress-001",
+            reranker_enabled=True,
+        )

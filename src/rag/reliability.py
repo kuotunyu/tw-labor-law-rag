@@ -50,16 +50,19 @@ def _validated_thresholds(thresholds: Iterable[float]) -> list[float]:
     return sorted(values)
 
 
-def privacy_reduced_trace(row: Mapping[str, Any], *, threshold: float) -> dict[str, Any]:
+def privacy_reduced_trace(
+    row: Mapping[str, Any], *, threshold_refused: bool
+) -> dict[str, Any]:
     """Return the exact, content-free trace schema approved for publication."""
-    threshold_value = _validated_thresholds([threshold])[0]
+    if type(threshold_refused) is not bool:
+        raise ValueError("threshold_refused must be a boolean")
     qid, answerable, rank, score, elapsed_ms = _validated_row(row)
     reduced = {
         "qid": qid,
         "answerable": answerable,
         "rank": rank,
         "top_score": round(score, 4),
-        "threshold_refused": score < threshold_value,
+        "threshold_refused": threshold_refused,
         "elapsed_ms": round(elapsed_ms, 1),
     }
     if tuple(reduced) != PUBLIC_TRACE_FIELDS:

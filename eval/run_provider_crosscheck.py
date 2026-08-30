@@ -50,6 +50,7 @@ from rag.provider_crosscheck import (  # noqa: E402
     select_crosscheck_rows,
     validate_request_maxima,
 )
+from rag.retrieval.refusal_policy import decide_retrieval_refusal  # noqa: E402
 from rag.retrieval.reranker import Reranker  # noqa: E402
 
 DATASET = PROJECT_ROOT / "eval" / "dataset" / "reliability_stress_v0.3.1.jsonl"
@@ -152,6 +153,27 @@ def _raw_result(
     }
 
 
+def _require_generation_admission(
+    retrieval,
+    settings: Settings,
+    *,
+    qid: str,
+    reranker_enabled: bool,
+) -> None:
+    decision = decide_retrieval_refusal(
+        has_hits=bool(retrieval.hits),
+        reranker_enabled=reranker_enabled,
+        applied_routes=retrieval.applied_routes,
+        top_score=retrieval.top_score,
+        global_threshold=settings.rerank_score_threshold,
+        severance_comparison_threshold=(
+            settings.severance_comparison_score_threshold
+        ),
+    )
+    if decision.refusal_stage is not None:
+        raise RuntimeError(f"selected row no longer reaches generation: {qid}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, default=DATASET)
@@ -252,10 +274,12 @@ def main() -> int:
         retrieval_by_qid = {}
         for index, row in enumerate(selected, start=1):
             retrieval = pipeline.run(row["question"])
-            if not retrieval.hits or retrieval.top_score < settings.rerank_score_threshold:
-                raise RuntimeError(
-                    f"selected row no longer reaches generation: {row['qid']}"
-                )
+            _require_generation_admission(
+                retrieval,
+                settings,
+                qid=row["qid"],
+                reranker_enabled=pipeline.reranker is not None,
+            )
             retrieval_by_qid[row["qid"]] = retrieval
             print(f"[retrieve] {index}/{len(selected)} {row['qid']}", flush=True)
 
