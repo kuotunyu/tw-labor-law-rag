@@ -19,7 +19,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 _FORMAT_VERSION = "1"
 _FIXED_TRACKED_PATHS = frozenset(
@@ -69,6 +69,10 @@ _MARKER_KEYS = (
     "python_full_version",
     "python_version",
     "sys_platform",
+)
+_WINDOWS_PYWIN32_RUNTIME_LAYOUT = (
+    PurePosixPath("Lib/site-packages/win32"),
+    PurePosixPath("Lib/site-packages/win32/lib"),
 )
 
 
@@ -852,6 +856,41 @@ def _installed_inventory(approved_sites: list[Path]) -> list[dict[str, str]]:
     ]
 
 
+def _expected_runtime_import_layout(
+    selected: Sequence[Mapping[str, object]], markers: Mapping[str, str]
+) -> tuple[PurePosixPath, ...]:
+    if not isinstance(selected, Sequence) or isinstance(selected, (str, bytes)):
+        raise ValueError("selected package inventory must be a sequence")
+    if not isinstance(markers, Mapping) or set(markers) != set(_MARKER_KEYS):
+        raise ValueError("runtime marker environment fields are invalid")
+    if not all(isinstance(markers[key], str) for key in _MARKER_KEYS):
+        raise ValueError("runtime marker environment values are invalid")
+
+    selected_names: list[str] = []
+    for entry in selected:
+        if not isinstance(entry, Mapping) or set(entry) != {"name", "version"}:
+            raise ValueError("selected package inventory entry fields are invalid")
+        name = entry["name"]
+        version = entry["version"]
+        if (
+            not isinstance(name, str)
+            or _pep503_name(name) != name
+            or not isinstance(version, str)
+            or not version
+        ):
+            raise ValueError("selected package inventory entry is invalid")
+        selected_names.append(name)
+
+    is_windows = (
+        markers["os_name"] == "nt"
+        and markers["sys_platform"] == "win32"
+        and markers["platform_system"] == "Windows"
+    )
+    if is_windows and "pywin32" in selected_names:
+        return _WINDOWS_PYWIN32_RUNTIME_LAYOUT
+    return ()
+
+
 def _parse_pyvenv(environment_root: Path) -> dict[str, str]:
     config_path = environment_root / "pyvenv.cfg"
     if not config_path.is_file():
@@ -915,6 +954,63 @@ def _validated_approved_sites(environment_root: Path) -> list[Path]:
                 "approved site-packages path resolves outside environment"
             ) from exc
     return approved_sites
+
+
+def _validated_runtime_import_roots(
+    environment_root: Path,
+    layout: Sequence[str],
+    selected: Sequence[Mapping[str, object]],
+    markers: Mapping[str, str],
+) -> list[Path]:
+    expected = _expected_runtime_import_layout(selected, markers)
+    if type(layout) is not list or any(type(item) is not str for item in layout):
+        raise ValueError("runtime import layout must be a list of strings")
+    try:
+        canonical_layout = tuple(
+            PurePosixPath(_canonical_path(item)) for item in layout
+        )
+    except ValueError as exc:
+        raise ValueError("runtime import layout contains a non-canonical path") from exc
+    if canonical_layout != expected:
+        raise ValueError(
+            "runtime import layout differs from the package-conditioned layout"
+        )
+
+    lexical_environment = Path(os.path.abspath(environment_root))
+    try:
+        resolved_environment = lexical_environment.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError("runtime import root environment is missing") from exc
+
+    roots: list[Path] = []
+    for relative in canonical_layout:
+        root = lexical_environment.joinpath(*relative.parts)
+        current = lexical_environment
+        for part in relative.parts:
+            current /= part
+            try:
+                path_stat = os.lstat(current)
+            except OSError as exc:
+                raise ValueError(
+                    "runtime import root path or parent is missing"
+                ) from exc
+            if _is_alias(path_stat):
+                raise ValueError(
+                    "runtime import root path or parent contains an alias"
+                )
+            if not stat.S_ISDIR(path_stat.st_mode):
+                raise ValueError(
+                    "runtime import root path or parent is not a directory"
+                )
+        try:
+            resolved_root = root.resolve(strict=True)
+            resolved_root.relative_to(resolved_environment)
+        except (OSError, ValueError) as exc:
+            raise ValueError(
+                "runtime import root resolves outside environment"
+            ) from exc
+        roots.append(root)
+    return roots
 
 
 def _validate_preimport_runtime(
@@ -1057,6 +1153,13 @@ def build_environment_binding(
         raise ValueError(
             "installed distribution inventory does not exactly match the selected no-dev lock"
         )
+    runtime_import_layout = [
+        path.as_posix()
+        for path in _expected_runtime_import_layout(selected, markers)
+    ]
+    _validated_runtime_import_roots(
+        environment, runtime_import_layout, selected, markers
+    )
     interpreter_relative = Path(os.path.abspath(sys.executable)).relative_to(
         environment
     )
@@ -1077,6 +1180,7 @@ def build_environment_binding(
         },
         "pyvenv": {"include_system_site_packages": False},
         "site_layout": site_layout,
+        "runtime_import_layout": runtime_import_layout,
         "lock_selection": {
             "lock_sha256": hashlib.sha256(lock_path.read_bytes()).hexdigest(),
             "offline": True,

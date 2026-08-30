@@ -6,7 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -26,6 +26,27 @@ DECLARED_INPUTS = {
     "stress_dataset": "eval/dataset/reliability_stress_v0.3.1.jsonl",
     "target_dataset": "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
 }
+WINDOWS_MARKERS = {
+    "implementation_name": "cpython",
+    "os_name": "nt",
+    "platform_machine": "AMD64",
+    "platform_python_implementation": "CPython",
+    "platform_system": "Windows",
+    "python_full_version": "3.11.9",
+    "python_version": "3.11",
+    "sys_platform": "win32",
+}
+NON_WINDOWS_MARKERS = {
+    **WINDOWS_MARKERS,
+    "os_name": "posix",
+    "platform_system": "Linux",
+    "sys_platform": "linux",
+}
+PYWIN32_SELECTED = [{"name": "pywin32", "version": "306"}]
+WINDOWS_PYWIN32_RUNTIME_LAYOUT = [
+    "Lib/site-packages/win32",
+    "Lib/site-packages/win32/lib",
+]
 
 
 def _run(*args: str, cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
@@ -579,6 +600,288 @@ def _install_metadata(
     )
 
 
+def _create_windows_pywin32_runtime_layout(environment_root: Path) -> list[Path]:
+    roots = [
+        environment_root.joinpath(*PurePosixPath(relative).parts)
+        for relative in WINDOWS_PYWIN32_RUNTIME_LAYOUT
+    ]
+    for root in roots:
+        root.mkdir(parents=True, exist_ok=True)
+    return roots
+
+
+def _directory_snapshot(path: Path) -> dict[str, bytes]:
+    return {
+        item.relative_to(path).as_posix(): item.read_bytes()
+        for item in path.rglob("*")
+        if item.is_file()
+    }
+
+
+@pytest.mark.parametrize(
+    ("selected", "markers", "expected"),
+    [
+        pytest.param(
+            PYWIN32_SELECTED,
+            WINDOWS_MARKERS,
+            WINDOWS_PYWIN32_RUNTIME_LAYOUT,
+            id="windows-pywin32",
+        ),
+        pytest.param([], WINDOWS_MARKERS, [], id="windows-without-pywin32"),
+        pytest.param(
+            PYWIN32_SELECTED,
+            NON_WINDOWS_MARKERS,
+            [],
+            id="non-windows-pywin32",
+        ),
+    ],
+)
+def test_expected_runtime_import_layout_requires_windows_and_pywin32_inventory(
+    bootstrap_module,
+    selected: list[dict[str, str]],
+    markers: dict[str, str],
+    expected: list[str],
+) -> None:
+    layout = bootstrap_module._expected_runtime_import_layout(selected, markers)
+
+    assert [path.as_posix() for path in layout] == expected
+
+
+def test_runtime_import_root_validator_accepts_only_the_exact_derived_layout(
+    bootstrap_module, tmp_path: Path
+) -> None:
+    environment_root = tmp_path / "authority-env"
+    expected_roots = _create_windows_pywin32_runtime_layout(environment_root)
+
+    roots = bootstrap_module._validated_runtime_import_roots(
+        environment_root,
+        WINDOWS_PYWIN32_RUNTIME_LAYOUT,
+        PYWIN32_SELECTED,
+        WINDOWS_MARKERS,
+    )
+
+    assert roots == expected_roots
+
+
+@pytest.mark.parametrize(
+    "layout",
+    [
+        pytest.param(
+            ["Lib/site-packages/win32"],
+            id="missing-root",
+        ),
+        pytest.param(
+            [*WINDOWS_PYWIN32_RUNTIME_LAYOUT, "Lib/site-packages/pythonwin"],
+            id="extra-pythonwin-root",
+        ),
+        pytest.param(
+            list(reversed(WINDOWS_PYWIN32_RUNTIME_LAYOUT)),
+            id="wrong-order",
+        ),
+        pytest.param(
+            ["Lib/site-packages/Win32", "Lib/site-packages/win32/lib"],
+            id="wrong-spelling",
+        ),
+        pytest.param(
+            [WINDOWS_PYWIN32_RUNTIME_LAYOUT[0]] * 2,
+            id="duplicate-root",
+        ),
+        pytest.param(
+            ["Lib/site-packages/win32/.", "Lib/site-packages/win32/lib"],
+            id="dot-segment",
+        ),
+        pytest.param(
+            ["Lib/site-packages/win32", "Lib/site-packages/win32//lib"],
+            id="empty-segment",
+        ),
+        pytest.param(
+            [r"Lib\site-packages\win32", "Lib/site-packages/win32/lib"],
+            id="backslash",
+        ),
+        pytest.param(
+            ["../outside", "Lib/site-packages/win32/lib"],
+            id="path-escape",
+        ),
+        pytest.param(
+            tuple(WINDOWS_PYWIN32_RUNTIME_LAYOUT),
+            id="wrong-container-type",
+        ),
+        pytest.param(
+            [PurePosixPath(path) for path in WINDOWS_PYWIN32_RUNTIME_LAYOUT],
+            id="wrong-element-type",
+        ),
+    ],
+)
+def test_runtime_import_root_validator_rejects_layout_drift_before_path_use(
+    bootstrap_module, tmp_path: Path, layout: object
+) -> None:
+    environment_root = tmp_path / "authority-env"
+    _create_windows_pywin32_runtime_layout(environment_root)
+
+    with pytest.raises(ValueError, match="runtime import layout"):
+        bootstrap_module._validated_runtime_import_roots(
+            environment_root,
+            layout,
+            PYWIN32_SELECTED,
+            WINDOWS_MARKERS,
+        )
+
+
+def test_runtime_import_root_validator_returns_empty_for_unconditioned_layouts(
+    bootstrap_module, tmp_path: Path
+) -> None:
+    environment_root = tmp_path / "authority-env"
+    environment_root.mkdir()
+
+    assert (
+        bootstrap_module._validated_runtime_import_roots(
+            environment_root, [], [], WINDOWS_MARKERS
+        )
+        == []
+    )
+    assert (
+        bootstrap_module._validated_runtime_import_roots(
+            environment_root, [], PYWIN32_SELECTED, NON_WINDOWS_MARKERS
+        )
+        == []
+    )
+
+
+@pytest.mark.parametrize("failure", ["missing", "special-file"])
+def test_runtime_import_root_validator_rejects_missing_and_non_directory_roots(
+    bootstrap_module, tmp_path: Path, failure: str
+) -> None:
+    environment_root = tmp_path / "authority-env"
+    win32_root = environment_root / "Lib/site-packages/win32"
+    win32_root.mkdir(parents=True)
+    if failure == "special-file":
+        (win32_root / "lib").write_text("not a directory\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="runtime import root"):
+        bootstrap_module._validated_runtime_import_roots(
+            environment_root,
+            WINDOWS_PYWIN32_RUNTIME_LAYOUT,
+            PYWIN32_SELECTED,
+            WINDOWS_MARKERS,
+        )
+
+
+def test_runtime_import_root_validator_rejects_symlinked_components_without_touching_target(
+    bootstrap_module, tmp_path: Path
+) -> None:
+    environment_root = tmp_path / "authority-env"
+    site = environment_root / "Lib/site-packages"
+    site.mkdir(parents=True)
+    external_target = tmp_path / "external-win32"
+    (external_target / "lib").mkdir(parents=True)
+    external_target.joinpath("sentinel.txt").write_text(
+        "untouched\n", encoding="utf-8"
+    )
+    try:
+        (site / "win32").symlink_to(external_target, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"OS denied directory symlink creation: {exc}")
+    before = _directory_snapshot(external_target)
+
+    with pytest.raises(ValueError, match="runtime import root.*alias"):
+        bootstrap_module._validated_runtime_import_roots(
+            environment_root,
+            WINDOWS_PYWIN32_RUNTIME_LAYOUT,
+            PYWIN32_SELECTED,
+            WINDOWS_MARKERS,
+        )
+
+    assert _directory_snapshot(external_target) == before
+
+
+def test_runtime_import_root_validator_rejects_windows_junction_without_touching_target(
+    bootstrap_module, tmp_path: Path
+) -> None:
+    if sys.platform != "win32":
+        pytest.skip("Windows junctions are unavailable on this platform")
+    environment_root = tmp_path / "authority-env"
+    site = environment_root / "Lib/site-packages"
+    site.mkdir(parents=True)
+    external_target = tmp_path / "junction-win32-target"
+    (external_target / "lib").mkdir(parents=True)
+    external_target.joinpath("sentinel.txt").write_text(
+        "untouched\n", encoding="utf-8"
+    )
+    created = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(site / "win32"), str(external_target)],
+        check=False,
+        capture_output=True,
+    )
+    if created.returncode != 0:
+        pytest.skip("OS denied junction creation")
+    before = _directory_snapshot(external_target)
+
+    with pytest.raises(ValueError, match="runtime import root.*alias"):
+        bootstrap_module._validated_runtime_import_roots(
+            environment_root,
+            WINDOWS_PYWIN32_RUNTIME_LAYOUT,
+            PYWIN32_SELECTED,
+            WINDOWS_MARKERS,
+        )
+
+    assert _directory_snapshot(external_target) == before
+
+
+def test_runtime_import_root_validator_rejects_portable_windows_reparse_seam(
+    bootstrap_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    environment_root = tmp_path / "authority-env"
+    _create_windows_pywin32_runtime_layout(environment_root)
+    monkeypatch.setattr(bootstrap_module, "_is_alias", lambda _path_stat: True)
+
+    with pytest.raises(ValueError, match="runtime import root.*alias"):
+        bootstrap_module._validated_runtime_import_roots(
+            environment_root,
+            WINDOWS_PYWIN32_RUNTIME_LAYOUT,
+            PYWIN32_SELECTED,
+            WINDOWS_MARKERS,
+        )
+
+
+def test_runtime_import_root_validator_requires_resolved_environment_containment(
+    bootstrap_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    environment_root = tmp_path / "authority-env"
+    site = environment_root / "Lib/site-packages"
+    site.mkdir(parents=True)
+    external_target = tmp_path / "external-win32"
+    (external_target / "lib").mkdir(parents=True)
+    if sys.platform == "win32":
+        created = subprocess.run(
+            [
+                "cmd",
+                "/c",
+                "mklink",
+                "/J",
+                str(site / "win32"),
+                str(external_target),
+            ],
+            check=False,
+            capture_output=True,
+        )
+        if created.returncode != 0:
+            pytest.skip("OS denied junction creation")
+    else:
+        try:
+            (site / "win32").symlink_to(external_target, target_is_directory=True)
+        except OSError as exc:
+            pytest.skip(f"OS denied directory symlink creation: {exc}")
+    monkeypatch.setattr(bootstrap_module, "_is_alias", lambda _path_stat: False)
+
+    with pytest.raises(ValueError, match="runtime import root.*outside environment"):
+        bootstrap_module._validated_runtime_import_roots(
+            environment_root,
+            WINDOWS_PYWIN32_RUNTIME_LAYOUT,
+            PYWIN32_SELECTED,
+            WINDOWS_MARKERS,
+        )
+
+
 def test_record_mode_requires_isolated_no_site_external_environment_before_project_import(
     git_repository: Path, tmp_path: Path
 ) -> None:
@@ -703,6 +1006,7 @@ def test_record_mode_binds_privacy_safe_external_interpreter_and_empty_inventory
         "interpreter",
         "pyvenv",
         "site_layout",
+        "runtime_import_layout",
         "lock_selection",
         "installed_distributions",
     }
@@ -712,6 +1016,7 @@ def test_record_mode_binds_privacy_safe_external_interpreter_and_empty_inventory
     )
     assert environment["pyvenv"] == {"include_system_site_packages": False}
     assert environment["installed_distributions"] == []
+    assert environment["runtime_import_layout"] == []
     assert environment["lock_selection"]["offline"] is True
     assert environment["lock_selection"]["frozen"] is True
     assert environment["lock_selection"]["no_dev"] is True
@@ -783,14 +1088,112 @@ def test_record_mode_rejects_unapproved_prebootstrap_path_and_does_not_process_p
     accepted = _record(git_repository, environment_root)
     assert accepted.returncode == 0, accepted.stderr
     assert not marker.exists()
+    assert (
+        json.loads(accepted.stdout)["environment_binding"]["runtime_import_layout"]
+        == []
+    )
 
 
-def _directory_snapshot(path: Path) -> dict[str, bytes]:
-    return {
-        item.relative_to(path).as_posix(): item.read_bytes()
-        for item in path.rglob("*")
-        if item.is_file()
-    }
+@pytest.mark.skipif(os.name != "nt", reason="PyWin32 runtime layout is Windows-only")
+def test_record_mode_binds_exact_pywin32_runtime_layout_without_processing_pth(
+    git_repository: Path, tmp_path: Path
+) -> None:
+    packages = """
+[[package]]
+name = 'pywin32'
+version = '306'
+"""
+    _replace_lock(
+        git_repository,
+        _minimal_lock(dependencies="{ name = 'pywin32' }", packages=packages),
+    )
+    environment_root = _create_environment(tmp_path / "authority-env")
+    site = _site_packages(environment_root)
+    _install_metadata(site, "pywin32", "306")
+    _create_windows_pywin32_runtime_layout(environment_root)
+    (site / "pythonwin").mkdir()
+    marker = tmp_path / "pth-imported.marker"
+    site.joinpath("pywin32.pth").write_text(
+        "win32\nwin32/lib\npythonwin\n"
+        f"import pathlib; pathlib.Path({str(marker)!r}).write_text('imported')\n",
+        encoding="utf-8",
+    )
+
+    completed = _record(git_repository, environment_root)
+
+    assert completed.returncode == 0, completed.stderr
+    environment = json.loads(completed.stdout)["environment_binding"]
+    assert environment["runtime_import_layout"] == WINDOWS_PYWIN32_RUNTIME_LAYOUT
+    assert not marker.exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="PyWin32 runtime layout is Windows-only")
+def test_record_mode_checks_exact_inventory_before_pywin32_runtime_layout(
+    git_repository: Path, tmp_path: Path
+) -> None:
+    packages = """
+[[package]]
+name = 'pywin32'
+version = '306'
+"""
+    _replace_lock(
+        git_repository,
+        _minimal_lock(dependencies="{ name = 'pywin32' }", packages=packages),
+    )
+    environment_root = _create_environment(tmp_path / "authority-env")
+
+    completed = _record(git_repository, environment_root)
+
+    assert completed.returncode != 0
+    assert "inventory" in completed.stderr
+    assert "runtime import root" not in completed.stderr
+
+
+@pytest.mark.skipif(os.name != "nt", reason="PyWin32 runtime layout is Windows-only")
+def test_runtime_root_rejection_precedes_project_import_and_artifact_work(
+    git_repository: Path, tmp_path: Path
+) -> None:
+    packages = """
+[[package]]
+name = 'pywin32'
+version = '306'
+"""
+    _replace_lock(
+        git_repository,
+        _minimal_lock(dependencies="{ name = 'pywin32' }", packages=packages),
+    )
+    import_marker = tmp_path / "project-imported.marker"
+    _write(
+        git_repository,
+        "eval/run_severance_refusal_policy.py",
+        "from pathlib import Path\n"
+        f"Path({str(import_marker)!r}).write_text('imported')\n",
+    )
+    _commit(git_repository, "runtime root ordering sentinel")
+    environment_root = _create_environment(tmp_path / "authority-env")
+    _install_metadata(_site_packages(environment_root), "pywin32", "306")
+    work_dir = tmp_path / "work"
+    command = _record_command(git_repository, environment_root)
+    command[command.index("record")] = "calibrate"
+    command.extend(["--", "--offline", "--work-dir", str(work_dir)])
+    process_environment = os.environ.copy()
+    process_environment.pop("PYTHONPATH", None)
+
+    completed = subprocess.run(
+        command,
+        cwd=git_repository,
+        env=process_environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert completed.returncode != 0
+    assert "runtime import root" in completed.stderr
+    assert not import_marker.exists()
+    assert not work_dir.exists()
 
 
 def test_record_mode_rejects_approved_site_through_symlinked_parent_without_touching_target(
@@ -1008,6 +1411,7 @@ def test_environment_binding_rejects_interpreter_lock_marker_and_inventory_tampe
         (("lock_selection", "lock_sha256"), "0" * 64),
         (("lock_selection", "markers", "sys_platform"), "tampered"),
         (("installed_distributions",), [{"name": "extra", "version": "1"}]),
+        (("runtime_import_layout",), ["Lib/site-packages/pythonwin"]),
     ):
         expected = json.loads(json.dumps(actual))
         target = expected
