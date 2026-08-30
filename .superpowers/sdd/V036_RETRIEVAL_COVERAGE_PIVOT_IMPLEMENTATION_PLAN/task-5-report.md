@@ -137,3 +137,77 @@ git diff --check
 The immutable historical NO-GO still matches Git blob
 `2cdb13b36d98b5ebfbfcd2cec877e571f3ab2dd4`; no model, provider, network,
 acceptance, official-export, or pivot-diagnostic action occurred.
+
+## Review-fix round 2
+
+Review-fix implementation commit:
+`765e372c61d5fbe43e3d7c829d5bc6d7661652e2`.
+
+### Root causes and RED evidence
+
+- The 36-entry manifest was broader than its original six-file predecessor,
+  but it still had no executable derivation from the authoritative import
+  graph. The new recursive static-import check initially failed with exactly
+  the six confirmed omissions: `src/rag/portfolio_demo_regression.py` plus the
+  `rag`, `generation`, `indexing`, `ingestion`, and `retrieval` package
+  `__init__.py` files. A synthetic newly imported local module and an
+  unallowlisted dynamic import also failed closed before model execution.
+- Resolved-path equality could self-approve a path that traversed a symlink or
+  Windows junction. The initial alias-focused run reported `3 failed, 2
+  skipped`: traversal back to the approved filename, a working Windows
+  junction, and the platform-independent reparse seam all reached the RED
+  condition; the two real symlink variants skipped only because Windows denied
+  symlink creation privileges.
+- Windows `Path` equality case-folded a differently cased lexical path. The
+  dedicated case-alias test reached preflight (`1 failed`) until the comparison
+  was changed to exact lexical parts.
+
+### Fix
+
+- `DECISION_CODE_PATHS` now has 42 entries, including all six reviewed runtime
+  omissions. A recursive AST walker starts from the authoritative evaluator,
+  release-verifier module, and release wrapper; follows local imports and
+  package-initializer execution semantics; and rejects any discovered local
+  file missing from the explicit manifest. Dynamic imports are fail-closed,
+  with an intentionally empty, documented exception allowlist.
+- Both the evaluator and release verifier execute the closure validation. The
+  release verifier still checks every manifest file's recorded hash, tracked
+  and clean working-tree state, and committed-revision bytes; a future local
+  import cannot silently escape those bindings.
+- Diagnostics output is compared lexically before resolution, including exact
+  path-part casing. The output and every lexical parent are inspected with
+  `lstat`; symlinks and Windows reparse points (including junctions) are
+  rejected before preflight, model construction, deletion, or writing.
+  Existing hardlink and protected-artifact identity checks remain in force.
+- Tests no longer duplicate the production manifest as their sole curated
+  oracle. They exercise the real derived closure, a synthetic omitted import,
+  dynamic-import rejection, traversal, case aliasing, output and parent
+  symlinks, a real Windows junction, a portable reparse seam, and untouched
+  arbitrary targets.
+
+### GREEN evidence
+
+```text
+.venv\Scripts\python.exe -m pytest tests\test_severance_refusal_policy.py -q -p no:cacheprovider -k "static_local_import_closure"
+3 passed, 139 deselected in 1.12s
+
+.venv\Scripts\python.exe -m pytest tests\test_severance_refusal_policy.py -q -p no:cacheprovider -k "rejects_nonapproved_diagnostics_output or through_symlink or through_windows_junction or alias_stat_seam or hardlink_alias_collision or aliased_as_a_source"
+15 passed, 2 skipped, 126 deselected in 1.20s
+
+.venv\Scripts\python.exe -m pytest tests\test_config.py tests\test_refusal_policy.py tests\test_answerer.py tests\test_reliability.py tests\test_portfolio_demo_regression.py tests\test_provider_crosscheck.py tests\test_pipeline.py tests\test_severance_refusal_policy.py -q -p no:cacheprovider
+345 passed, 2 skipped in 51.47s
+
+.venv\Scripts\python.exe -m pytest tests\test_release_verification.py -q -p no:cacheprovider -k "not test_release_verifier_recomputes_committed_evidence and not test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions"
+105 passed, 2 deselected in 7.95s
+
+.venv\Scripts\python.exe -m ruff check eval/run_severance_refusal_policy.py src/rag/release_verification.py src/rag/severance_refusal_policy.py tests/test_severance_refusal_policy.py
+All checks passed!
+
+git diff --check
+```
+
+The historical NO-GO file and the blob at commit `9890c785` both hash to
+`2cdb13b36d98b5ebfbfcd2cec877e571f3ab2dd4`. The pivot diagnostic and official
+artifact are absent. This review fix performed no model inference/download,
+provider call, network access, acceptance run, artifact export, deployment, or
+secret access. The Task 6/Task 7 handoff above is unchanged.
