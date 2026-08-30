@@ -73,6 +73,7 @@ scripts/download_corpus.py
 scripts/rebuild_qdrant_blue_green.py
 scripts/run_api.py
 scripts/run_space.py
+scripts/run_ui_fixture_api.py
 scripts/verify_release.py
 src/rag/__init__.py
 src/rag/api/__init__.py
@@ -143,10 +144,13 @@ tests/test_retriever.py
 tests/test_space_runner.py
 tests/test_tokenizer.py
 tests/test_ui_api_client.py
+tests/test_ui_bootstrap.py
 tests/test_ui_byok_app.py
 tests/test_ui_content.py
+tests/test_ui_fixture_api.py
 tests/test_vector_store.py
 tests/test_wage_arrears_regression.py
+ui/_bootstrap.py
 ui/api_client.py
 ui/app.py
 ui/content.py
