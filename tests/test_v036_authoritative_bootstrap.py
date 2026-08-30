@@ -584,6 +584,112 @@ def _record(
     )
 
 
+_PRIVATE_LOCK_SMOKE = r"""
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+bootstrap_path = Path(sys.argv[1])
+project_root = Path(sys.argv[2]).resolve(strict=True)
+environment_root = Path(sys.argv[3]).resolve(strict=True)
+binding_path = Path(sys.argv[4])
+pth_marker = Path(sys.argv[5])
+qdrant_root = Path(sys.argv[6]) if sys.argv[6] else None
+spec = importlib.util.spec_from_file_location(
+    "_v036_authoritative_bootstrap_lock_smoke", bootstrap_path
+)
+if spec is None or spec.loader is None:
+    raise RuntimeError("authoritative bootstrap import spec is unavailable")
+bootstrap = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = bootstrap
+spec.loader.exec_module(bootstrap)
+bootstrap._validate_preimport_runtime(project_root, environment_root)
+binding = json.loads(binding_path.read_text(encoding="utf-8"))
+bootstrap._activate_import_paths(project_root, environment_root, binding)
+
+import pywintypes
+import win32file
+from portalocker.portalocker import Win32Locker
+
+locker = Win32Locker()
+qdrant_closed = False
+if qdrant_root is not None:
+    from qdrant_client import QdrantClient
+
+    client = QdrantClient(path=str(qdrant_root))
+    try:
+        if not qdrant_root.is_dir():
+            raise RuntimeError("local Qdrant root was not constructed")
+    finally:
+        client.close()
+        qdrant_closed = True
+environment_paths = []
+for raw_path in sys.path:
+    try:
+        relative = Path(raw_path).relative_to(environment_root)
+    except ValueError:
+        continue
+    environment_paths.append(relative.as_posix())
+print(
+    json.dumps(
+        {
+            "dont_write_bytecode": sys.dont_write_bytecode,
+            "environment_paths": environment_paths,
+            "isolated": sys.flags.isolated,
+            "locker_sources": getattr(locker, "sources", None),
+            "locker_type": type(locker).__name__,
+            "no_site": sys.flags.no_site,
+            "pth_marker_exists": pth_marker.exists(),
+            "pythonwin_active": any(
+                Path(raw_path).name.casefold() == "pythonwin"
+                for raw_path in sys.path
+            ),
+            "pywintypes_source": getattr(pywintypes, "SOURCE", None),
+            "qdrant_closed": qdrant_closed,
+            "win32file_source": getattr(win32file, "SOURCE", None),
+        },
+        sort_keys=True,
+    )
+)
+"""
+
+
+def _run_private_lock_smoke(
+    repository: Path,
+    environment_root: Path,
+    binding_path: Path,
+    pth_marker: Path,
+    qdrant_root: Path | None = None,
+) -> subprocess.CompletedProcess:
+    process_environment = os.environ.copy()
+    for name in ("PYTHONHOME", "PYTHONPATH", "PYTHONUSERBASE"):
+        process_environment.pop(name, None)
+    return subprocess.run(
+        [
+            str(_environment_python(environment_root)),
+            "-B",
+            "-I",
+            "-S",
+            "-c",
+            _PRIVATE_LOCK_SMOKE,
+            str(BOOTSTRAP_PATH),
+            str(repository),
+            str(environment_root),
+            str(binding_path),
+            str(pth_marker),
+            "" if qdrant_root is None else str(qdrant_root),
+        ],
+        cwd=repository,
+        env=process_environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+
 def _replace_lock(repository: Path, payload: str) -> None:
     (repository / "uv.lock").write_text(payload, encoding="utf-8")
     _commit(repository, "lock fixture")
@@ -745,6 +851,31 @@ def test_runtime_import_root_validator_returns_empty_for_unconditioned_layouts(
         )
         == []
     )
+
+
+def test_import_activation_rejects_runtime_layout_replay_without_partial_path_change(
+    bootstrap_module, tmp_path: Path
+) -> None:
+    project_root = tmp_path / "repository"
+    for name in ("src", "eval", "scripts"):
+        (project_root / name).mkdir(parents=True)
+    environment_root = tmp_path / "authority-env"
+    _create_windows_pywin32_runtime_layout(environment_root)
+    before = list(sys.path)
+    replayed_binding = {
+        "runtime_import_layout": list(reversed(WINDOWS_PYWIN32_RUNTIME_LAYOUT)),
+        "lock_selection": {
+            "markers": WINDOWS_MARKERS,
+            "selected_packages": PYWIN32_SELECTED,
+        },
+    }
+
+    with pytest.raises(ValueError, match="runtime import layout"):
+        bootstrap_module._activate_import_paths(
+            project_root, environment_root, replayed_binding
+        )
+
+    assert sys.path == before
 
 
 @pytest.mark.parametrize("failure", ["missing", "special-file"])
@@ -1125,6 +1256,82 @@ version = '306'
     environment = json.loads(completed.stdout)["environment_binding"]
     assert environment["runtime_import_layout"] == WINDOWS_PYWIN32_RUNTIME_LAYOUT
     assert not marker.exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="PyWin32 runtime layout is Windows-only")
+def test_private_lock_smoke_activates_only_bound_split_roots_without_processing_pth(
+    git_repository: Path, tmp_path: Path
+) -> None:
+    packages = """
+[[package]]
+name = 'pywin32'
+version = '306'
+"""
+    _replace_lock(
+        git_repository,
+        _minimal_lock(dependencies="{ name = 'pywin32' }", packages=packages),
+    )
+    environment_root = _create_environment(tmp_path / "authority-env")
+    site = _site_packages(environment_root)
+    _install_metadata(site, "pywin32", "306")
+    win32_root, win32_lib_root = _create_windows_pywin32_runtime_layout(
+        environment_root
+    )
+    (win32_root / "win32file.py").write_text(
+        "SOURCE = 'win32'\n", encoding="utf-8"
+    )
+    (win32_lib_root / "pywintypes.py").write_text(
+        "SOURCE = 'win32/lib'\n", encoding="utf-8"
+    )
+    portalocker = site / "portalocker"
+    portalocker.mkdir()
+    (portalocker / "__init__.py").write_text("", encoding="utf-8")
+    (portalocker / "portalocker.py").write_text(
+        "class Win32Locker:\n"
+        "    def __init__(self):\n"
+        "        import pywintypes\n"
+        "        import win32file\n"
+        "        self.sources = [pywintypes.SOURCE, win32file.SOURCE]\n",
+        encoding="utf-8",
+    )
+    (site / "pythonwin").mkdir()
+    pth_marker = tmp_path / "malicious-pth.marker"
+    (site / "pywin32.pth").write_text(
+        "win32\nwin32/lib\npythonwin\n"
+        f"import pathlib; pathlib.Path({str(pth_marker)!r}).write_text('owned')\n",
+        encoding="utf-8",
+    )
+    recorded = _record(git_repository, environment_root)
+    assert recorded.returncode == 0, recorded.stderr
+    binding_path = tmp_path / "environment-binding.json"
+    binding_path.write_text(
+        json.dumps(json.loads(recorded.stdout)["environment_binding"]),
+        encoding="utf-8",
+    )
+
+    completed = _run_private_lock_smoke(
+        git_repository, environment_root, binding_path, pth_marker
+    )
+
+    assert not pth_marker.exists()
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "dont_write_bytecode": True,
+        "environment_paths": [
+            "Lib/site-packages",
+            "Lib/site-packages/win32",
+            "Lib/site-packages/win32/lib",
+        ],
+        "isolated": 1,
+        "locker_sources": ["win32/lib", "win32"],
+        "locker_type": "Win32Locker",
+        "no_site": 1,
+        "pth_marker_exists": False,
+        "pythonwin_active": False,
+        "pywintypes_source": "win32/lib",
+        "qdrant_closed": False,
+        "win32file_source": "win32",
+    }
 
 
 @pytest.mark.skipif(os.name != "nt", reason="PyWin32 runtime layout is Windows-only")

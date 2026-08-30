@@ -1274,15 +1274,37 @@ def _artifact_runtime(artifact_path: Path) -> dict[str, Any]:
     return runtime
 
 
-def _activate_import_paths(project_root: Path, environment_root: Path) -> None:
-    additions = [
+def _activate_import_paths(
+    project_root: Path,
+    environment_root: Path,
+    environment_binding: dict[str, Any],
+) -> None:
+    project_roots = [
         project_root / "src",
         project_root / "eval",
         project_root / "scripts",
-        *_validated_approved_sites(environment_root),
     ]
-    if not all(path.is_dir() for path in additions):
+    approved_sites = _validated_approved_sites(environment_root)
+    if not all(path.is_dir() for path in project_roots):
         raise ValueError("verified project or environment import root is missing")
+
+    if type(environment_binding) is not dict:
+        raise ValueError("environment binding is malformed during import activation")
+    lock_selection = environment_binding.get("lock_selection")
+    if type(lock_selection) is not dict:
+        raise ValueError("environment lock selection is malformed during import activation")
+    try:
+        layout = environment_binding["runtime_import_layout"]
+        markers = lock_selection["markers"]
+        selected = lock_selection["selected_packages"]
+    except KeyError as exc:
+        raise ValueError(
+            "environment runtime binding is incomplete during import activation"
+        ) from exc
+    runtime_roots = _validated_runtime_import_roots(
+        environment_root, layout, selected, markers
+    )
+    additions = [*project_roots, *approved_sites, *runtime_roots]
     sys.path.extend(os.fspath(path) for path in additions)
 
 
@@ -1350,7 +1372,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0
-        _activate_import_paths(project_root, environment_root)
+        _activate_import_paths(project_root, environment_root, environment_binding)
         if args.mode == "calibrate":
             if "--offline" not in entry_args:
                 raise ValueError("calibration bootstrap requires --offline")
