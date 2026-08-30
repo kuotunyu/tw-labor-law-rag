@@ -20,6 +20,21 @@
 
 此 artifact 對後兩題只證明「未被檢索層誤停」，並不宣稱已執行或驗證 LLM 拒答；每題均固定 `generation_called=false`。它是快速展示用 regression，不取代 40 題 formal baseline、60 題 reliability stress suite 或 archived provider evidence。`release/manifest.json` 綁定 dataset、snapshot、result、model revisions、runtime config 與精確彙總；release verifier 會重算每題排名、路由與邊界算術。
 
+## v0.3.6 route-aware refusal calibration: NO-GO
+
+2026-08-30 的 fresh offline calibration 以同一組固定 revision 的本機 retrieval
+pipeline 依序執行 30 題 target、60 題 stress 與 40 題 formal guard，且沒有建立
+LLM adapter 或送出 provider request。七個候選門檻都通過 stress 與 formal guard，
+但 target 都只有 `27/30`，因此沒有候選通過完整 gate，也沒有發布
+`severance_refusal_policy_v0.3.6.json` official artifact。
+
+失敗與候選門檻無關：`severance-policy-010` 與 `severance-policy-014` 的兩個必要
+法源只有一個進入 Top 5；`severance-policy-027` 沒有套用目標 route，但其 top
+score `0.02350945240753301` 低於維持不變的 global `0.03`，因此未符合預期的
+generation admission。這次結果不能用來綁定或發布 `0.015`；需要先另行審查
+retrieval quality／target contract 的根因，不得藉由修改資料、gate 或分數讓本次
+calibration 通過。
+
 ## v0.3.2 provider safety cross-check
 
 Gemini `gemini-3.5-flash-lite`／OpenAI `gpt-5.6-luna` 的正式 safety cross-check 已完成，`release/manifest.json` 記錄完整 contract，且本目錄收錄 `provider_crosscheck_results.json` 與 `provider_crosscheck_trace.jsonl`。兩家各五筆請求：Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。這是 safety cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質評估。provider trace 嚴格 content-free，不含 question/answer text、provider payload 或 credentials。

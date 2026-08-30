@@ -1,11 +1,16 @@
 import hashlib
 import json
 import math
+import os
+import subprocess
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import rag.severance_refusal_policy as policy
+from eval import run_severance_refusal_policy as runner
 from rag.retrieval.pipeline import plan_retrieval_query
 from rag.severance_refusal_policy import (
     build_case_observation,
@@ -17,6 +22,8 @@ from rag.severance_refusal_policy import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATASET = PROJECT_ROOT / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl"
+RUNNER = PROJECT_ROOT / "eval/run_severance_refusal_policy.py"
+STRESS_DATASET = PROJECT_ROOT / "eval/dataset/reliability_stress_v0.3.1.jsonl"
 EXPECTED_QIDS = (
     "severance-policy-001",
     "severance-policy-002",
@@ -143,6 +150,389 @@ FORMAL_ROUTES = {
 @pytest.fixture(scope="module")
 def cases():
     return load_cases(DATASET)
+
+
+def test_offline_runner_exposes_complete_cli_without_loading_models() -> None:
+    completed = subprocess.run(
+        [sys.executable, str(RUNNER), "--help"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        check=False,
+    )
+    stdout = completed.stdout.decode("utf-8", errors="replace")
+    stderr = completed.stderr.decode("utf-8", errors="replace")
+
+    assert completed.returncode == 0, stderr
+    for option in (
+        "--dataset",
+        "--stress-dataset",
+        "--formal-dataset",
+        "--snapshot",
+        "--work-dir",
+        "--offline",
+        "--device",
+        "--export-official",
+    ):
+        assert option in stdout
+
+
+def test_runner_forces_offline_mode_before_cached_model_preflight(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("TRANSFORMERS_OFFLINE", raising=False)
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    settings = SimpleNamespace(device="cpu")
+    calls = []
+    monkeypatch.setattr(runner, "Settings", lambda **kwargs: settings)
+    monkeypatch.setattr(
+        runner,
+        "require_cached_models",
+        lambda actual: calls.append(actual),
+    )
+
+    actual = runner._offline_preflight(SimpleNamespace(device="cpu"))
+
+    assert actual is settings
+    assert os.environ["TRANSFORMERS_OFFLINE"] == "1"
+    assert os.environ["HF_HUB_OFFLINE"] == "1"
+    assert calls == [settings]
+
+
+def test_runner_rejects_nonempty_work_directory_before_retrieval(tmp_path) -> None:
+    work_dir = tmp_path / "occupied"
+    work_dir.mkdir()
+    (work_dir / "existing.txt").write_text("do not overwrite", encoding="utf-8")
+
+    with pytest.raises(FileExistsError, match="absent or empty"):
+        runner._prepare_work_dir(work_dir)
+
+
+def test_runner_retrieves_each_target_once_and_records_unrounded_observation(
+    cases,
+) -> None:
+    by_question = {case.question: case for case in cases}
+    calls = []
+
+    def retrieve(question):
+        calls.append(question)
+        case = by_question[question]
+        hits = [
+            SimpleNamespace(
+                payload={"doc_title": source["law"], "articles": [source["article"]]}
+            )
+            for source in case.sources
+        ] or [SimpleNamespace(payload={"doc_title": "irrelevant", "articles": []})]
+        return SimpleNamespace(
+            hits=hits,
+            applied_routes=plan_retrieval_query(question).routes,
+            top_score=0.0150004,
+        )
+
+    observations = runner._run_target_cases(
+        SimpleNamespace(run=retrieve), cases
+    )
+
+    assert calls == [case.question for case in cases]
+    assert len(observations) == 30
+    assert observations[0] == {
+        "qid": "severance-policy-001",
+        "source_ranks": {
+            "勞動基準法|第 17 條": 2,
+            "勞工退休金條例|第 12 條": 1,
+        },
+        "applied_routes": ["severance_comparison"],
+        "top_score": 0.0150004,
+    }
+
+
+def test_runner_builds_guard_rows_from_fresh_scores_and_planned_routes() -> None:
+    row = json.loads(STRESS_DATASET.read_text(encoding="utf-8").splitlines()[2])
+    expected_source = row["sources"][0]
+    retrieval = SimpleNamespace(
+        hits=[
+            SimpleNamespace(payload={"doc_title": "other", "articles": []}),
+            SimpleNamespace(
+                payload={
+                    "doc_title": expected_source["doc"],
+                    "articles": [expected_source["article"]],
+                }
+            ),
+        ],
+        applied_routes=("not_used_as_guard_truth",),
+        top_score=0.0175004,
+    )
+
+    evidence = runner._run_guard_cases(
+        SimpleNamespace(run=lambda _question: retrieval), [row]
+    )
+
+    assert evidence == [
+        {
+            "qid": "stress-003",
+            "answerable": True,
+            "rank": 2,
+            "hit_count": 2,
+            "top_score": 0.0175004,
+            "applied_routes": ["severance_comparison"],
+        }
+    ]
+
+
+def test_runner_sweeps_every_candidate_over_the_same_retrieval_evidence(
+    monkeypatch,
+) -> None:
+    observations = [{"retrieval": "target"}]
+    stress = [{"retrieval": "stress"}]
+    formal = [{"retrieval": "formal"}]
+    calls = []
+
+    def evaluate(actual_observations, **kwargs):
+        calls.append((actual_observations, kwargs))
+        return {"candidate_threshold": kwargs["candidate_threshold"]}
+
+    monkeypatch.setattr(runner, "evaluate_candidate", evaluate)
+
+    results = runner._evaluate_candidates(observations, stress, formal)
+
+    assert [result["candidate_threshold"] for result in results] == list(
+        EXPECTED_CANDIDATES
+    )
+    assert len({id(call[0]) for call in calls}) == 1
+    assert all(call[0] is observations for call in calls)
+    assert all(call[1]["stress_rows"] is stress for call in calls)
+    assert all(call[1]["formal_rows"] is formal for call in calls)
+    assert all(call[1]["global_threshold"] == 0.03 for call in calls)
+
+
+def test_runner_rebuilds_identical_content_free_accepted_artifact(cases) -> None:
+    kwargs = {
+        "observations": _observations(cases),
+        "stress_rows": _stress_rows(),
+        "formal_rows": _formal_rows(),
+        "provenance": _provenance(),
+    }
+
+    first = runner._build_accepted_artifact(**kwargs)
+    second = runner._build_accepted_artifact(**kwargs)
+
+    assert first == second
+    assert first["schema_version"] == "1.2"
+    assert first["selected_threshold"] == 0.015
+    serialized = json.dumps(first, ensure_ascii=False, sort_keys=True)
+    for forbidden_key in (
+        '"question"',
+        '"content"',
+        '"answer"',
+        '"endpoint"',
+        '"url"',
+        '"credential"',
+        '"secret"',
+        '"api_key"',
+    ):
+        assert forbidden_key not in serialized
+
+
+def test_runner_reports_no_go_and_builds_no_artifact_when_any_gate_fails(
+    cases,
+) -> None:
+    observations = _observations(cases)
+    observations[0] = {**observations[0], "source_ranks": {}}
+
+    with pytest.raises(RuntimeError, match="NO-GO"):
+        runner._build_accepted_artifact(
+            observations=observations,
+            stress_rows=_stress_rows(),
+            formal_rows=_formal_rows(),
+            provenance=_provenance(),
+        )
+
+
+def test_runner_public_json_export_is_deterministic(tmp_path, cases) -> None:
+    artifact = runner._build_accepted_artifact(
+        observations=_observations(cases),
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+        provenance=_provenance(),
+    )
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+
+    runner._write_public_json(first, artifact)
+    runner._write_public_json(second, artifact)
+
+    assert first.read_bytes() == second.read_bytes()
+    assert first.read_bytes().endswith(b"\n")
+    assert first.read_text(encoding="utf-8") == json.dumps(
+        artifact, ensure_ascii=False, indent=2, sort_keys=True
+    ) + "\n"
+
+
+def test_runner_binds_exact_input_hashes_models_settings_and_zero_providers(
+    tmp_path,
+) -> None:
+    dataset = tmp_path / "target.jsonl"
+    stress = tmp_path / "stress.jsonl"
+    formal = tmp_path / "formal.jsonl"
+    snapshot = tmp_path / "snapshot.json"
+    for path, payload in (
+        (dataset, b"target\n"),
+        (stress, b"stress\n"),
+        (formal, b"formal\n"),
+        (snapshot, b"snapshot\n"),
+    ):
+        path.write_bytes(payload)
+    args = SimpleNamespace(
+        dataset=dataset,
+        stress_dataset=stress,
+        formal_dataset=formal,
+        snapshot=snapshot,
+    )
+    settings = SimpleNamespace(
+        embedding_model="BAAI/bge-m3",
+        embedding_model_revision="5617a9f61b028005a4858fdac845db406aefb181",
+        reranker_model="BAAI/bge-reranker-v2-m3",
+        reranker_model_revision="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        top_k_retrieve=20,
+        top_k_final=5,
+    )
+
+    provenance = runner._build_provenance(args, settings, "a" * 40)
+
+    assert provenance == {
+        "dataset_sha256": hashlib.sha256(b"target\n").hexdigest(),
+        "corpus_snapshot_sha256": hashlib.sha256(b"snapshot\n").hexdigest(),
+        "source_artifact_sha256": {
+            "stress_dataset": hashlib.sha256(b"stress\n").hexdigest(),
+            "formal_dataset": hashlib.sha256(b"formal\n").hexdigest(),
+        },
+        "embedding_model": "BAAI/bge-m3",
+        "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+        "reranker_model": "BAAI/bge-reranker-v2-m3",
+        "reranker_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        "retrieval_configuration": {
+            "chunking": "structure",
+            "retrieval": "hybrid",
+            "reranker": True,
+            "top_k_retrieve": 20,
+            "top_k_final": 5,
+        },
+        "code_revision": "a" * 40,
+        "run_origin": "fresh_offline_retrieval",
+        "provider_adapters": 0,
+        "provider_requests": 0,
+    }
+
+
+def test_runner_main_uses_one_retrieval_only_pipeline_and_exports_after_acceptance(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    target = tmp_path / "target.jsonl"
+    stress = tmp_path / "stress.jsonl"
+    formal = tmp_path / "formal.jsonl"
+    snapshot = tmp_path / "snapshot.json"
+    for path in (target, stress, formal):
+        path.write_text("{}\n", encoding="utf-8")
+    snapshot.write_text("{}\n", encoding="utf-8")
+    work_dir = tmp_path / "run"
+    official = tmp_path / "official.json"
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    pipeline = object()
+    closed = []
+    store = SimpleNamespace(close=lambda: closed.append("store"))
+    embedder = SimpleNamespace(close=lambda: closed.append("embedder"))
+    settings = SimpleNamespace(
+        embedding_model="BAAI/bge-m3",
+        embedding_model_revision="5617a9f61b028005a4858fdac845db406aefb181",
+        reranker_model="BAAI/bge-reranker-v2-m3",
+        reranker_model_revision="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        top_k_retrieve=20,
+        top_k_final=5,
+    )
+    target_cases = [object()]
+    stress_rows = [{"qid": "stress"}]
+    formal_rows = [{"qid": "formal"}]
+    observations = [{"qid": "target"}]
+    stress_evidence = [{"qid": "stress-evidence"}]
+    formal_evidence = [{"qid": "formal-evidence"}]
+    artifact = {"selected_threshold": 0.015}
+    calls = []
+
+    monkeypatch.setattr(runner, "OFFICIAL_RESULT", official, raising=False)
+    monkeypatch.setattr(runner, "_offline_preflight", lambda _args: settings)
+    monkeypatch.setattr(
+        runner,
+        "_materialize_audited_corpus",
+        lambda actual_work, committed: (
+            calls.append(("materialize", actual_work, committed)) or corpus
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_build_local_pipeline",
+        lambda _args, _work, actual_corpus: (
+            calls.append(("pipeline", actual_corpus))
+            or (settings, embedder, store, pipeline)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(runner, "load_cases", lambda _path: target_cases, raising=False)
+    monkeypatch.setattr(
+        runner,
+        "_load_dataset",
+        lambda path: stress_rows if path == stress else formal_rows,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_run_target_cases",
+        lambda actual_pipeline, actual_cases: (
+            calls.append(("target", actual_pipeline, actual_cases)) or observations
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_run_guard_cases",
+        lambda actual_pipeline, rows: (
+            calls.append(("guard", actual_pipeline, rows))
+            or (stress_evidence if rows is stress_rows else formal_evidence)
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_build_accepted_artifact",
+        lambda **kwargs: calls.append(("artifact", kwargs)) or artifact,
+    )
+    monkeypatch.setattr(runner, "_git_revision", lambda: "a" * 40, raising=False)
+
+    exit_code = runner.main(
+        [
+            "--dataset",
+            str(target),
+            "--stress-dataset",
+            str(stress),
+            "--formal-dataset",
+            str(formal),
+            "--snapshot",
+            str(snapshot),
+            "--work-dir",
+            str(work_dir),
+            "--offline",
+            "--device",
+            "cpu",
+            "--export-official",
+        ]
+    )
+
+    assert exit_code == 0
+    assert json.loads((work_dir / "results.json").read_text(encoding="utf-8")) == artifact
+    assert official.read_bytes() == (work_dir / "results.json").read_bytes()
+    assert closed == ["store", "embedder"]
+    assert ("target", pipeline, target_cases) in calls
+    assert ("guard", pipeline, stress_rows) in calls
+    assert ("guard", pipeline, formal_rows) in calls
 
 
 def _source_key(source: dict[str, str]) -> str:
