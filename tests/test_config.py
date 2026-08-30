@@ -20,20 +20,12 @@ def test_defaults():
     assert s.top_k_final == 5
     assert s.embedding_model_revision == DEFAULT_EMBEDDING_MODEL_REVISION
     assert s.reranker_model_revision == DEFAULT_RERANKER_MODEL_REVISION
-    assert s.severance_comparison_score_threshold == 0.015
+    assert s.rerank_score_threshold == 0.03
 
 
-@pytest.mark.parametrize("value", [0.0, 0.015, 1.0])
-def test_severance_comparison_score_threshold_accepts_finite_unit_interval(value):
-    settings = Settings(_env_file=None, severance_comparison_score_threshold=value)
-
-    assert settings.severance_comparison_score_threshold == value
-
-
-@pytest.mark.parametrize("value", [-0.000001, 1.000001, float("nan"), float("inf"), float("-inf")])
-def test_severance_comparison_score_threshold_rejects_out_of_range_or_non_finite_values(value):
-    with pytest.raises(ValidationError):
-        Settings(_env_file=None, severance_comparison_score_threshold=value)
+def test_settings_exposes_one_production_reranker_threshold():
+    assert set(Settings.model_fields) >= {"rerank_score_threshold"}
+    assert "severance_comparison_score_threshold" not in Settings.model_fields
 
 
 def test_env_override(monkeypatch):

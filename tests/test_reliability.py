@@ -88,7 +88,7 @@ def test_privacy_reduced_trace_requires_a_boolean_decision(threshold_refused):
         )
 
 
-def test_reliability_runner_reduces_with_shared_route_aware_decision(monkeypatch):
+def test_reliability_runner_preserves_routes_and_uses_global_decision(monkeypatch):
     calls = []
 
     def decide(**kwargs):
@@ -98,7 +98,6 @@ def test_reliability_runner_reduces_with_shared_route_aware_decision(monkeypatch
     monkeypatch.setattr(run_reliability_eval, "decide_retrieval_refusal", decide)
     settings = SimpleNamespace(
         rerank_score_threshold=0.9,
-        severance_comparison_score_threshold=0.2,
     )
     row = {
         **trace("stress-001", True, rank=2, score=0.1),
@@ -116,7 +115,6 @@ def test_reliability_runner_reduces_with_shared_route_aware_decision(monkeypatch
             "applied_routes": ("severance_comparison",),
             "top_score": 0.1,
             "global_threshold": 0.9,
-            "severance_comparison_threshold": 0.2,
         }
     ]
 
@@ -175,7 +173,6 @@ def test_reliability_main_uses_shared_policy_for_each_public_trace(
     )
     settings = SimpleNamespace(
         rerank_score_threshold=0.03,
-        severance_comparison_score_threshold=0.015,
         top_k_retrieve=20,
         top_k_final=5,
         embedding_model="embedding-test",
@@ -264,7 +261,6 @@ def test_reliability_main_uses_shared_policy_for_each_public_trace(
             "applied_routes": ("severance_comparison",),
             "top_score": 0.01,
             "global_threshold": 0.03,
-            "severance_comparison_threshold": 0.015,
         }
         for call in policy_calls
     )

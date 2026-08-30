@@ -3,8 +3,6 @@ from dataclasses import dataclass
 
 from rag.evaluation import RefusalStage
 
-SEVERANCE_COMPARISON_ROUTES = ("severance_comparison",)
-
 
 def _validated_unit_interval(value: float, *, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -32,7 +30,6 @@ def decide_retrieval_refusal(
     applied_routes: tuple[str, ...],
     top_score: float,
     global_threshold: float,
-    severance_comparison_threshold: float,
 ) -> RetrievalRefusalDecision:
     if type(has_hits) is not bool or type(reranker_enabled) is not bool:
         raise ValueError("hit and reranker flags must be booleans")
@@ -44,18 +41,9 @@ def decide_retrieval_refusal(
     global_value = _validated_unit_interval(
         global_threshold, name="global_threshold"
     )
-    severance_value = _validated_unit_interval(
-        severance_comparison_threshold,
-        name="severance_comparison_threshold",
-    )
     if not has_hits:
         return RetrievalRefusalDecision("no_hits", None)
     if not reranker_enabled:
         return RetrievalRefusalDecision(None, None)
-    threshold = (
-        severance_value
-        if applied_routes == SEVERANCE_COMPARISON_ROUTES
-        else global_value
-    )
-    stage: RefusalStage | None = "threshold" if score < threshold else None
-    return RetrievalRefusalDecision(stage, threshold)
+    stage: RefusalStage | None = "threshold" if score < global_value else None
+    return RetrievalRefusalDecision(stage, global_value)

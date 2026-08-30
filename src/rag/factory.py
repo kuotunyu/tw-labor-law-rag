@@ -106,5 +106,4 @@ def build_answerer(
         llm or build_llm(settings),
         refusal_threshold=settings.rerank_score_threshold,
         temperature=settings.llm_temperature,
-        severance_comparison_threshold=settings.severance_comparison_score_threshold,
     )

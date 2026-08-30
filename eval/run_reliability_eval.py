@@ -194,9 +194,6 @@ def _reduce_trace(row: dict, settings: Settings) -> dict:
         applied_routes=tuple(row["applied_routes"]),
         top_score=row["top_score"],
         global_threshold=settings.rerank_score_threshold,
-        severance_comparison_threshold=(
-            settings.severance_comparison_score_threshold
-        ),
     )
     return privacy_reduced_trace(
         row,

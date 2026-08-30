@@ -100,9 +100,6 @@ def _evaluate_retrieval(
         applied_routes=retrieval.applied_routes,
         top_score=retrieval.top_score,
         global_threshold=settings.rerank_score_threshold,
-        severance_comparison_threshold=(
-            settings.severance_comparison_score_threshold
-        ),
     )
     return {
         "retrieved": _retrieved_identities(retrieval.hits),

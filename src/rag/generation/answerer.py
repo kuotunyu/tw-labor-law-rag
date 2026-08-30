@@ -1,9 +1,9 @@
 """Assembles the final answer: retrieval -> LLM -> citation parsing -> refusal.
 
 Two refusal layers (see ``DESIGN.md``, section 4):
-  1. Retrieval layer — the shared route-aware policy selects either the global
-     threshold or the severance-comparison threshold for reranked results,
-     refusing without an LLM call when the top score is below that threshold.
+  1. Retrieval layer — the shared global policy refuses reranked results
+     without an LLM call when the primary-query top score is below the global
+     threshold. Routes remain retrieval evidence and never select a threshold.
      Raw vector/BM25/RRF scores are not calibrated for this gate. The
      cross-encoder is useful as a coarse filter, but high-scoring unanswerable
      questions can still reach the second layer.
@@ -53,18 +53,11 @@ class Answerer:
         llm: LLMAdapter | RoutedLLM,
         refusal_threshold: float = 0.0,
         temperature: float = 0.0,
-        *,
-        severance_comparison_threshold: float | None = None,
     ):
         self.pipeline = pipeline
         self.llm = llm
         self.refusal_threshold = refusal_threshold
         self.temperature = temperature
-        self.severance_comparison_threshold = (
-            refusal_threshold
-            if severance_comparison_threshold is None
-            else severance_comparison_threshold
-        )
 
     def answer(self, question: str) -> Answer:
         retrieval = self.pipeline.run(question)
@@ -75,7 +68,6 @@ class Answerer:
             applied_routes=retrieval.applied_routes,
             top_score=retrieval.top_score,
             global_threshold=self.refusal_threshold,
-            severance_comparison_threshold=self.severance_comparison_threshold,
         )
         if decision.refusal_stage is not None:
             return self._refuse(retrieval, stage=decision.refusal_stage)

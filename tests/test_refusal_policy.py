@@ -10,9 +10,9 @@ from rag.retrieval.refusal_policy import decide_retrieval_refusal
     [
         ("no hits before other conditions", "no_hits", None),
         ("hits with no reranker", None, None),
-        ("severance score below threshold", "threshold", 0.7),
-        ("severance score equal to threshold", None, 0.7),
-        ("severance score above threshold", None, 0.7),
+        ("severance score below global threshold", "threshold", 0.03),
+        ("severance score equal to global threshold", None, 0.03),
+        ("severance score above global threshold", None, 0.03),
         ("empty routes use global", "threshold", 0.03),
         ("unknown routes use global", "threshold", 0.03),
         ("duplicate routes use global", "threshold", 0.03),
@@ -23,18 +23,18 @@ def test_decision_table(case, expected_stage, expected_threshold):
     scores = {
         "no hits before other conditions": 0.0,
         "hits with no reranker": 0.0,
-        "severance score below threshold": 0.69,
-        "severance score equal to threshold": 0.7,
-        "severance score above threshold": 0.71,
+        "severance score below global threshold": 0.02,
+        "severance score equal to global threshold": 0.03,
+        "severance score above global threshold": 0.04,
         "empty routes use global": 0.02,
         "unknown routes use global": 0.02,
         "duplicate routes use global": 0.02,
         "multiple routes use global": 0.02,
     }
     routes = {
-        "severance score below threshold": ("severance_comparison",),
-        "severance score equal to threshold": ("severance_comparison",),
-        "severance score above threshold": ("severance_comparison",),
+        "severance score below global threshold": ("severance_comparison",),
+        "severance score equal to global threshold": ("severance_comparison",),
+        "severance score above global threshold": ("severance_comparison",),
         "unknown routes use global": ("other",),
         "duplicate routes use global": ("severance_comparison", "severance_comparison"),
         "multiple routes use global": ("severance_comparison", "other"),
@@ -45,7 +45,6 @@ def test_decision_table(case, expected_stage, expected_threshold):
         applied_routes=routes,
         top_score=scores[case],
         global_threshold=0.03,
-        severance_comparison_threshold=0.7,
     )
     assert decision.refusal_stage == expected_stage
     assert decision.effective_threshold == expected_threshold
@@ -58,7 +57,6 @@ def test_no_hits_has_priority_over_disabled_reranker():
         applied_routes=(),
         top_score=0.5,
         global_threshold=0.03,
-        severance_comparison_threshold=0.7,
     )
     assert decision.refusal_stage == "no_hits"
     assert decision.effective_threshold is None
@@ -67,7 +65,6 @@ def test_no_hits_has_priority_over_disabled_reranker():
 @pytest.mark.parametrize("field,value", [
     ("top_score", -0.01),
     ("global_threshold", math.inf),
-    ("severance_comparison_threshold", math.nan),
 ])
 @pytest.mark.parametrize(
     ("has_hits", "reranker_enabled"),
@@ -80,7 +77,6 @@ def test_validation_precedes_short_circuit_decisions(has_hits, reranker_enabled,
         applied_routes=(),
         top_score=0.5,
         global_threshold=0.03,
-        severance_comparison_threshold=0.7,
     )
     kwargs[field] = value
     with pytest.raises(ValueError):
@@ -98,10 +94,6 @@ def test_validation_precedes_short_circuit_decisions(has_hits, reranker_enabled,
         ("global_threshold", 1.01),
         ("global_threshold", math.nan),
         ("global_threshold", math.inf),
-        ("severance_comparison_threshold", -0.01),
-        ("severance_comparison_threshold", 1.01),
-        ("severance_comparison_threshold", math.nan),
-        ("severance_comparison_threshold", math.inf),
     ],
 )
 def test_invalid_scores_and_thresholds_are_rejected(field, value):
@@ -111,7 +103,6 @@ def test_invalid_scores_and_thresholds_are_rejected(field, value):
         applied_routes=(),
         top_score=0.5,
         global_threshold=0.03,
-        severance_comparison_threshold=0.7,
     )
     kwargs[field] = value
     with pytest.raises(ValueError):
@@ -136,7 +127,6 @@ def test_input_shapes_are_rejected(kwargs):
         applied_routes=(),
         top_score=0.5,
         global_threshold=0.03,
-        severance_comparison_threshold=0.7,
     )
     base.update(kwargs)
     with pytest.raises(ValueError):

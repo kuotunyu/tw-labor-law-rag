@@ -258,7 +258,6 @@ def test_portfolio_runner_uses_retrieval_routes_and_shared_decision(
     )
     settings = SimpleNamespace(
         rerank_score_threshold=0.03,
-        severance_comparison_score_threshold=0.015,
     )
 
     observation = run_portfolio_demo_regression._evaluate_retrieval(
@@ -281,7 +280,6 @@ def test_portfolio_runner_uses_retrieval_routes_and_shared_decision(
             "applied_routes": ("route_from_retrieval",),
             "top_score": 0.01,
             "global_threshold": 0.03,
-            "severance_comparison_threshold": 0.015,
         }
     ]
 
@@ -307,7 +305,6 @@ def test_portfolio_local_index_wiring_uses_shared_policy_observation(
     pipeline = SimpleNamespace(reranker=object(), run=lambda _question: retrieval)
     settings = SimpleNamespace(
         rerank_score_threshold=0.03,
-        severance_comparison_score_threshold=0.015,
         top_k_retrieve=20,
         top_k_final=5,
         rrf_k=60,

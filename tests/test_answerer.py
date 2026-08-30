@@ -296,7 +296,6 @@ def test_factory_uses_injected_routed_llm_for_refusal(monkeypatch):
     llm = RoutedLLM(FakeConcreteLLM())
     settings = SimpleNamespace(
         rerank_score_threshold=0.5,
-        severance_comparison_score_threshold=0.015,
         llm_temperature=0.0,
     )
     monkeypatch.setattr(factory, "build_retrieval_pipeline", lambda *args, **kwargs: pipeline)
@@ -317,7 +316,6 @@ def test_factory_default_concrete_llm_refusal_is_compatible(monkeypatch):
     llm = FakeConcreteLLM()
     settings = SimpleNamespace(
         rerank_score_threshold=0.5,
-        severance_comparison_score_threshold=0.015,
         llm_temperature=0.0,
     )
     monkeypatch.setattr(factory, "build_retrieval_pipeline", lambda *args, **kwargs: pipeline)
@@ -331,7 +329,7 @@ def test_factory_default_concrete_llm_refusal_is_compatible(monkeypatch):
     assert llm.calls == []
 
 
-def test_factory_forwards_special_severance_threshold(monkeypatch):
+def test_factory_uses_global_threshold_for_exact_severance_route(monkeypatch):
     hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.02)]
     pipeline = StaticPipeline(
         RetrievalResult(hits=hits, top_score=0.02, applied_routes=("severance_comparison",)),
@@ -340,16 +338,16 @@ def test_factory_forwards_special_severance_threshold(monkeypatch):
     llm = FakeLLM("依 [1] 回答。")
     settings = SimpleNamespace(
         rerank_score_threshold=0.03,
-        severance_comparison_score_threshold=0.015,
         llm_temperature=0.0,
     )
     monkeypatch.setattr(factory, "build_retrieval_pipeline", lambda *args, **kwargs: pipeline)
 
     result = factory.build_answerer(settings, object(), object(), llm=llm).answer("問題")
 
-    assert not result.refused
-    assert result.generation_called is True
-    assert len(llm.calls) == 1
+    assert result.refused
+    assert result.refusal_stage == "threshold"
+    assert result.generation_called is False
+    assert llm.calls == []
 
 
 def test_answerer_retrieval_layer_passes_threshold_when_high_enough():
@@ -372,17 +370,16 @@ def test_answerer_score_equal_to_threshold_calls_llm():
     assert len(llm.calls) == 1
 
 
-def test_answerer_refuses_severance_comparison_just_below_special_threshold():
-    hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.014999)]
+def test_answerer_refuses_severance_comparison_below_global_threshold():
+    hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.02)]
     llm = FakeLLM("should not be called")
     result = Answerer(
         StaticPipeline(
-            RetrievalResult(hits=hits, top_score=0.014999, applied_routes=("severance_comparison",)),
+            RetrievalResult(hits=hits, top_score=0.02, applied_routes=("severance_comparison",)),
             reranker=object(),
         ),
         llm,
         refusal_threshold=0.03,
-        severance_comparison_threshold=0.015,
     ).answer("問題")
 
     assert result.refused
@@ -391,17 +388,16 @@ def test_answerer_refuses_severance_comparison_just_below_special_threshold():
     assert llm.calls == []
 
 
-def test_answerer_calls_llm_at_severance_comparison_special_threshold():
-    hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.015)]
+def test_answerer_calls_llm_at_global_threshold_for_severance_comparison():
+    hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.03)]
     llm = FakeLLM("依 [1] 回答。")
     result = Answerer(
         StaticPipeline(
-            RetrievalResult(hits=hits, top_score=0.015, applied_routes=("severance_comparison",)),
+            RetrievalResult(hits=hits, top_score=0.03, applied_routes=("severance_comparison",)),
             reranker=object(),
         ),
         llm,
         refusal_threshold=0.03,
-        severance_comparison_threshold=0.015,
     ).answer("問題")
 
     assert not result.refused
@@ -437,7 +433,7 @@ def test_answerer_preserves_legacy_positional_constructor_arguments():
         ("severance_comparison", "wage_arrears_termination"),
     ],
 )
-def test_answerer_uses_global_threshold_unless_routes_are_exactly_severance_comparison(applied_routes):
+def test_answerer_uses_global_threshold_for_non_exact_routes(applied_routes):
     hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.02)]
     llm = FakeLLM("should not be called")
     result = Answerer(
@@ -447,7 +443,6 @@ def test_answerer_uses_global_threshold_unless_routes_are_exactly_severance_comp
         ),
         llm,
         refusal_threshold=0.03,
-        severance_comparison_threshold=0.015,
     ).answer("問題")
 
     assert result.refused

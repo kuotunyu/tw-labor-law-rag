@@ -166,9 +166,6 @@ def _require_generation_admission(
         applied_routes=retrieval.applied_routes,
         top_score=retrieval.top_score,
         global_threshold=settings.rerank_score_threshold,
-        severance_comparison_threshold=(
-            settings.severance_comparison_score_threshold
-        ),
     )
     if decision.refusal_stage is not None:
         raise RuntimeError(f"selected row no longer reaches generation: {qid}")

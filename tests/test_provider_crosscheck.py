@@ -260,7 +260,6 @@ def test_provider_runner_uses_shared_decision_for_generation_admission(monkeypat
     )
     settings = SimpleNamespace(
         rerank_score_threshold=0.03,
-        severance_comparison_score_threshold=0.015,
     )
 
     run_provider_crosscheck._require_generation_admission(
@@ -277,7 +276,6 @@ def test_provider_runner_uses_shared_decision_for_generation_admission(monkeypat
             "applied_routes": ("severance_comparison",),
             "top_score": 0.01,
             "global_threshold": 0.03,
-            "severance_comparison_threshold": 0.015,
         }
     ]
 
@@ -295,7 +293,6 @@ def test_provider_runner_rejects_when_shared_decision_refuses(monkeypatch):
     )
     settings = SimpleNamespace(
         rerank_score_threshold=0.03,
-        severance_comparison_score_threshold=0.015,
     )
 
     with pytest.raises(RuntimeError, match="stress-001"):
@@ -326,7 +323,6 @@ def test_provider_main_uses_shared_policy_before_provider_construction(
     credentials = SimpleNamespace(gemini_api_key="test", openai_api_key="test")
     settings = SimpleNamespace(
         rerank_score_threshold=0.03,
-        severance_comparison_score_threshold=0.015,
         reranker_model="reranker-test",
         reranker_model_revision="reranker-revision",
         device="cpu",
@@ -414,5 +410,4 @@ def test_provider_main_uses_shared_policy_before_provider_construction(
         "applied_routes": (),
         "top_score": 0.9,
         "global_threshold": 0.03,
-        "severance_comparison_threshold": 0.015,
     }

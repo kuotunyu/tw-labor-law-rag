@@ -86,12 +86,6 @@ class Settings(BaseSettings):
     # required the LLM refusal layer, so this is not a universal answerability
     # boundary. Recalibrate whenever the corpus, reranker, or query mix changes.
     rerank_score_threshold: float = 0.03
-    severance_comparison_score_threshold: float = Field(
-        default=0.015,
-        ge=0.0,
-        le=1.0,
-        allow_inf_nan=False,
-    )
 
     # ── Chunking ─────────────────────────────────────
     chunking_strategy: Literal["fixed", "structure"] = "structure"
