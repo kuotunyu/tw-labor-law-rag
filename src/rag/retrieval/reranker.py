@@ -9,12 +9,67 @@ answerable ones), but the cross-encoder score is.
 
 from __future__ import annotations
 
+from numbers import Real
 from types import MethodType
-from typing import Any
+from typing import Any, Sequence
 
 from rag.config import DEFAULT_RERANKER_MODEL_REVISION
 from rag.indexing.embedder import resolve_device, resolve_model_snapshot
 from rag.models import RetrievedChunk
+
+
+def _canonical_chunk_id(hit: RetrievedChunk) -> str:
+    """Return a stable chunk ID, rejecting malformed retrieval evidence."""
+    chunk_id = hit.payload.get("chunk_id")
+    if not isinstance(chunk_id, str) or not chunk_id or chunk_id != chunk_id.strip():
+        raise ValueError("candidate IDs must be non-blank canonical strings")
+    return chunk_id
+
+
+def _canonical_chunk_ids(hits: Sequence[RetrievedChunk], *, label: str) -> tuple[str, ...]:
+    chunk_ids = tuple(_canonical_chunk_id(hit) for hit in hits)
+    if len(set(chunk_ids)) != len(chunk_ids):
+        raise ValueError(f"{label} candidate IDs must be unique")
+    return chunk_ids
+
+
+def _require_exact_permutation(
+    expected_ids: tuple[str, ...],
+    ranking: Sequence[RetrievedChunk],
+    *,
+    label: str,
+) -> tuple[str, ...]:
+    ranking_ids = _canonical_chunk_ids(ranking, label=label)
+    if len(ranking_ids) != len(expected_ids) or set(ranking_ids) != set(expected_ids):
+        raise ValueError(f"{label} ranking must be an exact candidate-ID permutation")
+    return ranking_ids
+
+
+def interleave_reranker_rankings(
+    candidates: Sequence[RetrievedChunk],
+    primary_ranking: Sequence[RetrievedChunk],
+    secondary_ranking: Sequence[RetrievedChunk],
+) -> list[RetrievedChunk]:
+    """Merge two full reranker permutations by deterministic primary-first depth.
+
+    The secondary ranking contributes order only.  Each emitted hit comes from
+    the primary ranking, retaining its primary-query score even when that makes
+    the merged public scores non-monotonic.
+    """
+    candidate_ids = _canonical_chunk_ids(candidates, label="input")
+    primary_ids = _require_exact_permutation(candidate_ids, primary_ranking, label="primary")
+    secondary_ids = _require_exact_permutation(
+        candidate_ids, secondary_ranking, label="secondary"
+    )
+    primary_by_id = dict(zip(primary_ids, primary_ranking, strict=True))
+    merged: list[RetrievedChunk] = []
+    emitted_ids: set[str] = set()
+    for primary_id, secondary_id in zip(primary_ids, secondary_ids, strict=True):
+        for chunk_id in (primary_id, secondary_id):
+            if chunk_id not in emitted_ids:
+                merged.append(primary_by_id[chunk_id])
+                emitted_ids.add(chunk_id)
+    return merged
 
 
 def ensure_prepare_for_model(tokenizer: Any) -> None:
@@ -104,15 +159,30 @@ class Reranker:
                 ensure_prepare_for_model(tokenizer)
         return self._model
 
-    def rerank(self, query: str, candidates: list[RetrievedChunk], top_k: int) -> list[RetrievedChunk]:
+    def rerank_all(self, query: str, candidates: list[RetrievedChunk]) -> list[RetrievedChunk]:
+        """Score every candidate and return one complete stable ID permutation."""
         if not candidates:
             return []
+        _canonical_chunk_ids(candidates, label="input")
         pairs = [[query, c.payload["text"]] for c in candidates]
         scores = self.model.compute_score(pairs, normalize=True)
-        if isinstance(scores, float):
+        if isinstance(scores, Real):
             scores = [scores]
+        else:
+            try:
+                scores = list(scores)
+            except TypeError as exc:
+                raise ValueError("reranker score output must be a scalar or sequence") from exc
+        if len(scores) != len(candidates):
+            raise ValueError("reranker score count must match candidate count")
         reranked = [
             RetrievedChunk(score=float(s), payload=c.payload) for c, s in zip(candidates, scores)
         ]
         reranked.sort(key=lambda h: h.score, reverse=True)
-        return reranked[:top_k]
+        _require_exact_permutation(
+            _canonical_chunk_ids(candidates, label="input"), reranked, label="reranker"
+        )
+        return reranked
+
+    def rerank(self, query: str, candidates: list[RetrievedChunk], top_k: int) -> list[RetrievedChunk]:
+        return self.rerank_all(query, candidates)[:top_k]

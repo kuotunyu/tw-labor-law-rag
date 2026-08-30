@@ -23,6 +23,9 @@ _NEW_REGIME_CUES = ("勞退新制", "新制")
 _OLD_REGIME_CUES = ("勞基法舊制", "舊制")
 _SEVERANCE_CALC_CUES = ("試算", "計算", "公式", "formula", "上限", "年資")
 _SEVERANCE_LEGAL_TERMS = "資遣費 勞工退休金條例 勞動基準法 工作年資 平均工資 六個月"
+_OLD_REGIME_SEVERANCE_RERANK_VIEW = (
+    "勞基法舊制 資遣費 每滿一年 一個月平均工資 未滿一年 比例計給"
+)
 _WAGE_NONPAYMENT_CUES = (
     "欠薪",
     "沒發薪",
@@ -74,6 +77,7 @@ def _matches_all(folded: str, *cue_groups: tuple[str, ...]) -> bool:
 class QueryPlan:
     search_query: str
     routes: tuple[RouteName, ...]
+    rerank_only_views: tuple[str, ...] = ()
 
 
 def plan_retrieval_query(query: str) -> QueryPlan:
@@ -100,7 +104,17 @@ def plan_retrieval_query(query: str) -> QueryPlan:
     if _matches_all(folded, _WAGE_NONPAYMENT_CUES, _WORKER_IMMEDIATE_TERMINATION_CUES):
         expansions.append(_WAGE_ARREARS_LEGAL_TERMS)
         routes.append("wage_arrears_termination")
-    return QueryPlan(search_query=" ".join((query, *expansions)), routes=tuple(routes))
+    route_tuple = tuple(routes)
+    rerank_only_views = (
+        (_OLD_REGIME_SEVERANCE_RERANK_VIEW,)
+        if route_tuple == ("severance_comparison",)
+        else ()
+    )
+    return QueryPlan(
+        search_query=" ".join((query, *expansions)),
+        routes=route_tuple,
+        rerank_only_views=rerank_only_views,
+    )
 
 
 def _retrieval_query(query: str) -> str:

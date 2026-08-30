@@ -1,6 +1,7 @@
 import pytest
 
 from rag.models import RetrievedChunk
+from rag.retrieval import reranker as reranker_module
 from rag.retrieval.pipeline import (
     QueryPlan,
     RetrievalPipeline,
@@ -29,6 +30,26 @@ def test_plan_retrieval_query_returns_severance_route_for_casefolded_english_cue
     assert plan.routes == ("severance_comparison",)
     assert plan.search_query.endswith("資遣費 勞工退休金條例 勞動基準法 工作年資 平均工資 六個月")
     assert "severance_comparison" not in question
+
+
+def test_plan_retrieval_query_exposes_old_regime_view_only_for_exact_severance_route():
+    severance_question = (
+        "請比較勞退新制與勞基法舊制的資遣費計算公式、工作年資及最高上限。"
+    )
+    collision_question = (
+        "老闆在休假日用群組傳訊，說公司欠薪、也要我直接離職，"
+        "還附上勞退新制與勞基法舊制資遣費試算。"
+    )
+
+    exact_plan = plan_retrieval_query(severance_question)
+    collision_plan = plan_retrieval_query(collision_question)
+    unrelated_plan = plan_retrieval_query("公司欠薪兩個月，我該怎麼追討？")
+
+    assert exact_plan.rerank_only_views == (
+        "勞基法舊制 資遣費 每滿一年 一個月平均工資 未滿一年 比例計給",
+    )
+    assert collision_plan.rerank_only_views == ()
+    assert unrelated_plan.rerank_only_views == ()
 
 
 def test_plan_retrieval_query_returns_wage_arrears_route():
@@ -72,6 +93,71 @@ def test_retrieval_query_compatibility_wrapper_returns_plan_search_query():
 
 def hit(chunk_id, score=1.0):
     return RetrievedChunk(score=score, payload={"chunk_id": chunk_id, "text": chunk_id})
+
+
+def test_interleave_reranker_rankings_returns_empty_for_three_empty_inputs():
+    assert reranker_module.interleave_reranker_rankings([], [], []) == []
+
+
+def test_interleave_reranker_rankings_is_primary_first_and_keeps_primary_scores():
+    candidates = [hit("a"), hit("b"), hit("c"), hit("d")]
+    primary = [hit("c", 0.91), hit("b", 0.82), hit("a", 0.74), hit("d", 0.69)]
+    secondary = [hit("b", 0.05), hit("d", 0.04), hit("a", 0.03), hit("c", 0.02)]
+
+    merged = reranker_module.interleave_reranker_rankings(candidates, primary, secondary)
+
+    assert [item.payload["chunk_id"] for item in merged] == ["c", "b", "d", "a"]
+    assert [item.score for item in merged] == [0.91, 0.82, 0.69, 0.74]
+
+
+def test_interleave_reranker_rankings_is_deterministic_despite_cross_ranking_repeats():
+    candidates = [hit("a"), hit("b"), hit("c")]
+    primary = [hit("b", 0.9), hit("a", 0.8), hit("c", 0.7)]
+    secondary = [hit("c", 0.3), hit("b", 0.2), hit("a", 0.1)]
+
+    first = reranker_module.interleave_reranker_rankings(candidates, primary, secondary)
+    second = reranker_module.interleave_reranker_rankings(candidates, primary, secondary)
+
+    assert [item.payload["chunk_id"] for item in first] == ["b", "c", "a"]
+    assert second == first
+
+
+@pytest.mark.parametrize(
+    ("candidates", "primary", "secondary"),
+    [
+        ([hit("a"), hit("a")], [hit("a"), hit("a")], [hit("a"), hit("a")]),
+        ([hit(" ")], [hit(" ")], [hit(" ")]),
+        ([hit("a"), hit("b")], [hit("a"), hit("a")], [hit("a"), hit("b")]),
+        ([hit("a"), hit("b")], [hit("a"), hit("b")], [hit("a"), hit("a")]),
+        ([hit("a"), hit("b")], [hit("a"), hit("b")], [hit("a"), hit("foreign")]),
+        ([hit("a"), hit("b")], [hit("a")], [hit("a"), hit("b")]),
+        ([hit("a"), hit("b")], [hit("a"), hit("b")], [hit("a")]),
+    ],
+)
+def test_interleave_reranker_rankings_rejects_noncanonical_or_incomplete_permutations(
+    candidates, primary, secondary
+):
+    with pytest.raises(ValueError, match="candidate IDs|ranking"):
+        reranker_module.interleave_reranker_rankings(candidates, primary, secondary)
+
+
+def test_interleave_reranker_rankings_rejects_non_string_chunk_ids_as_unstable():
+    unstable = hit(["a"])
+
+    with pytest.raises(ValueError, match="candidate IDs"):
+        reranker_module.interleave_reranker_rankings([unstable], [unstable], [unstable])
+
+
+def test_rerank_all_rejects_a_score_count_mismatch_without_loading_a_model():
+    reranker = object.__new__(reranker_module.Reranker)
+    reranker._model = type(
+        "ScoreMismatchModel",
+        (),
+        {"compute_score": staticmethod(lambda _pairs, normalize: [0.9])},
+    )()
+
+    with pytest.raises(ValueError, match="score count"):
+        reranker.rerank_all("query", [hit("a"), hit("b")])
 
 
 class FakeRetriever:
