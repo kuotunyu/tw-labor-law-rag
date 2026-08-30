@@ -185,9 +185,10 @@ def _stress_rows():
                 "qid": qid,
                 "answerable": answerable,
                 "rank": 1 if answerable else None,
+                "has_hits": True,
+                "reranker_enabled": True,
                 "top_score": score,
                 "applied_routes": STRESS_ROUTES.get(qid, []),
-                "score_precision": "raw_unrounded",
             }
         )
     return rows
@@ -199,9 +200,10 @@ def _formal_rows():
             "qid": f"eval-{number:02d}",
             "answerable": True,
             "rank": rank,
-            "top_score": 0.5,
+            "has_hits": True,
+            "reranker_enabled": True,
+            "top_score": 0.5000004 if number == 3 else 0.5,
             "applied_routes": FORMAL_ROUTES.get(f"eval-{number:02d}", []),
-            "score_precision": "raw_unrounded",
         }
         for number, rank in enumerate(FORMAL_RANKS, start=1)
     ]
@@ -210,23 +212,26 @@ def _formal_rows():
             "qid": f"eval-{number:02d}",
             "answerable": False,
             "rank": None,
+            "has_hits": True,
+            "reranker_enabled": True,
             "top_score": 0.0 if number <= 39 else 0.5,
             "applied_routes": [],
-            "score_precision": "raw_unrounded",
         }
         for number in range(31, 41)
     )
     return rows
 
 
-def _candidate_results(observations):
+def _candidate_results(observations, *, stress_rows=None, formal_rows=None):
+    stress = _stress_rows() if stress_rows is None else stress_rows
+    formal = _formal_rows() if formal_rows is None else formal_rows
     return [
         evaluate_candidate(
             observations,
             candidate_threshold=threshold,
             global_threshold=0.03,
-            stress_rows=_stress_rows(),
-            formal_rows=_formal_rows(),
+            stress_rows=stress,
+            formal_rows=formal,
         )
         for threshold in EXPECTED_CANDIDATES
     ]
@@ -242,16 +247,13 @@ def _canonical_sha256(value) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def _provenance(candidate_results):
-    first = candidate_results[0]
+def _provenance():
     return {
         "dataset_sha256": "a" * 64,
         "corpus_snapshot_sha256": "b" * 64,
         "source_artifact_sha256": {
             "stress_dataset": "c" * 64,
             "formal_dataset": "d" * 64,
-            "stress_raw_evidence": _canonical_sha256(first["stress_evidence"]),
-            "formal_raw_evidence": _canonical_sha256(first["formal_evidence"]),
         },
         "embedding_model": "BAAI/bge-m3",
         "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
@@ -265,6 +267,7 @@ def _provenance(candidate_results):
             "top_k_final": 5,
         },
         "code_revision": "f" * 40,
+        "run_origin": "fresh_offline_retrieval",
         "provider_adapters": 0,
         "provider_requests": 0,
     }
@@ -414,6 +417,53 @@ def test_evaluator_recomputes_canonical_source_and_route_contracts(cases):
         )
 
 
+def test_collision_route_contract_allows_additional_non_prohibited_route(cases):
+    observations = _observations(cases)
+    observations[19] = {
+        **observations[19],
+        "applied_routes": [
+            "wage_arrears_termination",
+            "off_hours_employer_message",
+        ],
+    }
+
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    collision = result["cases"][19]
+    assert collision["route_contract_passed"] is True
+    assert collision["effective_threshold"] == 0.03
+    assert collision["passed"] is True
+
+
+def test_collision_route_contract_rejects_any_prohibited_route(cases):
+    observations = _observations(cases)
+    observations[19] = {
+        **observations[19],
+        "applied_routes": [
+            "wage_arrears_termination",
+            "severance_comparison",
+        ],
+    }
+
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    collision = result["cases"][19]
+    assert collision["route_contract_passed"] is False
+    assert collision["passed"] is False
+
+
 def test_candidate_recomputes_target_stress_and_formal_gates(cases):
     result = evaluate_candidate(
         _observations(cases),
@@ -440,9 +490,10 @@ def test_candidate_recomputes_target_stress_and_formal_gates(cases):
         "qid": "stress-037",
         "answerable": True,
         "rank": 1,
+        "has_hits": True,
+        "reranker_enabled": True,
         "top_score": 0.0175004,
         "applied_routes": ["severance_comparison"],
-        "score_precision": "raw_unrounded",
     }
 
 
@@ -465,10 +516,23 @@ def test_candidate_uses_unrounded_score_and_shared_equality_behavior(cases):
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
-        (lambda stress, formal: stress[0].pop("score_precision"), "fields"),
         (
-            lambda stress, formal: stress[0].update(score_precision="rounded_4dp"),
-            "raw_unrounded",
+            lambda stress, formal: stress[0].pop("has_hits"),
+            "fields",
+        ),
+        (
+            lambda stress, formal: stress[0].update(has_hits=1),
+            "has_hits",
+        ),
+        (
+            lambda stress, formal: formal[0].update(reranker_enabled="yes"),
+            "reranker_enabled",
+        ),
+        (
+            lambda stress, formal: stress[0].update(
+                score_precision="raw_unrounded"
+            ),
+            "fields",
         ),
         (
             lambda stress, formal: (
@@ -492,11 +556,31 @@ def test_candidate_uses_unrounded_score_and_shared_equality_behavior(cases):
         ),
     ],
 )
-def test_guard_evidence_is_raw_and_bound_to_qid(cases, mutate, message):
+def test_guard_evidence_fields_and_identity_are_bound_to_qid(
+    cases, mutate, message
+):
     stress = _stress_rows()
     formal = _formal_rows()
     mutate(stress, formal)
     with pytest.raises(ValueError, match=message):
+        evaluate_candidate(
+            _observations(cases),
+            candidate_threshold=0.015,
+            global_threshold=0.03,
+            stress_rows=stress,
+            formal_rows=formal,
+        )
+
+
+@pytest.mark.parametrize("guard_name", ["stress", "formal"])
+def test_guard_evidence_rejects_four_decimal_source_substitution(cases, guard_name):
+    stress = _stress_rows()
+    formal = _formal_rows()
+    rows = stress if guard_name == "stress" else formal
+    for row in rows:
+        row["top_score"] = round(row["top_score"], 4)
+
+    with pytest.raises(ValueError, match="four-decimal"):
         evaluate_candidate(
             _observations(cases),
             candidate_threshold=0.015,
@@ -667,38 +751,110 @@ def test_official_artifact_recomputes_and_publishes_only_safe_truth(cases):
     artifact = build_official_artifact(
         observations=observations,
         candidate_results=results,
-        provenance=_provenance(results),
+        provenance=_provenance(),
     )
     assert tuple(artifact) == (
         "schema_version",
         "provenance",
         "candidate_thresholds",
+        "global_threshold",
         "selected_threshold",
+        "guard_evidence",
+        "guard_evidence_binding_sha256",
         "candidates",
         "cases",
     )
+    assert artifact["schema_version"] == "1.1"
     assert artifact["candidate_thresholds"] == list(EXPECTED_CANDIDATES)
+    assert artifact["global_threshold"] == 0.03
     assert artifact["selected_threshold"] == 0.015
     assert all("cases" not in result for result in artifact["candidates"])
     assert all("stress_evidence" not in result for result in artifact["candidates"])
     assert all("formal_evidence" not in result for result in artifact["candidates"])
+    assert artifact["guard_evidence"] == {
+        "stress": results[0]["stress_evidence"],
+        "formal": results[0]["formal_evidence"],
+    }
+    assert artifact["guard_evidence"]["stress"][36]["top_score"] == 0.0175004
+    assert artifact["guard_evidence"]["formal"][2]["top_score"] == 0.5000004
+    assert artifact["guard_evidence_binding_sha256"] == _canonical_sha256(
+        {
+            "guard_evidence": artifact["guard_evidence"],
+            "provenance": artifact["provenance"],
+        }
+    )
     assert set(artifact["cases"][0]) == OFFICIAL_CASE_FIELDS
     assert artifact["cases"][0]["top_score"] == 0.015
+
+    selected = next(
+        candidate
+        for candidate in artifact["candidates"]
+        if candidate["candidate_threshold"] == artifact["selected_threshold"]
+    )
+    stress_decisions = [
+        policy.decide_retrieval_refusal(
+            has_hits=row["has_hits"],
+            reranker_enabled=row["reranker_enabled"],
+            applied_routes=tuple(row["applied_routes"]),
+            top_score=row["top_score"],
+            global_threshold=artifact["global_threshold"],
+            severance_comparison_threshold=artifact["selected_threshold"],
+        ).refused
+        for row in artifact["guard_evidence"]["stress"]
+    ]
+    assert sum(
+        refused and row["answerable"]
+        for refused, row in zip(
+            stress_decisions, artifact["guard_evidence"]["stress"], strict=True
+        )
+    ) == selected["stress"]["direct_false_refusals"]
+    assert sum(
+        refused and not row["answerable"]
+        for refused, row in zip(
+            stress_decisions, artifact["guard_evidence"]["stress"], strict=True
+        )
+    ) == selected["stress"]["direct_unanswerable_refusals"]
     serialized = json.dumps(artifact, ensure_ascii=False, sort_keys=True)
     assert all(case.question not in serialized for case in cases)
 
 
-def test_official_artifact_rejects_raw_evidence_provenance_mismatch(cases):
+def test_official_artifact_rejects_hidden_self_hashed_guard_evidence(cases):
     observations = _observations(cases)
     results = _candidate_results(observations)
-    provenance = _provenance(results)
+    provenance = _provenance()
     provenance["source_artifact_sha256"]["stress_raw_evidence"] = "0" * 64
-    with pytest.raises(ValueError, match="raw evidence hash"):
+    provenance["source_artifact_sha256"]["formal_raw_evidence"] = "1" * 64
+    with pytest.raises(ValueError, match="source_artifact_sha256 fields"):
         build_official_artifact(
             observations=observations,
             candidate_results=results,
             provenance=provenance,
         )
+
+
+def test_official_artifact_binding_tracks_the_actual_published_guard_rows(cases):
+    observations = _observations(cases)
+    baseline = build_official_artifact(
+        observations=observations,
+        candidate_results=_candidate_results(observations),
+        provenance=_provenance(),
+    )
+    changed_stress = _stress_rows()
+    changed_stress[36]["top_score"] = 0.0175008
+    changed = build_official_artifact(
+        observations=observations,
+        candidate_results=_candidate_results(
+            observations,
+            stress_rows=changed_stress,
+        ),
+        provenance=_provenance(),
+    )
+
+    assert changed["guard_evidence"]["stress"][36]["top_score"] == 0.0175008
+    assert (
+        changed["guard_evidence_binding_sha256"]
+        != baseline["guard_evidence_binding_sha256"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -709,6 +865,7 @@ def test_official_artifact_rejects_raw_evidence_provenance_mismatch(cases):
         ("relative_path", "embedding_model"),
         ("schemeless_endpoint", "embedding_model"),
         ("credential_value", "embedding_revision"),
+        ("invalid_run_origin", "run_origin"),
         ("account_field", "provenance fields"),
         ("nested_endpoint_key", "retrieval_configuration fields"),
     ],
@@ -716,7 +873,7 @@ def test_official_artifact_rejects_raw_evidence_provenance_mismatch(cases):
 def test_official_artifact_rejects_nested_privacy_attacks(cases, attack, message):
     observations = _observations(cases)
     results = _candidate_results(observations)
-    provenance = _provenance(results)
+    provenance = _provenance()
     if attack == "nested_source_key":
         observations[0] = {**observations[0], "source_ranks": {"question": 1}}
     elif attack == "route_value":
@@ -730,6 +887,8 @@ def test_official_artifact_rejects_nested_privacy_attacks(cases, attack, message
         provenance["embedding_model"] = "api.internal.example"
     elif attack == "credential_value":
         provenance["embedding_revision"] = "sk-private-credential"
+    elif attack == "invalid_run_origin":
+        provenance["run_origin"] = "imported_public_trace"
     elif attack == "account_field":
         provenance["account"] = "person@example.com"
     else:

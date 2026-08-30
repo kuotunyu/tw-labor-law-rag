@@ -33,6 +33,8 @@
 
 `severance_refusal_policy_v0.3.6.jsonl` 每行只有 `qid`、`question`、`case_type`、`answerable`、`sources`、`required_routes`、`prohibited_routes`、`expect_generation` 與 `style_tags`。資料集固定為 `severance-policy-001`～`030`，前 15 題必須是可答正例，並同時以《勞工退休金條例》第 12 條與《勞動基準法》第 17 條為來源；後 15 題是單一制度、一般終止、預告、欠薪、退休、無關新舊用語、部分 cue 與多路由碰撞。
 
-正例必須正確地只啟用 `severance_comparison`，並覆蓋法律中文、口語中文、中英混合、標點、長敘事、新舊制反轉次序、公式、上限與混合年資。碰撞負例不得落入單一 `severance_comparison` 特殊門檻；只有欠薪立即終止題可啟用 `wage_arrears_termination`，而同時命中兩條路由的題必須保留多路由身分以驗證全域門檻 fallback。載入器對欄位、順序、布林值、來源、路由、樣式覆蓋與重複值全部 fail closed。
+正例必須正確地命中 `severance_comparison`，並覆蓋法律中文、口語中文、中英混合、標點、長敘事、新舊制反轉次序、公式、上限與混合年資。路由契約的判定是「所有 `required_routes` 都存在，且所有 `prohibited_routes` 都不存在」；額外的非禁止路由可以保留。共用拒答政策另外限定：只有路由組正確等於單一 `severance_comparison` 才使用特殊門檻，加上任何其他路由都回退全域門檻。載入器對欄位、順序、布林值、來源、路由、樣式覆蓋與重複值全部 fail closed。
 
-校準觀測列只接受 `qid`、正規來源名次、allowlist 路由與未捨入 `top_score`；來源、路由、可答性與生成預期都由每個 qid 的內建正規契約重新計算，不接受呼叫者預先計算的 pass/fail 布林值。Stress 與 formal guard 必須提供新鮮、未捨入的 raw score，每列標示 `score_precision: raw_unrounded`，並在公開產物中以兩組 raw evidence canonical SHA-256 綁定；既有只保留小數四位的 public trace 不符合此輸入契約。選擇器會透過共用拒答政策重播每個候選的全部決策，而公開產物會移除 raw guard 列，只保留經重算的匯總與內容無關的 30 筆 case 結果。
+校準觀測列只接受 `qid`、正規來源名次、allowlist 路由與未捨入 `top_score`；來源、路由、可答性與生成預期都由每個 qid 的內建正規契約重新計算，不接受呼叫者預先計算的 pass/fail 布林值。Stress 與 formal guard 每列公開完整的內容無關重播輸入：正規 `qid`、可答性、名次、`has_hits`、`reranker_enabled`、正規路由與保留輸入精度的 `top_score`。任一 guard 組的全部分數若都與小數四位相容即 fail closed，因此不能直接使用 v0.3.1 的捨入 public trace；Task 6 必須從新鮮的離線檢索 pipeline 產生這些列。
+
+正式產物以 `run_origin: fresh_offline_retrieval` 作為釋出來源列舉，並將公開 guard 列與 dataset、corpus snapshot、code revision、固定 model revisions 及 retrieval configuration 一起計算 `guard_evidence_binding_sha256`。這個列舉是等待 release verifier 跨任務檢查的來源聲明，綁定 hash 只確保公開列與公開 metadata 一致，兩者都不獨立證明實際執行來源。Task 7 可以從公開列、全域門檻與七個候選門檻重播所有 stress/formal 決策與匯總。

@@ -52,9 +52,10 @@ _GUARD_FIELDS = {
     "qid",
     "answerable",
     "rank",
+    "has_hits",
+    "reranker_enabled",
     "top_score",
     "applied_routes",
-    "score_precision",
 }
 _CANDIDATE_FIELDS = {
     "candidate_threshold",
@@ -77,14 +78,13 @@ _PROVENANCE_FIELDS = {
     "reranker_revision",
     "retrieval_configuration",
     "code_revision",
+    "run_origin",
     "provider_adapters",
     "provider_requests",
 }
 _SOURCE_ARTIFACT_FIELDS = {
     "stress_dataset",
     "formal_dataset",
-    "stress_raw_evidence",
-    "formal_raw_evidence",
 }
 _RETRIEVAL_CONFIGURATION = {
     "chunking": "structure",
@@ -97,6 +97,7 @@ _EMBEDDING_MODEL = "BAAI/bge-m3"
 _EMBEDDING_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
 _RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 _RERANKER_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+_RUN_ORIGIN = "fresh_offline_retrieval"
 _KNOWN_ROUTES = {
     "off_hours_employer_message",
     "severance_comparison",
@@ -553,32 +554,45 @@ def _validated_guard_rows(rows: object, *, label: str) -> list[dict[str, Any]]:
             raise ValueError(f"{label} row {qid}: rank must be null or positive")
         if not answerable and rank is not None:
             raise ValueError(f"{label} row {qid}: unanswerable rank must be null")
+        has_hits = _boolean(row["has_hits"], field="has_hits", identity=qid)
+        reranker_enabled = _boolean(
+            row["reranker_enabled"], field="reranker_enabled", identity=qid
+        )
         routes = _routes(
             row["applied_routes"], field="applied_routes", require_tuple=False
         )
         if routes != expected_routes.get(qid, ()):
             raise ValueError(f"{label} route identity is not canonical for {qid}")
-        if row["score_precision"] != "raw_unrounded":
-            raise ValueError(f"{label} score_precision must be raw_unrounded")
         normalized.append(
             {
                 "qid": qid,
                 "answerable": answerable,
                 "rank": rank,
+                "has_hits": has_hits,
+                "reranker_enabled": reranker_enabled,
                 "top_score": _unit_interval(row["top_score"], field="top_score"),
                 "applied_routes": list(routes),
-                "score_precision": "raw_unrounded",
             }
+        )
+    if not any(row["top_score"] != round(row["top_score"], 4) for row in normalized):
+        raise ValueError(
+            f"{label} guard scores cannot be entirely four-decimal values"
         )
     return normalized
 
 
 def _decision(
-    *, routes: list[str], score: float, candidate: float, global_threshold: float
+    *,
+    has_hits: bool,
+    reranker_enabled: bool,
+    routes: list[str],
+    score: float,
+    candidate: float,
+    global_threshold: float,
 ):
     return decide_retrieval_refusal(
-        has_hits=True,
-        reranker_enabled=True,
+        has_hits=has_hits,
+        reranker_enabled=reranker_enabled,
         applied_routes=tuple(routes),
         top_score=score,
         global_threshold=global_threshold,
@@ -599,8 +613,13 @@ def _evaluate_target(
             row["source_ranks"].get(source, 6) <= 5
             for source in contract.source_keys
         )
-        route_contract = tuple(row["applied_routes"]) == contract.required_routes
+        applied_routes = set(row["applied_routes"])
+        route_contract = set(contract.required_routes) <= applied_routes and not (
+            set(contract.prohibited_routes) & applied_routes
+        )
         decision = _decision(
+            has_hits=True,
+            reranker_enabled=True,
             routes=row["applied_routes"],
             score=row["top_score"],
             candidate=candidate,
@@ -658,6 +677,8 @@ def _stress_summary(
 ) -> dict[str, Any]:
     decisions = [
         _decision(
+            has_hits=row["has_hits"],
+            reranker_enabled=row["reranker_enabled"],
             routes=row["applied_routes"],
             score=row["top_score"],
             candidate=candidate,
@@ -690,6 +711,8 @@ def _formal_summary(
     answerable = [row for row in rows if row["answerable"]]
     decisions = [
         _decision(
+            has_hits=row["has_hits"],
+            reranker_enabled=row["reranker_enabled"],
             routes=row["applied_routes"],
             score=row["top_score"],
             candidate=candidate,
@@ -899,12 +922,7 @@ def _canonical_sha256(value: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _validated_provenance(
-    provenance: object,
-    *,
-    stress_evidence: list[dict[str, Any]],
-    formal_evidence: list[dict[str, Any]],
-) -> dict[str, Any]:
+def _validated_provenance(provenance: object) -> dict[str, Any]:
     if not isinstance(provenance, dict) or set(provenance) != _PROVENANCE_FIELDS:
         raise ValueError(f"provenance fields must equal {sorted(_PROVENANCE_FIELDS)}")
     source_hashes = provenance["source_artifact_sha256"]
@@ -914,13 +932,6 @@ def _validated_provenance(
         field: _hex(source_hashes[field], field=field, length=64)
         for field in sorted(_SOURCE_ARTIFACT_FIELDS)
     }
-    expected_raw_hashes = {
-        "stress_raw_evidence": _canonical_sha256(stress_evidence),
-        "formal_raw_evidence": _canonical_sha256(formal_evidence),
-    }
-    for field, expected in expected_raw_hashes.items():
-        if normalized_hashes[field] != expected:
-            raise ValueError(f"{field} raw evidence hash mismatch")
     exact_strings = {
         "embedding_model": _EMBEDDING_MODEL,
         "embedding_revision": _EMBEDDING_REVISION,
@@ -937,6 +948,8 @@ def _validated_provenance(
         raise ValueError("retrieval_configuration fields are invalid")
     if configuration != _RETRIEVAL_CONFIGURATION:
         raise ValueError("retrieval_configuration must equal the approved primitives")
+    if provenance["run_origin"] != _RUN_ORIGIN:
+        raise ValueError("run_origin must equal fresh_offline_retrieval")
     for field in ("provider_adapters", "provider_requests"):
         if type(provenance[field]) is not int or provenance[field] != 0:
             raise ValueError(f"{field} must be zero")
@@ -955,6 +968,7 @@ def _validated_provenance(
         "code_revision": _hex(
             provenance["code_revision"], field="code_revision", length=40
         ),
+        "run_origin": _RUN_ORIGIN,
         "provider_adapters": 0,
         "provider_requests": 0,
     }
@@ -964,7 +978,10 @@ _PUBLIC_KEYS = {
     "schema_version",
     "provenance",
     "candidate_thresholds",
+    "global_threshold",
     "selected_threshold",
+    "guard_evidence",
+    "guard_evidence_binding_sha256",
     "candidates",
     "cases",
     "candidate_threshold",
@@ -988,6 +1005,9 @@ _PUBLIC_KEYS = {
     "mrr_at_10",
     "qid",
     "case_type",
+    "rank",
+    "has_hits",
+    "reranker_enabled",
     "source_ranks",
     "applied_routes",
     "top_score",
@@ -1005,7 +1025,7 @@ _PUBLIC_KEYS = {
     *_CANONICAL_SOURCE_KEYS,
 }
 _PUBLIC_STRINGS = {
-    "1.0",
+    "1.1",
     "positive",
     "collision_negative",
     "threshold",
@@ -1015,7 +1035,10 @@ _PUBLIC_STRINGS = {
     _EMBEDDING_REVISION,
     _RERANKER_MODEL,
     _RERANKER_REVISION,
+    _RUN_ORIGIN,
     *EXPECTED_QIDS,
+    *_STRESS_QIDS,
+    *_FORMAL_QIDS,
     *_KNOWN_ROUTES,
 }
 
@@ -1059,10 +1082,19 @@ def build_official_artifact(
     )
     if _observations_from_case_results(selected["cases"]) != target_evidence:
         raise ValueError("selected candidate cases do not match target observations")
-    normalized_provenance = _validated_provenance(
-        provenance,
-        stress_evidence=selected["stress_evidence"],
-        formal_evidence=selected["formal_evidence"],
+    normalized_provenance = _validated_provenance(provenance)
+    guard_evidence = {
+        label: [
+            {**row, "applied_routes": list(row["applied_routes"])}
+            for row in selected[f"{label}_evidence"]
+        ]
+        for label in ("stress", "formal")
+    }
+    guard_evidence_binding = _canonical_sha256(
+        {
+            "guard_evidence": guard_evidence,
+            "provenance": normalized_provenance,
+        }
     )
     public_cases = [
         {
@@ -1085,10 +1117,13 @@ def build_official_artifact(
         for result in candidates
     ]
     artifact = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "provenance": normalized_provenance,
         "candidate_thresholds": list(CANDIDATE_THRESHOLDS),
+        "global_threshold": selected["global_threshold"],
         "selected_threshold": selected_threshold,
+        "guard_evidence": guard_evidence,
+        "guard_evidence_binding_sha256": guard_evidence_binding,
         "candidates": public_candidates,
         "cases": public_cases,
     }
