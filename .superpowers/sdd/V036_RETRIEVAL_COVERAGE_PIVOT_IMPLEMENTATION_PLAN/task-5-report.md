@@ -346,3 +346,78 @@ git diff --check
 No model inference/download, provider call, network access, acceptance run,
 artifact export, deployment, or secret access occurred. The historical and
 artifact-integrity checks and the Task 6/Task 7 handoff remain unchanged.
+
+## Review-fix round 5
+
+Review-fix implementation commit:
+`9334b8ef7768e491d8423028e85186120dba6707`.
+
+### Root causes and RED evidence
+
+- A nested function's global names were resolved against the module's final
+  binding set. Consequently, a module-level call could execute builtin
+  `eval`, `exec`, `compile`, or `__import__` before a later same-named user
+  definition while the validator treated that future definition as already
+  effective. The first public-validator RED table reported `8 failed` for
+  direct calls, an alias, branch and try joins, and a nested local call chain.
+- Dynamic namespace acquisition was not forbidden at its source. Seven cases
+  using `globals`, `locals`, `vars`, or `sys.modules` reached RED, including
+  aliases, mapping subscription/`get`, a renamed `sys`, and a renamed
+  `sys.modules` import. Four post-binding user shadows and two ordinary mapping
+  controls remained green, proving the intended boundary rather than a blanket
+  ban on matching strings.
+- A supplementary import-time audit exposed two more execution contexts:
+  lambda aliases and class bodies (`2 failed, 8 passed`). An immediate lambda
+  invocation then supplied its own RED (`1 failed, 10 passed`).
+
+### Fix
+
+- The final-binding scan remains authoritative for functions that are only
+  callable after module initialization. A separate module import-time pass
+  now follows known local function and lambda identities through assignments,
+  destructuring, conditional expressions, and branch/try binding joins.
+  Called bodies receive the exact module binding environment effective at the
+  call point; recursive local call chains carry the same snapshot and use a
+  call stack to terminate cycles.
+- Function definitions and lambdas are explicit binding kinds instead of
+  generic safe values. Direct, aliased, nested, class-body, and immediate
+  lambda calls are therefore analyzed without executing Python or constructing
+  a retrieval model. User-defined shadows are accepted only when their runtime
+  binding precedes the import-time invocation.
+- Unshadowed `globals`, `locals`, and `vars` references are rejected at
+  acquisition. `sys.modules`, `from sys import modules`, builtin namespace
+  imports, and dynamic `__dict__` access are also rejected at the source.
+  Clearly user-bound similarly named functions and proven ordinary dictionary
+  subscription/`get` remain valid.
+
+The authoritative evaluator and release verifier continue to invoke the same
+public closure validator before evidence acceptance or replay.
+
+### GREEN evidence
+
+```text
+.venv\Scripts\python.exe -m pytest tests\test_severance_refusal_policy.py -q -p no:cacheprovider -k "static_local_import_closure"
+75 passed, 140 deselected in 1.54s
+
+.venv\Scripts\python.exe -m pytest tests\test_severance_refusal_policy.py -q -p no:cacheprovider
+213 passed, 2 skipped in 66.43s
+
+.venv\Scripts\python.exe -m pytest tests\test_config.py tests\test_refusal_policy.py tests\test_answerer.py tests\test_reliability.py tests\test_portfolio_demo_regression.py tests\test_provider_crosscheck.py tests\test_pipeline.py tests\test_severance_refusal_policy.py -q -p no:cacheprovider
+417 passed, 2 skipped in 66.70s
+
+.venv\Scripts\python.exe -m pytest tests\test_release_verification.py -q -p no:cacheprovider -k "not test_release_verifier_recomputes_committed_evidence and not test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions"
+105 passed, 2 deselected in 8.91s
+
+.venv\Scripts\ruff.exe check eval\run_severance_refusal_policy.py src\rag\release_verification.py src\rag\severance_refusal_policy.py tests\test_severance_refusal_policy.py
+All checks passed!
+
+git diff --check
+```
+
+The historical NO-GO working file and its bound `9890c785` revision both map
+to Git blob `2cdb13b36d98b5ebfbfcd2cec877e571f3ab2dd4`; their byte SHA-256 is
+`ebed566b3778f6674ef55641564861ef3c17bb899197bb40e3ba7f81bb6e010c`.
+The pivot diagnostic and official artifact remain absent. No model
+inference/download, provider call, network access, acceptance run, artifact
+export, deployment, secret access, or `progress.md` edit occurred. The
+Task 6/Task 7 handoff remains unchanged.
