@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
 from rag.models import RetrievedChunk
-from rag.retrieval.reranker import Reranker
+from rag.retrieval.reranker import Reranker, interleave_reranker_rankings
 from rag.retrieval.retriever import Retriever
 
 _EMPLOYER_CUES = ("老闆", "主管", "雇主")
@@ -145,11 +145,29 @@ class RetrievalPipeline:
     def run(self, query: str) -> RetrievalResult:
         plan = plan_retrieval_query(query)
         candidates = self.retriever.retrieve(plan.search_query, top_k=self.top_k_retrieve)
-        if self.reranker is not None:
-            hits = self.reranker.rerank(plan.search_query, candidates, top_k=self.top_k_final)
-        else:
+        if self.reranker is not None and candidates:
+            if plan.rerank_only_views:
+                primary_ranking = self.reranker.rerank_all(
+                    plan.search_query, candidates
+                )
+                top_score = primary_ranking[0].score
+                secondary_ranking = self.reranker.rerank_all(
+                    plan.rerank_only_views[0], candidates
+                )
+                hits = interleave_reranker_rankings(
+                    candidates, primary_ranking, secondary_ranking
+                )[: self.top_k_final]
+            else:
+                hits = self.reranker.rerank(
+                    plan.search_query, candidates, top_k=self.top_k_final
+                )
+                top_score = hits[0].score if hits else 0.0
+        elif candidates:
             hits = candidates[: self.top_k_final]
-        top_score = hits[0].score if hits else 0.0
+            top_score = hits[0].score if hits else 0.0
+        else:
+            hits = []
+            top_score = 0.0
         return RetrievalResult(
             hits=hits,
             candidates=candidates,

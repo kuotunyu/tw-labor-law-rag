@@ -186,6 +186,10 @@ def recorded_pipeline(calls, *, rerank=True):
             calls.append(("rerank", query))
             return candidates[:top_k]
 
+        def rerank_all(self, query, candidates):
+            calls.append(("rerank", query))
+            return candidates
+
     return RetrievalPipeline(
         RecordingRetriever(),
         reranker=RecordingReranker() if rerank else None,
@@ -208,6 +212,221 @@ def test_pipeline_with_reranker_reorders():
     pipeline = RetrievalPipeline(FakeRetriever(hits), reranker=FakeReranker(), top_k_retrieve=20, top_k_final=2)
     result = pipeline.run("query")
     assert [h.payload["chunk_id"] for h in result.hits] == ["c", "b"]
+
+
+def test_pipeline_exact_severance_route_reranks_full_pool_twice_then_merges_top_five():
+    question = "請比較勞退新制與勞基法舊制的資遣費計算公式、工作年資及最高上限。"
+    candidates = [hit(f"cached-{index}") for index in range(6)]
+    primary = [
+        hit("cached-0", 0.021),
+        hit("cached-1", 0.020),
+        hit("cached-2", 0.019),
+        hit("cached-3", 0.018),
+        hit("cached-4", 0.017),
+        hit("cached-5", 0.016),
+    ]
+    secondary = [
+        hit("cached-5", 0.99),
+        hit("cached-0", 0.98),
+        hit("cached-1", 0.97),
+        hit("cached-2", 0.96),
+        hit("cached-3", 0.95),
+        hit("cached-4", 0.94),
+    ]
+    calls = []
+
+    class RecordingRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(("retrieve", query, top_k))
+            return candidates[:top_k]
+
+    class RecordingReranker:
+        def rerank_all(self, query, received_candidates):
+            calls.append(("rerank", query, len(received_candidates)))
+            assert received_candidates == candidates
+            return primary if query.endswith("六個月") else secondary
+
+        def rerank(self, query, received_candidates, top_k):
+            raise AssertionError("exact severance route must use full-pool reranking")
+
+    result = RetrievalPipeline(
+        RecordingRetriever(),
+        reranker=RecordingReranker(),
+        top_k_retrieve=20,
+        top_k_final=5,
+    ).run(question)
+
+    planned = plan_retrieval_query(question)
+    assert calls == [
+        ("retrieve", planned.search_query, 20),
+        ("rerank", planned.search_query, 6),
+        ("rerank", planned.rerank_only_views[0], 6),
+    ]
+    assert [item.payload["chunk_id"] for item in result.hits] == [
+        "cached-0",
+        "cached-5",
+        "cached-1",
+        "cached-2",
+        "cached-3",
+    ]
+    assert result.top_score == 0.021
+    assert len(result.candidates) == 6
+
+
+def test_pipeline_non_exact_route_retains_single_reranker_call():
+    question = (
+        "老闆在休假日用群組傳訊，說公司欠薪、也要我直接離職，"
+        "還附上勞退新制與勞基法舊制資遣費試算。"
+    )
+    candidates = [hit(f"candidate-{index}") for index in range(3)]
+    calls = []
+
+    class RecordingRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(("retrieve", query, top_k))
+            return candidates
+
+    class RecordingReranker:
+        def rerank(self, query, received_candidates, top_k):
+            calls.append(("rerank", query, len(received_candidates), top_k))
+            return received_candidates[:top_k]
+
+        def rerank_all(self, _query, _received_candidates):
+            raise AssertionError("non-exact routes must retain the single-reranker path")
+
+    result = RetrievalPipeline(
+        RecordingRetriever(),
+        reranker=RecordingReranker(),
+        top_k_retrieve=20,
+        top_k_final=5,
+    ).run(question)
+
+    assert len(calls) == 2
+    assert calls[0][0] == "retrieve"
+    assert calls[1] == ("rerank", calls[0][1], 3, 5)
+    assert result.applied_routes == (
+        "off_hours_employer_message",
+        "severance_comparison",
+        "wage_arrears_termination",
+    )
+
+
+def test_pipeline_empty_candidates_makes_no_reranker_call():
+    calls = []
+
+    class EmptyRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(("retrieve", query, top_k))
+            return []
+
+    class CountingReranker:
+        def rerank(self, *_args, **_kwargs):
+            calls.append(("rerank",))
+            return []
+
+        def rerank_all(self, *_args, **_kwargs):
+            calls.append(("rerank_all",))
+            return []
+
+    result = RetrievalPipeline(
+        EmptyRetriever(),
+        reranker=CountingReranker(),
+        top_k_retrieve=20,
+        top_k_final=5,
+    ).run("請比較勞退新制與勞基法舊制的資遣費計算公式、工作年資及最高上限。")
+
+    assert result.hits == []
+    assert result.top_score == 0.0
+    assert [call[0] for call in calls] == ["retrieve"]
+
+
+_CACHED_SEVERANCE_CASES = (
+    (
+        "severance-policy-010",
+        "公司開的 termination package 要怎麼計算？我同時有勞退新制和勞基法舊制年資？",
+    ),
+    (
+        "severance-policy-014",
+        "勞退新制＋勞基法舊制：被資遣時，年資、平均工資、最高上限如何計算？",
+    ),
+    (
+        "severance-policy-015",
+        "我想校對資遣費試算：勞退新制與勞基法舊制年資都存在時，公式有何差異？",
+    ),
+)
+
+
+def _cached_authority(chunk_id, law, article):
+    return RetrievedChunk(
+        score=1.0,
+        payload={
+            "chunk_id": chunk_id,
+            "text": f"cached {chunk_id}",
+            "doc_title": law,
+            "articles": [article],
+        },
+    )
+
+
+def _authority_stage_ranks(hits):
+    ranks = {}
+    for rank, item in enumerate(hits, start=1):
+        key = (item.payload.get("doc_title"), tuple(item.payload.get("articles", [])))
+        ranks.setdefault(key, rank)
+    return ranks
+
+
+@pytest.mark.parametrize(("qid", "question"), _CACHED_SEVERANCE_CASES)
+def test_pipeline_cached_severance_cases_keep_both_authorities_in_top_five(qid, question):
+    new_regime = _cached_authority("cached-new", "勞工退休金條例", "第 12 條")
+    old_regime = _cached_authority("cached-old", "勞動基準法", "第 17 條")
+    noise = [hit(f"cached-noise-{index}") for index in range(4)]
+    candidates = [new_regime, *noise, old_regime]
+    primary = [
+        RetrievedChunk(score=0.91 - index / 100, payload=item.payload)
+        for index, item in enumerate(candidates)
+    ]
+    secondary = [
+        RetrievedChunk(score=0.80 - index / 100, payload=item.payload)
+        for index, item in enumerate([old_regime, new_regime, *noise])
+    ]
+    calls = []
+
+    class CachedRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(("retrieve", query, top_k))
+            return candidates[:top_k]
+
+    class CachedReranker:
+        def rerank_all(self, query, received_candidates):
+            calls.append(("rerank", query, len(received_candidates)))
+            assert received_candidates == candidates
+            return primary if query == plan_retrieval_query(question).search_query else secondary
+
+    result = RetrievalPipeline(
+        CachedRetriever(), CachedReranker(), top_k_retrieve=20, top_k_final=5
+    ).run(question)
+
+    stage_ranks = {
+        "candidate_pool": _authority_stage_ranks(result.candidates),
+        "final_top_five": _authority_stage_ranks(result.hits),
+    }
+    required_authorities = {
+        ("勞工退休金條例", ("第 12 條",)),
+        ("勞動基準法", ("第 17 條",)),
+    }
+
+    assert qid not in " ".join(call[1] for call in calls)
+    assert "第 12 條" not in " ".join(call[1] for call in calls)
+    assert "第 17 條" not in " ".join(call[1] for call in calls)
+    assert stage_ranks["candidate_pool"][("勞動基準法", ("第 17 條",))] == 6
+    assert all(
+        stage_ranks["final_top_five"][authority] <= 5
+        for authority in required_authorities
+    )
+    assert calls[0][0] == "retrieve"
+    assert [call[0] for call in calls[1:]] == ["rerank", "rerank"]
+    assert all(call[2] <= 20 for call in calls[1:])
 
 
 def test_pipeline_uses_one_planned_query_and_exposes_only_applied_routes():
@@ -302,7 +521,11 @@ def test_pipeline_expands_new_and_old_regime_severance_calculations(question):
 
     recorded_pipeline(calls).run(question)
 
-    assert calls == [("retrieve", expected), ("rerank", expected)]
+    assert calls == [
+        ("retrieve", expected),
+        ("rerank", expected),
+        ("rerank", "勞基法舊制 資遣費 每滿一年 一個月平均工資 未滿一年 比例計給"),
+    ]
 
 
 @pytest.mark.parametrize(
