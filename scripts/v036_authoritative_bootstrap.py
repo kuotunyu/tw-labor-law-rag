@@ -126,6 +126,8 @@ def _parse_tree_records(payload: bytes) -> list[dict[str, str]]:
             raise ValueError("malformed NUL-delimited git tree metadata") from exc
         if not _HEX_OID.fullmatch(oid):
             raise ValueError("malformed Git object identity")
+        if mode == "160000" or object_type == "commit":
+            raise ValueError("Git tree contains a forbidden gitlink or submodule")
         records.append(
             {
                 "path": _decode_git_path(raw_path),
@@ -154,6 +156,8 @@ def _parse_index_records(payload: bytes) -> list[dict[str, str]]:
             raise ValueError("Git index contains an unresolved staged entry")
         if not _HEX_OID.fullmatch(oid):
             raise ValueError("malformed Git index object identity")
+        if mode == "160000":
+            raise ValueError("Git index contains a forbidden gitlink or submodule")
         records.append(
             {
                 "path": _decode_git_path(raw_path),
@@ -878,6 +882,41 @@ def _approved_sites(environment_root: Path) -> list[Path]:
     ]
 
 
+def _validated_approved_sites(environment_root: Path) -> list[Path]:
+    lexical_environment = Path(os.path.abspath(environment_root))
+    try:
+        resolved_environment = lexical_environment.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError("approved environment root is missing") from exc
+    approved_sites = _approved_sites(lexical_environment)
+    for site_path in approved_sites:
+        current = lexical_environment
+        for part in site_path.relative_to(lexical_environment).parts:
+            current /= part
+            try:
+                path_stat = os.lstat(current)
+            except OSError as exc:
+                raise ValueError(
+                    "approved site-packages path or parent is missing"
+                ) from exc
+            if _is_alias(path_stat):
+                raise ValueError(
+                    "approved site-packages path or parent contains an alias"
+                )
+            if not stat.S_ISDIR(path_stat.st_mode):
+                raise ValueError(
+                    "approved site-packages path or parent is not a directory"
+                )
+        try:
+            resolved_site = site_path.resolve(strict=True)
+            resolved_site.relative_to(resolved_environment)
+        except (OSError, ValueError) as exc:
+            raise ValueError(
+                "approved site-packages path resolves outside environment"
+            ) from exc
+    return approved_sites
+
+
 def _validate_preimport_runtime(
     project_root: Path, environment_root: Path
 ) -> tuple[list[Path], dict[str, str]]:
@@ -949,10 +988,7 @@ def _validate_preimport_runtime(
     if recorded_version is not None and recorded_version != platform.python_version():
         raise ValueError("pyvenv.cfg interpreter version does not match sys.version")
 
-    approved_sites = _approved_sites(environment)
-    for site_path in approved_sites:
-        if not site_path.is_dir():
-            raise ValueError("approved environment site-packages directory is missing")
+    approved_sites = _validated_approved_sites(environment)
 
     home_path = Path(home)
     major_minor = f"python{sys.version_info.major}.{sys.version_info.minor}"
@@ -1139,7 +1175,7 @@ def _activate_import_paths(project_root: Path, environment_root: Path) -> None:
         project_root / "src",
         project_root / "eval",
         project_root / "scripts",
-        *_approved_sites(environment_root),
+        *_validated_approved_sites(environment_root),
     ]
     if not all(path.is_dir() for path in additions):
         raise ValueError("verified project or environment import root is missing")
@@ -1150,9 +1186,33 @@ def _entry_arguments(arguments: list[str]) -> list[str]:
     return arguments[1:] if arguments[:1] == ["--"] else arguments
 
 
+def _authoritative_calibration_arguments(arguments: list[str]) -> list[str]:
+    entry_args = _entry_arguments(arguments)
+    protected_options = (
+        "--dataset",
+        "--stress-dataset",
+        "--formal-dataset",
+        "--snapshot",
+    )
+    for argument in entry_args:
+        option_name = argument.partition("=")[0]
+        if option_name.startswith("--") and any(
+            option.startswith(option_name) for option in protected_options
+        ):
+            raise ValueError(
+                "authoritative input paths may not be overridden during calibration"
+            )
+    return entry_args
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        entry_args = (
+            _authoritative_calibration_arguments(args.entry_args)
+            if args.mode == "calibrate"
+            else []
+        )
         project_root = args.project_root.resolve(strict=True)
         environment_root = args.environment_root.resolve(strict=True)
         environment_binding = build_environment_binding(project_root, environment_root)
@@ -1188,7 +1248,6 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         _activate_import_paths(project_root, environment_root)
         if args.mode == "calibrate":
-            entry_args = _entry_arguments(args.entry_args)
             if "--offline" not in entry_args:
                 raise ValueError("calibration bootstrap requires --offline")
             os.environ["TRANSFORMERS_OFFLINE"] = "1"

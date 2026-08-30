@@ -194,6 +194,86 @@ def test_revision_binding_rejects_duplicate_collision_extra_and_missing_bindings
         )
 
 
+@pytest.mark.parametrize("record_kind", ["tree", "index"])
+def test_nul_git_metadata_rejects_nonselected_gitlinks_before_filtering(
+    bootstrap_module, record_kind: str
+) -> None:
+    oid = b"a" * 40
+    if record_kind == "tree":
+        payload = b"160000 commit " + oid + b"\tvendor/dependency\0"
+        parser = bootstrap_module._parse_tree_records
+    else:
+        payload = b"160000 " + oid + b" 0\tvendor/dependency\0"
+        parser = bootstrap_module._parse_index_records
+
+    with pytest.raises(ValueError, match="gitlink|submodule"):
+        parser(payload)
+
+
+def _create_local_dependency_repository(path: Path) -> str:
+    path.mkdir()
+    _run("git", "init", cwd=path)
+    _run("git", "config", "user.email", "tests@example.invalid", cwd=path)
+    _run("git", "config", "user.name", "Test Fixture", cwd=path)
+    path.joinpath("README.md").write_text("local dependency\n", encoding="utf-8")
+    _run("git", "add", "README.md", cwd=path)
+    _run("git", "commit", "-m", "fixture", cwd=path)
+    return _run("git", "rev-parse", "HEAD", cwd=path).stdout.decode().strip()
+
+
+def test_revision_binding_rejects_real_nonselected_local_submodule_in_recorded_and_head_tree(
+    bootstrap_module, git_repository: Path, tmp_path: Path
+) -> None:
+    recorded_binding = _binding(bootstrap_module, git_repository)
+    dependency = tmp_path / "local-dependency"
+    _create_local_dependency_repository(dependency)
+    _run(
+        "git",
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        str(dependency),
+        "vendor/dependency",
+        cwd=git_repository,
+    )
+    _commit(git_repository, "local submodule")
+    current_revision = (
+        _run("git", "rev-parse", "HEAD", cwd=git_repository).stdout.decode().strip()
+    )
+
+    with pytest.raises(ValueError, match="gitlink|submodule"):
+        bootstrap_module.build_revision_binding(
+            git_repository, current_revision, DECLARED_INPUTS
+        )
+    with pytest.raises(ValueError, match="gitlink|submodule"):
+        bootstrap_module.verify_revision_binding(
+            git_repository, recorded_binding, DECLARED_INPUTS
+        )
+
+
+def test_revision_binding_rejects_nonselected_gitlink_staged_in_current_index(
+    bootstrap_module, git_repository: Path, tmp_path: Path
+) -> None:
+    binding = _binding(bootstrap_module, git_repository)
+    dependency_revision = _create_local_dependency_repository(
+        tmp_path / "local-dependency"
+    )
+    _run(
+        "git",
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        f"160000,{dependency_revision},vendor/staged-dependency",
+        cwd=git_repository,
+    )
+
+    with pytest.raises(ValueError, match="gitlink|submodule"):
+        bootstrap_module.verify_revision_binding(
+            git_repository, binding, DECLARED_INPUTS
+        )
+
+
 @pytest.mark.parametrize("mutation", ["added", "removed", "renamed", "changed", "mode"])
 def test_revision_binding_rejects_current_head_tree_drift(
     bootstrap_module, git_repository: Path, mutation: str
@@ -669,6 +749,112 @@ def test_record_mode_rejects_unapproved_prebootstrap_path_and_does_not_process_p
     assert not marker.exists()
 
 
+def _directory_snapshot(path: Path) -> dict[str, bytes]:
+    return {
+        item.relative_to(path).as_posix(): item.read_bytes()
+        for item in path.rglob("*")
+        if item.is_file()
+    }
+
+
+def test_record_mode_rejects_approved_site_through_symlinked_parent_without_touching_target(
+    git_repository: Path, tmp_path: Path
+) -> None:
+    _replace_lock(git_repository, _minimal_lock())
+    environment_root = _create_environment(tmp_path / "authority-env")
+    site_parent = _site_packages(environment_root).parent
+    external_target = tmp_path / "external-site-parent"
+    site_parent.rename(external_target)
+    external_target.joinpath("sentinel.txt").write_text("untouched\n", encoding="utf-8")
+    try:
+        site_parent.symlink_to(external_target, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"OS denied directory symlink creation: {exc}")
+    before = _directory_snapshot(external_target)
+
+    completed = _record(git_repository, environment_root)
+
+    assert completed.returncode != 0
+    assert "site-packages" in completed.stderr and "alias" in completed.stderr
+    assert _directory_snapshot(external_target) == before
+
+
+def test_record_mode_rejects_approved_site_windows_junction_without_touching_target(
+    git_repository: Path, tmp_path: Path
+) -> None:
+    if sys.platform != "win32":
+        pytest.skip("Windows junctions are unavailable on this platform")
+    _replace_lock(git_repository, _minimal_lock())
+    environment_root = _create_environment(tmp_path / "authority-env")
+    site_path = _site_packages(environment_root)
+    site_path.rename(environment_root / "original-site-packages")
+    external_target = tmp_path / "junction-site-target"
+    external_target.mkdir()
+    external_target.joinpath("sentinel.txt").write_text("untouched\n", encoding="utf-8")
+    created = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(site_path), str(external_target)],
+        check=False,
+        capture_output=True,
+    )
+    if created.returncode != 0:
+        pytest.skip("OS denied junction creation")
+    before = _directory_snapshot(external_target)
+
+    completed = _record(git_repository, environment_root)
+
+    assert completed.returncode != 0
+    assert "site-packages" in completed.stderr and "alias" in completed.stderr
+    assert _directory_snapshot(external_target) == before
+
+
+def test_approved_site_validator_rejects_portable_windows_reparse_seam(
+    bootstrap_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    validator = getattr(bootstrap_module, "_validated_approved_sites", None)
+    assert callable(validator), "bootstrap must expose approved-site alias validation"
+    environment_root = tmp_path / "authority-env"
+    _site_packages(environment_root).mkdir(parents=True)
+    monkeypatch.setattr(bootstrap_module, "_is_alias", lambda _path_stat: True)
+
+    with pytest.raises(ValueError, match="site-packages.*alias"):
+        validator(environment_root)
+
+
+def test_approved_site_validator_requires_resolved_containment_when_alias_seam_misses(
+    bootstrap_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    validator = getattr(bootstrap_module, "_validated_approved_sites", None)
+    assert callable(validator), (
+        "bootstrap must expose approved-site containment validation"
+    )
+    environment_root = tmp_path / "authority-env"
+    site_path = _site_packages(environment_root)
+    site_path.parent.mkdir(parents=True)
+    external_target = tmp_path / "external-site"
+    external_target.mkdir()
+    external_target.joinpath("sentinel.txt").write_text("untouched\n", encoding="utf-8")
+    if sys.platform == "win32":
+        created = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(site_path), str(external_target)],
+            check=False,
+            capture_output=True,
+        )
+        if created.returncode != 0:
+            pytest.skip("OS denied junction creation")
+    else:
+        try:
+            site_path.symlink_to(external_target, target_is_directory=True)
+        except OSError as exc:
+            pytest.skip(f"OS denied directory symlink creation: {exc}")
+    before = _directory_snapshot(external_target)
+    monkeypatch.setattr(bootstrap_module, "_is_alias", lambda _path_stat: False)
+
+    with pytest.raises(ValueError, match="site-packages.*outside environment"):
+        validator(environment_root)
+
+    assert _directory_snapshot(external_target) == before
+
+
 def test_lock_markers_select_one_exact_version_and_exclude_dev_group(
     git_repository: Path, tmp_path: Path
 ) -> None:
@@ -855,6 +1041,81 @@ def main(argv, *, trusted_runtime):
     assert "untracked or ignored importable" in rejected.stderr
     assert not marker.exists()
     assert not (tmp_path / "work").exists()
+
+
+@pytest.mark.parametrize(
+    ("option", "value_kind", "option_form"),
+    [
+        ("--dataset", "relative", "separate"),
+        ("--stress-dataset", "absolute", "equals"),
+        ("--formal-dataset", "traversal", "separate"),
+        ("--snapshot", "alias", "equals"),
+        ("--data", "relative", "equals"),
+        ("--stress", "absolute", "separate"),
+        ("--formal", "traversal", "equals"),
+        ("--snap", "alias", "separate"),
+    ],
+)
+def test_calibration_rejects_all_input_overrides_before_project_import_or_work(
+    git_repository: Path,
+    tmp_path: Path,
+    option: str,
+    value_kind: str,
+    option_form: str,
+) -> None:
+    _replace_lock(git_repository, _minimal_lock())
+    import_marker = tmp_path / "project-imported.marker"
+    invocation_marker = tmp_path / "runner-invoked.marker"
+    _write(
+        git_repository,
+        "eval/run_severance_refusal_policy.py",
+        """import os
+from pathlib import Path
+
+Path(os.environ['BOOTSTRAP_IMPORT_MARKER']).write_text('imported')
+
+def main(argv, *, trusted_runtime):
+    Path(os.environ['BOOTSTRAP_INVOCATION_MARKER']).write_text('invoked')
+    return 0
+""",
+    )
+    _commit(git_repository, "calibration override sentinel")
+    environment_root = _create_environment(tmp_path / "authority-env")
+    work_dir = tmp_path / "work"
+    values = {
+        "relative": "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
+        "absolute": str(tmp_path / "outside-stress.jsonl"),
+        "traversal": "eval/dataset/../dataset/eval_set.jsonl",
+        "alias": "release/./corpus_snapshot.json",
+    }
+    override = (
+        [option, values[value_kind]]
+        if option_form == "separate"
+        else [f"{option}={values[value_kind]}"]
+    )
+    command = _record_command(git_repository, environment_root)
+    command[command.index("record")] = "calibrate"
+    command.extend(["--", "--offline", *override, "--work-dir", str(work_dir)])
+    process_environment = os.environ.copy()
+    process_environment.pop("PYTHONPATH", None)
+    process_environment["BOOTSTRAP_IMPORT_MARKER"] = str(import_marker)
+    process_environment["BOOTSTRAP_INVOCATION_MARKER"] = str(invocation_marker)
+
+    completed = subprocess.run(
+        command,
+        cwd=git_repository,
+        env=process_environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+
+    assert completed.returncode != 0
+    assert "authoritative input" in completed.stderr
+    assert not import_marker.exists()
+    assert not invocation_marker.exists()
+    assert not work_dir.exists()
 
 
 def test_artifact_verification_entrypoint_passes_exact_runtime_after_validation(

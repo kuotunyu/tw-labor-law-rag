@@ -108,3 +108,81 @@ unchanged.
 - Task 7 reuses the committed bootstrap and replay implementation read-only.
   Any Python/test change returns the process to Task 5 and invalidates the
   Task 6 artifact; Task 7 owns public packaging and the two allowlist tests.
+
+## Binding-redesign review-fix round 1
+
+### Root causes and RED evidence
+
+- The bootstrap attested four exact declared inputs but passed its calibration
+  remainder directly to the runner. Four exact/equals-form overrides reported
+  `4 failed`; all reached the stub project import and runner invocation. A
+  mutation check then exposed downstream `argparse` long-option abbreviation:
+  the four exact cases passed while `--data`, `--stress`, `--formal`, and
+  `--snap` reported `4 failed`.
+- Full NUL-delimited Git records were parsed, but gitlink type/mode validation
+  occurred only while materializing selected paths. Synthetic tree/index
+  records, a real offline local submodule, and a staged nonselected gitlink
+  reported `4 failed`; the staged case reached only the generic dirty-tree
+  fallback.
+- Approved site paths were accepted with `Path.is_dir()`, which follows
+  aliases. A real Windows site junction and the missing portable validator
+  seam reported `2 failed, 1 skipped`; a forced alias-detector miss separately
+  reported `1 failed` before resolved containment existed.
+
+### Fix
+
+- Authoritative calibration now rejects every exact, equals-form, or
+  `argparse`-abbreviated spelling of `--dataset`, `--stress-dataset`,
+  `--formal-dataset`, and `--snapshot` before project/environment resolution,
+  import-path activation, offline preflight, work-directory preparation,
+  materialization, model/index/provider construction, or writes. The
+  authoritative path therefore always uses the four attested runner defaults.
+- Tree parsing rejects any `160000`/`commit` gitlink globally, and index
+  parsing rejects every `160000` entry globally, before selected-path
+  filtering. This applies to recorded revisions, current `HEAD`, and the full
+  current index, including non-Python paths.
+- Approved environment-relative site parents and the site directory itself
+  are checked with `lstat` plus the portable symlink/Windows-reparse detector.
+  The resolved site must also remain below the resolved environment root even
+  if the alias detector misses. These checks run before distribution inventory
+  enumeration and again before verified roots are added to `sys.path`.
+  Symlink/junction external targets are read-only and remain byte-identical.
+
+### GREEN evidence
+
+```text
+.venv\Scripts\python.exe -m pytest tests\test_v036_authoritative_bootstrap.py -q -p no:cacheprovider -k "rejects_all_input_overrides or calibration_entrypoint_imports_project_only_after_all_bindings_pass"
+9 passed, 62 deselected in 17.95s
+
+.venv\Scripts\python.exe -m pytest tests\test_v036_authoritative_bootstrap.py -q -p no:cacheprovider -k "gitlink or submodule"
+4 passed, 59 deselected in 4.98s
+
+.venv\Scripts\python.exe -m pytest tests\test_v036_authoritative_bootstrap.py -q -p no:cacheprovider -k "symlinked_parent or windows_junction_without or portable_windows_reparse_seam or resolved_containment_when_alias_seam_misses"
+3 passed, 1 skipped, 63 deselected in 1.55s
+
+.venv\Scripts\python.exe -m pytest tests\test_v036_authoritative_bootstrap.py tests\test_severance_refusal_policy.py tests\test_release_verification.py -q -p no:cacheprovider -k "not test_release_verifier_recomputes_committed_evidence and not test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions"
+308 passed, 4 skipped, 2 deselected in 157.75s
+
+.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider -k "not test_release_verifier_recomputes_committed_evidence and not test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions"
+925 passed, 4 skipped, 2 deselected in 241.49s
+
+.venv\Scripts\python.exe -m pytest tests\test_release_verification.py -q -p no:cacheprovider -k "not test_release_verifier_recomputes_committed_evidence and not test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions"
+105 passed, 2 deselected in 10.13s
+
+.venv\Scripts\ruff.exe check .
+All checks passed!
+
+git diff --check
+```
+
+The historical NO-GO working copy and `HEAD` still resolve to Git blob
+`2cdb13b36d98b5ebfbfcd2cec877e571f3ab2dd4`; the official and pivot diagnostic
+artifacts remain absent, and `progress.md` remains unchanged. No network,
+package sync, model/provider construction, acceptance, export, deployment,
+secret access, or project artifact deletion occurred.
+
+Ignored test-generated `__pycache__` trees remain under the exact code roots
+(`src/rag` packages, `eval`, and `scripts`) and were intentionally not removed
+in this review fix. Task 6 must begin from a cache-clean committed checkout;
+the authoritative bootstrap correctly treats those ignored trees as a failing
+precondition.
