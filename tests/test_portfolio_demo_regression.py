@@ -31,7 +31,8 @@ def test_portfolio_dataset_has_exact_representative_contract() -> None:
         f"portfolio-{number:03d}" for number in range(1, 11)
     ]
     assert sum(case.answerable for case in cases) == 6
-    assert sum(case.expect_threshold_refusal for case in cases) == 4
+    assert sum(case.expect_threshold_refusal for case in cases) == 2
+    assert sum(case.expected_refusal_stage == "llm" for case in cases) == 2
     assert {source["law"] for case in cases for source in case.sources} >= {
         "勞動基準法",
         "勞工請假規則",
@@ -67,6 +68,7 @@ def _valid_rows() -> list[dict]:
         ),
         (lambda rows: rows[0].update(expect_threshold_refusal=True), "portfolio case"),
         (lambda rows: rows[0].update(expected_refusal_stage="threshold"), "portfolio case"),
+        (lambda rows: rows[6].update(expected_refusal_stage="threshold"), "portfolio case"),
         (
             lambda rows: rows[0].update(
                 prohibited_sources=list(rows[0]["sources"])
@@ -113,6 +115,26 @@ def test_result_builder_scores_sources_and_refusal_without_answer_text(cases) ->
     assert result["generation_called"] is False
     assert result["passed"] is True
     assert "answer" not in result
+
+
+def test_unanswerable_llm_stage_passes_retrieval_boundary_without_generation(
+    cases,
+) -> None:
+    case = next(case for case in cases if case.expected_refusal_stage == "llm")
+
+    result = build_result(
+        case,
+        retrieved=[("最低工資法", "第 4 條", 1)],
+        applied_routes=[],
+        threshold_refused=False,
+        top_score=0.1,
+    )
+
+    assert result["expected_refusal_stage"] == "llm"
+    assert result["refusal_stage"] is None
+    assert result["generation_allowed"] is True
+    assert result["generation_called"] is False
+    assert result["passed"] is True
 
 
 def test_summary_requires_all_expected_sources_at_five_and_exact_refusal(
