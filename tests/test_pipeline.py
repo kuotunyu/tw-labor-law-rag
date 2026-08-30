@@ -1,7 +1,73 @@
 import pytest
 
 from rag.models import RetrievedChunk
-from rag.retrieval.pipeline import RetrievalPipeline
+from rag.retrieval.pipeline import (
+    QueryPlan,
+    RetrievalPipeline,
+    _retrieval_query,
+    plan_retrieval_query,
+)
+
+
+def test_plan_retrieval_query_returns_off_hours_route_and_preserves_question():
+    question = "主管在休假日用群組傳訊息要求我處理工作，這算加班嗎？"
+    plan = plan_retrieval_query(question)
+
+    assert isinstance(plan, QueryPlan)
+    assert plan.routes == ("off_hours_employer_message",)
+    assert plan.search_query == (
+        f"{question} 雇主 休息日 例假 工作時間 延長工作時間 出勤 加班"
+    )
+    assert question in plan.search_query
+    assert "off_hours_employer_message" not in question
+
+
+def test_plan_retrieval_query_returns_severance_route_for_casefolded_english_cues():
+    question = "Please compare SEVERANCE and TERMINATION PACKAGE with 勞退新制勞基法舊制試算。"
+    plan = plan_retrieval_query(question)
+
+    assert plan.routes == ("severance_comparison",)
+    assert plan.search_query.endswith("資遣費 勞工退休金條例 勞動基準法 工作年資 平均工資 六個月")
+    assert "severance_comparison" not in question
+
+
+def test_plan_retrieval_query_returns_wage_arrears_route():
+    question = "公司 unpaid salary，我想 immediately resign。"
+    plan = plan_retrieval_query(question)
+
+    assert plan.routes == ("wage_arrears_termination",)
+    assert plan.search_query.endswith(
+        "勞動基準法 第十四條 不依勞動契約給付工作報酬 勞工得不經預告終止契約"
+    )
+
+
+def test_plan_retrieval_query_returns_no_routes_without_complete_cue_group():
+    plan = plan_retrieval_query("公司欠薪兩個月，我該怎麼追討？")
+
+    assert plan == QueryPlan(search_query="公司欠薪兩個月，我該怎麼追討？", routes=())
+
+
+def test_plan_retrieval_query_appends_all_routes_in_existing_order():
+    question = (
+        "老闆在休假日用群組傳訊，說公司欠薪、也要我直接離職，"
+        "還附上勞退新制與勞基法舊制資遣費試算。"
+    )
+    plan = plan_retrieval_query(question)
+
+    assert plan.routes == (
+        "off_hours_employer_message",
+        "severance_comparison",
+        "wage_arrears_termination",
+    )
+    assert plan.search_query.startswith(question + " ")
+    assert plan.search_query.index("雇主 休息日") < plan.search_query.index("資遣費 勞工退休金條例")
+    assert plan.search_query.index("資遣費 勞工退休金條例") < plan.search_query.index("勞動基準法 第十四條")
+
+
+def test_retrieval_query_compatibility_wrapper_returns_plan_search_query():
+    question = "公司欠薪，我想直接離職。"
+
+    assert _retrieval_query(question) == plan_retrieval_query(question).search_query
 
 
 def hit(chunk_id, score=1.0):
