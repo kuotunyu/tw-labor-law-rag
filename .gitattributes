@@ -11,6 +11,7 @@
 *.yaml text eol=lf
 .env* text eol=lf
 .gitignore text eol=lf
+.python-version text eol=lf
 .dockerignore text eol=lf
 Dockerfile text eol=lf
 

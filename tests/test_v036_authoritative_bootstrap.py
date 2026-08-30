@@ -144,6 +144,42 @@ def test_revision_binding_uses_exact_full_git_tree_metadata_and_casefolded_pytho
     )
 
 
+def test_real_autocrlf_checkout_preserves_python_version_blob_bytes(
+    bootstrap_module, git_repository: Path, tmp_path: Path
+) -> None:
+    shutil.copyfile(PROJECT_ROOT / ".gitattributes", git_repository / ".gitattributes")
+    git_repository.joinpath(".python-version").write_bytes(b"3.11\n")
+    _commit(git_repository, "real checkout attributes")
+    checkout = tmp_path / "autocrlf-checkout"
+    _run(
+        "git",
+        "clone",
+        "--config",
+        "core.autocrlf=true",
+        str(git_repository),
+        str(checkout),
+        cwd=tmp_path,
+    )
+    revision = _run("git", "rev-parse", "HEAD", cwd=checkout).stdout.decode().strip()
+    committed = _run(
+        "git", "cat-file", "blob", "HEAD:.python-version", cwd=checkout
+    ).stdout
+
+    assert committed == b"3.11\n"
+    assert checkout.joinpath(".python-version").read_bytes() == committed
+    status = _run(
+        "git", "status", "--porcelain=v1", "-z", "--untracked-files=all", cwd=checkout
+    ).stdout
+    assert status == b"", status
+    binding = bootstrap_module.build_revision_binding(
+        checkout, revision, DECLARED_INPUTS
+    )
+    assert (
+        bootstrap_module.verify_revision_binding(checkout, binding, DECLARED_INPUTS)
+        == binding
+    )
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [

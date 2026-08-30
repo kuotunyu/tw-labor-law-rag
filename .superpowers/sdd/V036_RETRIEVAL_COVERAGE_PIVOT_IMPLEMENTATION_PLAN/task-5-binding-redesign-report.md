@@ -186,3 +186,94 @@ Ignored test-generated `__pycache__` trees remain under the exact code roots
 in this review fix. Task 6 must begin from a cache-clean committed checkout;
 the authoritative bootstrap correctly treats those ignored trees as a failing
 precondition.
+
+## Task 6 preflight fix round 2
+
+### Root cause and RED evidence
+
+The candidate revision `358ec7178d904a1ffaf7864d80c1061152f94909`
+recorded `.python-version` as LF bytes (Git blob
+`2c0733315e415bfb5e5b353f9996ecd964d395b2`). On the Windows acceptance host,
+the system Git configuration set `core.autocrlf=true`; because
+`.gitattributes` provided only the catch-all `* text=auto` for this path, the
+clean checkout contained `3.11\r\n` (raw Git object
+`37504c53d76dd34c2db246533e5601568d567ed9`). Git's filter-aware object ID
+still matched the committed LF blob, so `git status` was clean while the
+authoritative raw-byte gate correctly rejected the checkout.
+
+A real temporary Git repository/clone regression using the repository's
+actual `.gitattributes` and clone-local `core.autocrlf=true` failed before the
+configuration fix:
+
+```text
+1 failed, 71 deselected in 1.07s
+E assert b'3.11\r\n' == b'3.11\n'
+```
+
+Deleting the exact `.python-version` attribute rule reproduces this failure;
+the test does not infer behavior from source text or a change detector.
+
+### Minimal fix and binding decision
+
+The sole checkout-policy change is:
+
+```gitattributes
+.python-version text eol=lf
+```
+
+The working copy of `.python-version` was normalized through an `apply_patch`
+delete/add while preserving the logical value `3.11`. Raw checkout-byte
+verification and every bootstrap semantic remain unchanged.
+
+`.gitattributes` does not need to be added to the selected bound-file set.
+The artifact already binds the exact full code revision, and reproduction of
+that revision necessarily uses its recorded attributes. The bootstrap then
+requires an exact clean `HEAD`/index and compares the actual bytes of every
+selected file with the recorded Git blobs. Those checks are sufficient to
+reject both a changed attributes revision and any platform checkout
+transformation, as this incident demonstrated. Expanding the set would add no
+independent guarantee.
+
+### GREEN evidence
+
+```text
+.venv\Scripts\python.exe -B -m pytest tests\test_v036_authoritative_bootstrap.py -q -p no:cacheprovider -k "revision_binding_rejects_index_checkout_and_sparse_drift or real_autocrlf_checkout_preserves_python_version_blob_bytes"
+5 passed, 67 deselected in 14.09s
+
+# The new real-checkout regression was also repeated ten times.
+10/10 passed
+
+.venv\Scripts\python.exe -B -m pytest tests\test_v036_authoritative_bootstrap.py tests\test_severance_refusal_policy.py tests\test_release_verification.py -q -p no:cacheprovider -k "not test_release_verifier_recomputes_committed_evidence and not test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions"
+309 passed, 4 skipped, 2 deselected in 154.34s
+
+.venv\Scripts\ruff.exe check .
+All checks passed!
+
+git diff --check
+```
+
+One earlier combined execution reached `308 passed, 4 skipped, 2 deselected`
+and reported the new clone dirty only at its final clean-tree assertion after
+both raw LF assertions had passed. Exact porcelain diagnostics were added;
+the condition did not reproduce in ten focused repetitions, a two-test
+sequence, or the complete GREEN rerun above.
+
+The final clean committed candidate was then checked with the existing Task 6
+environment outside the repository by the authoritative `python -B -I -S`
+bootstrap in `--mode record`, with offline variables set and `PYTHONPATH`
+removed. It exited zero without calibration, model/provider construction,
+package sync, network access, or repository artifacts.
+
+```text
+RECORD_OK exit=0 revision=<contemporaneous HEAD> tracked=118 declared=4 distributions=124
+WORKTREE_STATUS=0
+```
+
+The initial diagnostic run recreated one `scripts/__pycache__`; it was moved,
+not deleted, into the existing external Task 6 quarantine under
+`scripts/__pycache__-task5-round2`. No quarantined content was restored. The
+exact `src`/`eval`/`scripts` roots contain no ignored importable or cache
+artifact at the record gate. The historical NO-GO blob remains
+`2cdb13b36d98b5ebfbfcd2cec877e571f3ab2dd4`; no official or pivot artifact,
+public allowlist change, `progress.md` change, secret access, acceptance,
+inference, download, or deployment occurred.
