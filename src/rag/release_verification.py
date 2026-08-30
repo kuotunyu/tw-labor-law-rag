@@ -31,12 +31,8 @@ from rag.reliability import (
     pareto_better_thresholds,
 )
 from rag.retrieval.pipeline import plan_retrieval_query
-from rag.severance_refusal_policy import (
-    DECISION_CODE_PATHS,
-    replay_official_artifact,
-    validate_decision_import_closure,
-)
 from rag.severance_refusal_policy import load_cases as load_severance_policy_cases
+from rag.severance_refusal_policy import replay_official_artifact
 
 ABLATION_FIELDS = frozenset(
     {
@@ -2294,54 +2290,11 @@ def _provider_metrics(provider: str, rows: Sequence[Mapping[str, Any]]) -> dict[
     }
 
 
-def _require_bound_file(root: Path, relative_path: str, *, label: str) -> Path:
-    path = root / relative_path
-    if not path.is_file():
-        raise ReleaseVerificationError(
-            f"severance refusal policy missing bound file {label}"
-        )
-    return path
-
-
-def _require_clean_committed_path(
-    root: Path, revision: str, relative_path: str, *, label: str
-) -> None:
-    tracked = subprocess.run(
-        ["git", "-C", str(root), "ls-files", "--error-unmatch", "--", relative_path],
-        check=False,
-        capture_output=True,
-    )
-    status = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(root),
-            "status",
-            "--porcelain",
-            "--untracked-files=all",
-            "--",
-            relative_path,
-        ],
-        check=False,
-        capture_output=True,
-    )
-    comparison = subprocess.run(
-        ["git", "-C", str(root), "diff", "--quiet", revision, "--", relative_path],
-        check=False,
-    )
-    if (
-        tracked.returncode != 0
-        or status.returncode != 0
-        or status.stdout
-        or comparison.returncode != 0
-    ):
-        raise ReleaseVerificationError(
-            "severance refusal policy committed revision mismatch for " + label
-        )
-
-
 def _verify_severance_refusal_policy_artifact(
-    project_root: Path, artifact_path: Path
+    project_root: Path,
+    artifact_path: Path,
+    *,
+    trusted_runtime: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Replay and bind v0.3.6 policy evidence without model construction."""
 
@@ -2351,14 +2304,6 @@ def _verify_severance_refusal_policy_artifact(
         raise ReleaseVerificationError(
             "severance refusal policy schema_version must equal 1.3"
         )
-    for field, relative_path in DECISION_CODE_PATHS.items():
-        _require_bound_file(root, relative_path, label=field)
-    try:
-        validate_decision_import_closure(root)
-    except ValueError as exc:
-        raise ReleaseVerificationError(
-            f"severance refusal policy import closure failed: {exc}"
-        ) from exc
     try:
         replayed = replay_official_artifact(artifact)
     except (RuntimeError, ValueError) as exc:
@@ -2367,6 +2312,23 @@ def _verify_severance_refusal_policy_artifact(
         ) from exc
 
     provenance = replayed["provenance"]
+    if not isinstance(trusted_runtime, dict) or set(trusted_runtime) != {
+        "revision_binding",
+        "environment_binding",
+    }:
+        raise ReleaseVerificationError(
+            "severance refusal policy requires authoritative bootstrap bindings"
+        )
+    _assert_equal(
+        "severance refusal policy revision binding",
+        trusted_runtime["revision_binding"],
+        provenance["revision_binding"],
+    )
+    _assert_equal(
+        "severance refusal policy environment binding",
+        trusted_runtime["environment_binding"],
+        provenance["environment_binding"],
+    )
     source_paths = {
         "dataset_sha256": root
         / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
@@ -2414,46 +2376,6 @@ def _verify_severance_refusal_policy_artifact(
                 tuple(evidence["applied_routes"]),
                 plan_retrieval_query(row["question"]).routes,
             )
-    for field, relative_path in DECISION_CODE_PATHS.items():
-        decision_path = _require_bound_file(root, relative_path, label=field)
-        _assert_equal(
-            f"severance refusal policy decision code {field} SHA-256",
-            hashlib.sha256(decision_path.read_bytes()).hexdigest(),
-            provenance["decision_code_sha256"][field],
-        )
-
-    revision = provenance["code_revision"]
-    try:
-        subprocess.run(
-            ["git", "-C", str(root), "cat-file", "-e", f"{revision}^{{commit}}"],
-            check=True,
-            capture_output=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        raise ReleaseVerificationError(
-            "severance refusal policy code_revision is not a committed revision"
-        ) from exc
-    for field, relative_path in DECISION_CODE_PATHS.items():
-        _require_clean_committed_path(
-            root,
-            revision,
-            relative_path,
-            label=f"decision code {field}",
-        )
-    committed_sources = {
-        "dataset_sha256": "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
-        "corpus_snapshot_sha256": "release/corpus_snapshot.json",
-        "stress_dataset": "eval/dataset/reliability_stress_v0.3.1.jsonl",
-        "formal_dataset": "eval/dataset/eval_set.jsonl",
-    }
-    for field, relative_path in committed_sources.items():
-        _require_clean_committed_path(
-            root,
-            revision,
-            relative_path,
-            label=f"source {field}",
-        )
-
     return {
         "schema_version": replayed["schema_version"],
         "production_threshold": replayed["production_threshold"],
@@ -2470,7 +2392,9 @@ def _verify_severance_refusal_policy_artifact(
     }
 
 
-def verify_release(project_root: Path) -> dict[str, Any]:
+def verify_release(
+    project_root: Path, *, trusted_runtime: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Verify all committed release evidence and return a deterministic summary."""
 
     root = project_root.resolve()
@@ -2625,7 +2549,9 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         root / "eval/official/severance_refusal_policy_v0.3.6.json"
     )
     severance_policy_summary = (
-        _verify_severance_refusal_policy_artifact(root, severance_policy_path)
+        _verify_severance_refusal_policy_artifact(
+            root, severance_policy_path, trusted_runtime=trusted_runtime
+        )
         if severance_policy_path.is_file()
         else None
     )

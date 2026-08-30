@@ -32,14 +32,12 @@ from rag.retrieval.pipeline import (  # noqa: E402
 )
 from rag.severance_refusal_policy import (  # noqa: E402
     CANDIDATE_THRESHOLDS,
-    DECISION_CODE_PATHS,
     SeverancePolicyCase,
     build_case_observation,
     build_no_go_evidence,
     build_official_artifact,
     evaluate_route_ablation_candidate,
     load_cases,
-    validate_decision_import_closure,
 )
 from rag.wage_arrears_regression import require_cached_models  # noqa: E402
 
@@ -310,8 +308,15 @@ def _write_public_json(path: Path, value: object) -> None:
 
 
 def _build_provenance(
-    args: argparse.Namespace, settings: Settings, code_revision: str
+    args: argparse.Namespace,
+    settings: Settings,
+    code_revision: str,
+    *,
+    trusted_runtime: dict[str, Any],
 ) -> dict[str, Any]:
+    revision_binding = trusted_runtime["revision_binding"]
+    if revision_binding.get("revision") != code_revision:
+        raise RuntimeError("authoritative bootstrap revision differs from clean HEAD")
     return {
         "dataset_sha256": hashlib.sha256(args.dataset.read_bytes()).hexdigest(),
         "corpus_snapshot_sha256": hashlib.sha256(
@@ -325,10 +330,10 @@ def _build_provenance(
                 args.formal_dataset.read_bytes()
             ).hexdigest(),
         },
-        "decision_code_sha256": {
-            name: hashlib.sha256((PROJECT_ROOT / path).read_bytes()).hexdigest()
-            for name, path in DECISION_CODE_PATHS.items()
-        },
+        "revision_binding": json.loads(json.dumps(revision_binding)),
+        "environment_binding": json.loads(
+            json.dumps(trusted_runtime["environment_binding"])
+        ),
         "embedding_model": settings.embedding_model,
         "embedding_revision": settings.embedding_model_revision,
         "reranker_model": settings.reranker_model,
@@ -464,12 +469,34 @@ def _build_local_pipeline(
     return settings, embedder, store, pipeline
 
 
-def main(argv: list[str] | None = None) -> int:
+def _require_trusted_runtime(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {
+        "revision_binding",
+        "environment_binding",
+    }:
+        raise RuntimeError(
+            "calibration must start through the authoritative bootstrap"
+        )
+    revision_binding = value["revision_binding"]
+    if (
+        not isinstance(revision_binding, dict)
+        or not isinstance(revision_binding.get("revision"), str)
+        or not isinstance(value["environment_binding"], dict)
+    ):
+        raise RuntimeError("authoritative bootstrap attestation is malformed")
+    return value
+
+
+def main(
+    argv: list[str] | None = None,
+    *,
+    trusted_runtime: dict[str, Any] | None = None,
+) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
+    trusted_runtime = _require_trusted_runtime(trusted_runtime)
     try:
         args.diagnostics_output = _validated_diagnostics_output(args)
-        validate_decision_import_closure(PROJECT_ROOT)
     except ValueError as exc:
         parser.error(str(exc))
     if not args.offline:
@@ -495,7 +522,12 @@ def main(argv: list[str] | None = None) -> int:
         candidates = _evaluate_route_ablation(
             observations, stress_evidence, formal_evidence
         )
-        provenance = _build_provenance(args, settings, candidate_revision)
+        provenance = _build_provenance(
+            args,
+            settings,
+            candidate_revision,
+            trusted_runtime=trusted_runtime,
+        )
         try:
             artifact = _build_accepted_artifact(
                 observations=observations,

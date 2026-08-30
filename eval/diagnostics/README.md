@@ -16,10 +16,20 @@ fixed production threshold `0.03` separately from the evaluation-only
 candidate is also `0.03`. It retains raw unrounded content-free target,
 stress, and formal evidence; exact route checks; first-stage and reranker call
 counts; CPU/FP32 and local-only model provenance; `rrf_k`; semantic-view and
-merge-policy bindings; clean committed source hashes; and zero-provider
-counters.
+merge-policy bindings; exact revision/environment bindings; and zero-provider
+counters. The revision binding covers every tracked Python file plus the
+declared configuration/data inputs and must match the recorded Git tree,
+current `HEAD`, index metadata, and checkout bytes. The environment binding is
+created before project imports by the committed `python -I -S` bootstrap using
+an explicit environment outside the repository; it records only privacy-safe
+interpreter/platform, frozen no-development lock selection, and exact installed
+distribution facts.
 
 The pivot diagnostic can be replayed with
 `rag.severance_refusal_policy.replay_no_go_evidence` without loading retrieval
 models or rerunning the 130 queries. A NO-GO diagnostic never authorizes an
-official artifact or any production-threshold change.
+official artifact or any production-threshold change. Authoritative Task 7
+replay first passes the diagnostic to
+`scripts/v036_authoritative_bootstrap.py --mode verify-artifact` under the same
+explicit external environment; the verifier is read-only and rejects source,
+environment, artifact, or inventory drift before importing project code.

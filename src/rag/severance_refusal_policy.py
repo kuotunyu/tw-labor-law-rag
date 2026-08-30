@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
 import math
-import symtable
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -18,60 +17,21 @@ from rag.retrieval.pipeline import (
 from rag.retrieval.refusal_policy import decide_retrieval_refusal
 
 CANDIDATE_THRESHOLDS = (0.0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03)
-DECISION_CODE_PATHS = {
-    # Runtime configuration, data contracts, and construction wiring.
-    "config": "src/rag/config.py",
-    "corpus_audit": "src/rag/corpus_audit.py",
-    "evaluation": "src/rag/evaluation.py",
-    "factory": "src/rag/factory.py",
-    "models": "src/rag/models.py",
-    "portfolio_demo_regression": "src/rag/portfolio_demo_regression.py",
-    "reliability": "src/rag/reliability.py",
-    "wage_arrears_regression": "src/rag/wage_arrears_regression.py",
-    # Factory imports whose import-time behavior is part of provider isolation.
-    "generation_answerer": "src/rag/generation/answerer.py",
-    "generation_package": "src/rag/generation/__init__.py",
-    "generation_llm": "src/rag/generation/llm.py",
-    "generation_prompts": "src/rag/generation/prompts.py",
-    "generation_router": "src/rag/generation/router.py",
-    # Complete local indexing and retrieval implementation used by acceptance.
-    "index_bm25": "src/rag/indexing/bm25_index.py",
-    "index_embedder": "src/rag/indexing/embedder.py",
-    "index_legal_terms": "src/rag/indexing/dict/legal_terms.txt",
-    "index_tokenizer": "src/rag/indexing/tokenizer.py",
-    "index_vector_store": "src/rag/indexing/vector_store.py",
-    "indexing_package": "src/rag/indexing/__init__.py",
-    "ingestion_chunkers": "src/rag/ingestion/chunkers.py",
-    "ingestion_cleaner": "src/rag/ingestion/cleaner.py",
-    "ingestion_loader": "src/rag/ingestion/loader.py",
-    "ingestion_package": "src/rag/ingestion/__init__.py",
-    "rag_package": "src/rag/__init__.py",
-    "retrieval_fusion": "src/rag/retrieval/fusion.py",
-    "retrieval_pipeline": "src/rag/retrieval/pipeline.py",
-    "retrieval_refusal_policy": "src/rag/retrieval/refusal_policy.py",
-    "retrieval_reranker": "src/rag/retrieval/reranker.py",
-    "retrieval_retriever": "src/rag/retrieval/retriever.py",
-    "retrieval_package": "src/rag/retrieval/__init__.py",
-    # Evidence construction, replay, and release verification entry points.
-    "severance_policy": "src/rag/severance_refusal_policy.py",
-    "runner_bootstrap": "eval/_bootstrap.py",
-    "runner_lib": "eval/lib.py",
-    "runner_reliability": "eval/run_reliability_eval.py",
-    "runner_severance": "eval/run_severance_refusal_policy.py",
-    "script_audit_corpus": "scripts/audit_corpus.py",
-    "script_bootstrap": "scripts/_bootstrap.py",
-    "script_download_corpus": "scripts/download_corpus.py",
-    "release_verifier": "src/rag/release_verification.py",
-    "release_verifier_wrapper": "scripts/verify_release.py",
-    # Python dependency resolution can alter CPU/FP32/model execution semantics.
-    "project_configuration": "pyproject.toml",
-    "runtime_lock": "uv.lock",
-}
-DECISION_IMPORT_ROOTS = (
-    "eval/run_severance_refusal_policy.py",
-    "src/rag/release_verification.py",
-    "scripts/verify_release.py",
+REQUIRED_TRACKED_CODE_PATHS = frozenset(
+    {
+        ".python-version",
+        "Dockerfile",
+        "pyproject.toml",
+        "src/rag/indexing/dict/legal_terms.txt",
+        "uv.lock",
+    }
 )
+DECLARED_INPUT_PATHS = {
+    "corpus_snapshot": "release/corpus_snapshot.json",
+    "formal_dataset": "eval/dataset/eval_set.jsonl",
+    "stress_dataset": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+    "target_dataset": "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
+}
 EXPECTED_QIDS = tuple(
     f"severance-policy-{number:03d}" for number in range(1, 31)
 )
@@ -162,7 +122,8 @@ _PROVENANCE_FIELDS = {
     "dataset_sha256",
     "corpus_snapshot_sha256",
     "source_artifact_sha256",
-    "decision_code_sha256",
+    "revision_binding",
+    "environment_binding",
     "embedding_model",
     "embedding_revision",
     "reranker_model",
@@ -335,758 +296,6 @@ _FORMAL_ROUTES = {
     "eval-03": _SEVERANCE_ROUTE,
     "eval-10": _WAGE_ROUTE,
 }
-
-
-def _relative_project_path(project_root: Path, path: Path) -> str:
-    return path.relative_to(project_root).as_posix()
-
-
-def _module_name_for_path(project_root: Path, path: Path) -> tuple[str, ...]:
-    source_root = project_root / "src"
-    try:
-        relative = path.relative_to(source_root)
-    except ValueError:
-        relative = path.relative_to(project_root)
-    parts = list(relative.with_suffix("").parts)
-    if parts and parts[-1] == "__init__":
-        parts.pop()
-    return tuple(parts)
-
-
-def _resolve_local_module(
-    project_root: Path, importing_path: Path, module: str
-) -> Path | None:
-    if not module:
-        return None
-    parts = module.split(".")
-    candidates = []
-    if len(parts) == 1:
-        candidates.extend(
-            (
-                importing_path.parent / f"{module}.py",
-                importing_path.parent / module / "__init__.py",
-            )
-        )
-    for base in (project_root / "src", project_root):
-        module_path = base.joinpath(*parts)
-        candidates.extend((module_path.with_suffix(".py"), module_path / "__init__.py"))
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    return None
-
-
-def _package_initializers(project_root: Path, path: Path) -> tuple[Path, ...]:
-    source_root = project_root / "src"
-    try:
-        path.relative_to(source_root)
-        package_root = source_root
-    except ValueError:
-        package_root = project_root
-    initializers = []
-    parent = path.parent
-    while parent != package_root and package_root in parent.parents:
-        initializer = parent / "__init__.py"
-        if initializer.is_file():
-            initializers.append(initializer)
-        parent = parent.parent
-    return tuple(initializers)
-
-
-def _imported_local_paths(
-    project_root: Path, importing_path: Path, tree: ast.AST
-) -> set[Path]:
-    imported: set[Path] = set()
-    current_module = _module_name_for_path(project_root, importing_path)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            modules = [alias.name for alias in node.names]
-        elif isinstance(node, ast.ImportFrom):
-            if node.level:
-                package = (
-                    current_module
-                    if importing_path.name == "__init__.py"
-                    else current_module[:-1]
-                )
-                keep = len(package) - node.level + 1
-                prefix = package[: max(keep, 0)]
-                base = ".".join((*prefix, *(node.module or "").split(".")))
-            else:
-                base = node.module or ""
-            modules = [base]
-            modules.extend(
-                f"{base}.{alias.name}" if base else alias.name
-                for alias in node.names
-                if alias.name != "*"
-            )
-        else:
-            continue
-        for module in modules:
-            resolved = _resolve_local_module(project_root, importing_path, module)
-            if resolved is not None:
-                imported.add(resolved)
-    return imported
-
-
-_PROVEN_SAFE = "safe"
-_PROVEN_CLASS = "class"
-_PROVEN_SYS_MODULE = "sys-module"
-_LOCAL_FUNCTION_PREFIX = "local-function:"
-_UNKNOWN_BINDING = "unknown"
-_UNBOUND = "unbound"
-_DYNAMIC_API_NAMES = {
-    "__import__",
-    "import_module",
-    "eval",
-    "exec",
-    "compile",
-}
-_DYNAMIC_BUILTINS_IMPORTS = {*_DYNAMIC_API_NAMES, "getattr", "*"}
-_DYNAMIC_NAMESPACE_NAMES = {"globals", "locals", "vars"}
-
-
-def _local_function_binding(
-    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
-) -> str:
-    name = node.name if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) else "lambda"
-    return (
-        f"{_LOCAL_FUNCTION_PREFIX}{node.lineno}:{node.col_offset}:{name}"
-    )
-
-
-def _bindings_are_proven_safe(bindings: set[str]) -> bool:
-    return bool(bindings) and all(
-        binding in {_PROVEN_SAFE, _PROVEN_CLASS, _PROVEN_SYS_MODULE}
-        or binding.startswith(_LOCAL_FUNCTION_PREFIX)
-        for binding in bindings
-    )
-
-
-def _join_binding_environments(
-    environments: list[dict[str, set[str]]],
-) -> dict[str, set[str]]:
-    names = set().union(*(environment for environment in environments))
-    return {
-        name: set().union(
-            *(environment.get(name, {_UNBOUND}) for environment in environments)
-        )
-        for name in names
-    }
-
-
-class _AccessScope:
-    """Scope-wide runtime bindings paired with Python's symbol table."""
-
-    def __init__(
-        self,
-        node: ast.AST,
-        table: symtable.SymbolTable,
-        parent: _AccessScope | None,
-    ) -> None:
-        self.node = node
-        self.table = table
-        self.parent = parent
-        self._children = list(table.get_children())
-        self._used_children: set[int] = set()
-        self._child_scopes: dict[int, _AccessScope] = {}
-        if parent is None:
-            self.function_definitions: dict[
-                str,
-                tuple[
-                    ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
-                    _AccessScope,
-                ],
-            ] = {}
-        else:
-            self.function_definitions = parent.function_definitions
-        self.final_bindings = self._final_bindings()
-
-    def _is_local_target(self, name: str) -> bool:
-        if self.table.get_type() == "module":
-            return True
-        try:
-            symbol = self.table.lookup(name)
-        except KeyError:
-            return False
-        return symbol.is_local() or symbol.is_parameter()
-
-    def _bind_target(
-        self,
-        environment: dict[str, set[str]],
-        target: ast.AST,
-        bindings: set[str],
-    ) -> None:
-        if isinstance(target, ast.Name) and self._is_local_target(target.id):
-            environment[target.id] = set(bindings)
-        elif isinstance(target, (ast.Tuple, ast.List)):
-            for element in target.elts:
-                self._bind_target(environment, element, {_UNKNOWN_BINDING})
-        elif isinstance(target, ast.Starred):
-            self._bind_target(environment, target.value, {_UNKNOWN_BINDING})
-
-    def _expression_bindings(
-        self, node: ast.AST, environment: dict[str, set[str]]
-    ) -> set[str]:
-        if isinstance(node, ast.Constant):
-            return {_PROVEN_SAFE}
-        if isinstance(node, ast.Lambda):
-            binding = _local_function_binding(node)
-            self.function_definitions[binding] = (node, self)
-            return {binding}
-        if isinstance(node, ast.Name):
-            return set(environment.get(node.id, {_UNKNOWN_BINDING}))
-        if isinstance(node, ast.IfExp):
-            return self._expression_bindings(
-                node.body, environment
-            ) | self._expression_bindings(node.orelse, environment)
-        if isinstance(node, (ast.Tuple, ast.List, ast.Set, ast.Dict)):
-            return {_PROVEN_SAFE}
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if environment.get(node.func.id) == {_PROVEN_CLASS}:
-                return {_PROVEN_SAFE}
-        return {_UNKNOWN_BINDING}
-
-    def _bind_assignment(
-        self,
-        environment: dict[str, set[str]],
-        target: ast.AST,
-        value: ast.AST,
-    ) -> None:
-        if isinstance(target, (ast.Tuple, ast.List)) and isinstance(
-            value, (ast.Tuple, ast.List)
-        ):
-            if len(target.elts) == len(value.elts):
-                for element, item in zip(target.elts, value.elts, strict=True):
-                    self._bind_assignment(environment, element, item)
-                return
-        self._bind_target(
-            environment, target, self._expression_bindings(value, environment)
-        )
-
-    def _analyze_statements(
-        self,
-        statements: list[ast.stmt],
-        initial: dict[str, set[str]],
-    ) -> dict[str, set[str]]:
-        environment = {name: set(kinds) for name, kinds in initial.items()}
-        for statement in statements:
-            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                binding = _local_function_binding(statement)
-                self.function_definitions[binding] = (statement, self)
-                self._bind_target(
-                    environment,
-                    ast.Name(id=statement.name, ctx=ast.Store()),
-                    {binding},
-                )
-            elif isinstance(statement, ast.ClassDef):
-                self._bind_target(
-                    environment,
-                    ast.Name(id=statement.name, ctx=ast.Store()),
-                    {_PROVEN_CLASS},
-                )
-            elif isinstance(statement, ast.Assign):
-                for target in statement.targets:
-                    self._bind_assignment(environment, target, statement.value)
-            elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
-                self._bind_assignment(environment, statement.target, statement.value)
-            elif isinstance(statement, ast.AugAssign):
-                self._bind_target(
-                    environment, statement.target, {_UNKNOWN_BINDING}
-                )
-            elif isinstance(statement, (ast.Import, ast.ImportFrom)):
-                aliases = statement.names
-                for alias in aliases:
-                    name = alias.asname or alias.name.split(".", maxsplit=1)[0]
-                    if isinstance(statement, ast.Import):
-                        module = alias.name.split(".", maxsplit=1)[0]
-                        binding = (
-                            _UNKNOWN_BINDING
-                            if module in {"importlib", "builtins"}
-                            else (
-                                _PROVEN_SYS_MODULE
-                                if module == "sys"
-                                else _PROVEN_SAFE
-                            )
-                        )
-                    else:
-                        module = (statement.module or "").split(
-                            ".", maxsplit=1
-                        )[0]
-                        binding = (
-                            _UNKNOWN_BINDING
-                            if module == "importlib"
-                            or (
-                                module == "builtins"
-                                and alias.name in _DYNAMIC_BUILTINS_IMPORTS
-                            )
-                            else _PROVEN_SAFE
-                        )
-                    self._bind_target(
-                        environment,
-                        ast.Name(id=name, ctx=ast.Store()),
-                        {binding},
-                    )
-            elif isinstance(statement, ast.Delete):
-                for target in statement.targets:
-                    self._bind_target(environment, target, {_UNBOUND})
-            elif isinstance(statement, ast.If):
-                environment = _join_binding_environments(
-                    [
-                        self._analyze_statements(statement.body, environment),
-                        self._analyze_statements(statement.orelse, environment),
-                    ]
-                )
-            elif isinstance(statement, (ast.For, ast.AsyncFor)):
-                loop_environment = {
-                    name: set(kinds) for name, kinds in environment.items()
-                }
-                self._bind_target(
-                    loop_environment, statement.target, {_UNKNOWN_BINDING}
-                )
-                loop_environment = self._analyze_statements(
-                    statement.body, loop_environment
-                )
-                environment = _join_binding_environments(
-                    [
-                        environment,
-                        loop_environment,
-                        self._analyze_statements(statement.orelse, environment),
-                    ]
-                )
-            elif isinstance(statement, (ast.Try, ast.TryStar)):
-                normal = self._analyze_statements(statement.body, environment)
-                normal = self._analyze_statements(statement.orelse, normal)
-                paths = [normal]
-                for handler in statement.handlers:
-                    handler_environment = {
-                        name: set(kinds) for name, kinds in environment.items()
-                    }
-                    if handler.name:
-                        self._bind_target(
-                            handler_environment,
-                            ast.Name(id=handler.name, ctx=ast.Store()),
-                            {_UNKNOWN_BINDING},
-                        )
-                    paths.append(
-                        self._analyze_statements(handler.body, handler_environment)
-                    )
-                environment = self._analyze_statements(
-                    statement.finalbody, _join_binding_environments(paths)
-                )
-            elif isinstance(statement, (ast.With, ast.AsyncWith)):
-                with_environment = {
-                    name: set(kinds) for name, kinds in environment.items()
-                }
-                for item in statement.items:
-                    if item.optional_vars is not None:
-                        self._bind_target(
-                            with_environment,
-                            item.optional_vars,
-                            {_UNKNOWN_BINDING},
-                        )
-                environment = self._analyze_statements(
-                    statement.body, with_environment
-                )
-        return environment
-
-    def _final_bindings(self) -> dict[str, set[str]]:
-        environment = self._initial_bindings()
-        return self._analyze_statements(self._statements(), environment)
-
-    def _initial_bindings(self) -> dict[str, set[str]]:
-        return {
-            symbol.get_name(): {_PROVEN_SAFE}
-            for symbol in self.table.get_symbols()
-            if symbol.is_parameter()
-        }
-
-    def _statements(self) -> list[ast.stmt]:
-        if isinstance(self.node, ast.Module):
-            return self.node.body
-        if isinstance(
-            self.node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-        ):
-            return self.node.body
-        return []
-
-    def bindings_before(self, name: str, node: ast.AST) -> set[str]:
-        return self.environment_before(node).get(name, {_UNBOUND})
-
-    def environment_before(self, node: ast.AST) -> dict[str, set[str]]:
-        line = getattr(node, "lineno", -1)
-        column = getattr(node, "col_offset", -1)
-        preceding = [
-            statement
-            for statement in self._statements()
-            if getattr(statement, "end_lineno", statement.lineno) < line
-            or (
-                getattr(statement, "end_lineno", statement.lineno) == line
-                and getattr(statement, "end_col_offset", -1) <= column
-            )
-        ]
-        return self._analyze_statements(preceding, self._initial_bindings())
-
-    def child(self, node: ast.AST) -> _AccessScope:
-        cached = self._child_scopes.get(id(node))
-        if cached is not None:
-            return cached
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            expected_type, expected_name = "function", node.name
-        elif isinstance(node, ast.Lambda):
-            expected_type, expected_name = "function", "lambda"
-        elif isinstance(node, ast.ClassDef):
-            expected_type, expected_name = "class", node.name
-        else:
-            raise ValueError(f"unsupported decision scope: {type(node).__name__}")
-        for index, child in enumerate(self._children):
-            if index in self._used_children:
-                continue
-            if (
-                child.get_type() == expected_type
-                and child.get_name() == expected_name
-                and child.get_lineno() == node.lineno
-            ):
-                self._used_children.add(index)
-                resolved = _AccessScope(node, child, self)
-                self._child_scopes[id(node)] = resolved
-                return resolved
-        raise ValueError(
-            f"cannot resolve decision scope {expected_name!r} at line {node.lineno}"
-        )
-
-
-class _DynamicAccessVisitor(ast.NodeVisitor):
-    """Reject acquisition or access to dynamic execution APIs."""
-
-    def __init__(
-        self,
-        scope: _AccessScope,
-        *,
-        module_bindings: dict[str, set[str]] | None = None,
-        import_time: bool = False,
-        call_stack: frozenset[str] = frozenset(),
-    ) -> None:
-        self.scope = scope
-        self.module_bindings = module_bindings
-        self.import_time = import_time
-        self.call_stack = call_stack
-        self.reason: str | None = None
-
-    def _reject(self, node: ast.AST, reason: str) -> None:
-        if self.reason is None:
-            self.reason = f"line {getattr(node, 'lineno', '?')}: {reason}"
-
-    def _module_scope(self) -> _AccessScope:
-        scope = self.scope
-        while scope.parent is not None:
-            scope = scope.parent
-        return scope
-
-    def _enclosing_bindings(self, name: str) -> set[str]:
-        scope = self.scope.parent
-        while scope is not None:
-            if scope.table.get_type() == "class":
-                scope = scope.parent
-                continue
-            try:
-                symbol = scope.table.lookup(name)
-            except KeyError:
-                scope = scope.parent
-                continue
-            if symbol.is_local() or symbol.is_parameter():
-                return scope.final_bindings.get(name, {_UNBOUND})
-            scope = scope.parent
-        return {_UNBOUND}
-
-    def _resolved_bindings(self, name: str, node: ast.AST) -> set[str]:
-        try:
-            symbol = self.scope.table.lookup(name)
-        except KeyError:
-            return {_UNBOUND}
-        scope_type = self.scope.table.get_type()
-        if scope_type == "module" or symbol.is_local() or symbol.is_parameter():
-            return self.scope.bindings_before(name, node)
-        if symbol.is_free() or symbol.is_nonlocal():
-            return self._enclosing_bindings(name)
-        if symbol.is_global():
-            module = self._module_scope()
-            if self.module_bindings is not None:
-                return self.module_bindings.get(name, {_UNBOUND})
-            return module.final_bindings.get(name, {_UNBOUND})
-        return {_UNKNOWN_BINDING}
-
-    def _name_is_proven_safe(self, name: str, node: ast.AST) -> bool:
-        return _bindings_are_proven_safe(self._resolved_bindings(name, node))
-
-    def _expression_is_proven_safe(self, node: ast.AST) -> bool:
-        if isinstance(node, (ast.Constant, ast.Lambda)):
-            return True
-        if isinstance(node, ast.Name):
-            return self._name_is_proven_safe(node.id, node)
-        return False
-
-    def visit_Import(self, node: ast.Import) -> None:
-        for alias in node.names:
-            if alias.name.split(".", maxsplit=1)[0] in {"importlib", "builtins"}:
-                self._reject(node, f"forbidden dynamic API import {alias.name!r}")
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        module = (node.module or "").split(".", maxsplit=1)[0]
-        imported = {alias.name for alias in node.names}
-        if module == "importlib" or (
-            module == "builtins" and imported & _DYNAMIC_BUILTINS_IMPORTS
-        ) or (
-            module == "sys" and "modules" in imported
-        ):
-            self._reject(
-                node,
-                f"forbidden dynamic API import from {(node.module or '')!r}",
-            )
-
-    def visit_Name(self, node: ast.Name) -> None:
-        if not isinstance(node.ctx, ast.Load):
-            return
-        if node.id == "__builtins__":
-            self._reject(node, "access to the builtin namespace is forbidden")
-        elif node.id in _DYNAMIC_NAMESPACE_NAMES and not self._name_is_proven_safe(
-            node.id, node
-        ):
-            self._reject(
-                node,
-                f"builtin namespace acquisition via {node.id!r} is forbidden",
-            )
-        elif node.id in _DYNAMIC_API_NAMES and not self._name_is_proven_safe(
-            node.id, node
-        ):
-            self._reject(
-                node,
-                f"{node.id!r} does not resolve to a proven-safe user binding",
-            )
-        elif node.id == "getattr" and not self._name_is_proven_safe(
-            node.id, node
-        ):
-            self._reject(node, "builtin getattr may only perform literal safe access")
-
-    def visit_Attribute(self, node: ast.Attribute) -> None:
-        if node.attr == "__dict__":
-            self._reject(node, "dynamic namespace __dict__ access is forbidden")
-        elif node.attr == "modules" and (
-            isinstance(node.value, ast.Name)
-            and _PROVEN_SYS_MODULE
-            in self._resolved_bindings(node.value.id, node.value)
-        ):
-            self._reject(node, "sys.modules namespace access is forbidden")
-        elif node.attr in _DYNAMIC_API_NAMES and not self._expression_is_proven_safe(
-            node.value
-        ):
-            self._reject(
-                node,
-                f"cannot prove {node.attr!r} attribute acquisition is safe",
-            )
-        self.generic_visit(node)
-
-    def visit_Subscript(self, node: ast.Subscript) -> None:
-        if isinstance(node.value, ast.Name) and node.value.id == "__builtins__":
-            self._reject(node, "builtin namespace subscription is forbidden")
-        self.generic_visit(node)
-
-    def visit_Call(self, node: ast.Call) -> None:
-        if (
-            isinstance(node.func, ast.Name)
-            and node.func.id == "getattr"
-            and not self._name_is_proven_safe("getattr", node.func)
-        ):
-            attribute = (
-                node.args[1].value
-                if len(node.args) >= 2
-                and isinstance(node.args[1], ast.Constant)
-                and isinstance(node.args[1].value, str)
-                else None
-            )
-            if attribute is None:
-                self._reject(node, "dynamic getattr attribute is not a literal string")
-            elif attribute in _DYNAMIC_API_NAMES and (
-                not node.args or not self._expression_is_proven_safe(node.args[0])
-            ):
-                self._reject(
-                    node,
-                    f"cannot prove getattr acquisition of {attribute!r} is safe",
-                )
-            for argument in node.args:
-                self.visit(argument)
-            for keyword in node.keywords:
-                self.visit(keyword.value)
-            return
-        if self.import_time:
-            if isinstance(node.func, ast.Name):
-                callable_name = node.func.id
-                bindings = self._resolved_bindings(node.func.id, node.func)
-            elif isinstance(node.func, ast.Lambda):
-                callable_name = "lambda"
-                binding = _local_function_binding(node.func)
-                self.scope.function_definitions[binding] = (node.func, self.scope)
-                bindings = {binding}
-            else:
-                callable_name = "callable"
-                bindings = set()
-            function_bindings = sorted(
-                binding
-                for binding in bindings
-                if binding.startswith(_LOCAL_FUNCTION_PREFIX)
-            )
-            for binding in function_bindings:
-                if binding in self.call_stack:
-                    continue
-                definition = self.scope.function_definitions.get(binding)
-                if definition is None:
-                    self._reject(
-                        node,
-                        f"cannot resolve import-time local call {callable_name!r}",
-                    )
-                    break
-                function, defining_scope = definition
-                module_bindings = self.module_bindings
-                if module_bindings is None:
-                    module_bindings = self._module_scope().environment_before(node)
-                called = _DynamicAccessVisitor(
-                    defining_scope.child(function),
-                    module_bindings=module_bindings,
-                    import_time=True,
-                    call_stack=self.call_stack | {binding},
-                )
-                if isinstance(function, ast.Lambda):
-                    called.visit(function.body)
-                else:
-                    for statement in function.body:
-                        called.visit(statement)
-                if called.reason is not None:
-                    self.reason = called.reason
-                    break
-        self.generic_visit(node)
-
-    def _visit_function_header(
-        self, node: ast.FunctionDef | ast.AsyncFunctionDef
-    ) -> None:
-        for decorator in node.decorator_list:
-            self.visit(decorator)
-        for default in (*node.args.defaults, *node.args.kw_defaults):
-            if default is not None:
-                self.visit(default)
-        arguments = (
-            *node.args.posonlyargs,
-            *node.args.args,
-            *node.args.kwonlyargs,
-            node.args.vararg,
-            node.args.kwarg,
-        )
-        for argument in arguments:
-            if argument is not None and argument.annotation is not None:
-                self.visit(argument.annotation)
-        if node.returns is not None:
-            self.visit(node.returns)
-
-    def _visit_nested_scope(self, node: ast.AST, body: list[ast.stmt]) -> None:
-        child_visitor = _DynamicAccessVisitor(self.scope.child(node))
-        for statement in body:
-            child_visitor.visit(statement)
-        if self.reason is None:
-            self.reason = child_visitor.reason
-
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self._visit_function_header(node)
-        if not self.import_time:
-            self._visit_nested_scope(node, node.body)
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self._visit_function_header(node)
-        if not self.import_time:
-            self._visit_nested_scope(node, node.body)
-
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        for expression in (*node.decorator_list, *node.bases):
-            self.visit(expression)
-        for keyword in node.keywords:
-            self.visit(keyword.value)
-        if self.import_time:
-            module_bindings = self.module_bindings
-            if module_bindings is None:
-                module_bindings = self._module_scope().environment_before(node)
-            child_visitor = _DynamicAccessVisitor(
-                self.scope.child(node),
-                module_bindings=module_bindings,
-                import_time=True,
-                call_stack=self.call_stack,
-            )
-            for statement in node.body:
-                child_visitor.visit(statement)
-            if self.reason is None:
-                self.reason = child_visitor.reason
-        else:
-            self._visit_nested_scope(node, node.body)
-
-    def visit_Lambda(self, node: ast.Lambda) -> None:
-        for default in (*node.args.defaults, *node.args.kw_defaults):
-            if default is not None:
-                self.visit(default)
-        if not self.import_time:
-            child_visitor = _DynamicAccessVisitor(self.scope.child(node))
-            child_visitor.visit(node.body)
-            if self.reason is None:
-                self.reason = child_visitor.reason
-
-
-def _dynamic_execution_reason(
-    tree: ast.Module, source: str, filename: str
-) -> str | None:
-    # No file-level allowlist exists. A future exception must resolve and bind
-    # an exact target rather than exempting an importer wholesale.
-    table = symtable.symtable(source, filename, "exec")
-    root_scope = _AccessScope(tree, table, None)
-    visitor = _DynamicAccessVisitor(root_scope)
-    visitor.visit(tree)
-    if visitor.reason is not None:
-        return visitor.reason
-    import_time_visitor = _DynamicAccessVisitor(root_scope, import_time=True)
-    import_time_visitor.visit(tree)
-    return import_time_visitor.reason
-
-
-def validate_decision_import_closure(
-    project_root: Path,
-    *,
-    roots: tuple[str, ...] = DECISION_IMPORT_ROOTS,
-    manifest: dict[str, str] = DECISION_CODE_PATHS,
-) -> frozenset[str]:
-    """Discover static local imports and reject manifest omissions."""
-
-    root = project_root.resolve()
-    pending = [root / relative for relative in roots]
-    discovered: set[str] = set()
-    while pending:
-        path = pending.pop()
-        if not path.is_file():
-            raise ValueError(f"decision import closure file is missing: {path}")
-        relative = _relative_project_path(root, path)
-        if relative in discovered:
-            continue
-        discovered.add(relative)
-        source = path.read_text(encoding="utf-8")
-        tree = ast.parse(source, filename=relative)
-        dynamic_reason = _dynamic_execution_reason(tree, source, relative)
-        if dynamic_reason is not None:
-            raise ValueError(
-                "dynamic import or code execution in "
-                f"{relative}: {dynamic_reason} is forbidden"
-            )
-        pending.extend(_package_initializers(root, path))
-        pending.extend(_imported_local_paths(root, path, tree))
-    omissions = discovered - set(manifest.values())
-    if omissions:
-        raise ValueError(
-            "decision import closure is missing manifest entries: "
-            + ", ".join(sorted(omissions))
-        )
-    return frozenset(discovered)
 
 
 def _invalid(identity: object, message: str) -> ValueError:
@@ -1951,6 +1160,277 @@ def _canonical_sha256(value: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _canonical_repo_path(value: object, *, field: str) -> str:
+    if not isinstance(value, str) or not value or "\\" in value:
+        raise ValueError(f"{field} must be a canonical POSIX path")
+    path = Path(value)
+    if path.is_absolute() or any(part in {"", ".", ".."} for part in value.split("/")):
+        raise ValueError(f"{field} must be a canonical POSIX path")
+    if "/".join(value.split("/")) != value:
+        raise ValueError(f"{field} must be a canonical POSIX path")
+    return value
+
+
+def _validated_bound_entry(value: object, *, field: str) -> dict[str, str]:
+    expected_fields = {"path", "mode", "object_type", "blob_oid", "sha256"}
+    if not isinstance(value, dict) or set(value) != expected_fields:
+        raise ValueError(f"{field} fields are invalid")
+    path = _canonical_repo_path(value["path"], field=f"{field}.path")
+    if value["mode"] not in {"100644", "100755"}:
+        raise ValueError(f"{field} must bind a regular Git mode")
+    if value["object_type"] != "blob":
+        raise ValueError(f"{field} must bind a Git blob")
+    return {
+        "path": path,
+        "mode": value["mode"],
+        "object_type": "blob",
+        "blob_oid": _hex(value["blob_oid"], field=f"{field}.blob_oid", length=40),
+        "sha256": _hex(value["sha256"], field=f"{field}.sha256", length=64),
+    }
+
+
+def _require_unique_bound_paths(entries: list[dict[str, str]], *, field: str) -> None:
+    paths = [entry["path"] for entry in entries]
+    if len(paths) != len(set(paths)):
+        raise ValueError(f"{field} contains a duplicate path")
+    casefolded = [path.casefold() for path in paths]
+    if len(casefolded) != len(set(casefolded)):
+        raise ValueError(f"{field} contains a case-fold path collision")
+
+
+def _validated_revision_binding(
+    value: object, *, code_revision: str
+) -> dict[str, Any]:
+    fields = {"format_version", "revision", "tracked_files", "declared_inputs"}
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ValueError("revision_binding fields are invalid")
+    if value["format_version"] != "1":
+        raise ValueError("revision_binding format_version must equal 1")
+    revision = _hex(value["revision"], field="revision_binding.revision", length=40)
+    if revision != code_revision:
+        raise ValueError("revision_binding revision must equal code_revision")
+    if not isinstance(value["tracked_files"], list):
+        raise ValueError("revision_binding tracked_files must be a list")
+    tracked = [
+        _validated_bound_entry(entry, field="revision_binding.tracked_file")
+        for entry in value["tracked_files"]
+    ]
+    _require_unique_bound_paths(tracked, field="revision_binding tracked_files")
+    if tracked != sorted(tracked, key=lambda entry: entry["path"]):
+        raise ValueError("revision_binding tracked_files must use canonical order")
+    tracked_paths = {entry["path"] for entry in tracked}
+    if not REQUIRED_TRACKED_CODE_PATHS <= tracked_paths:
+        raise ValueError("revision_binding is missing a required tracked-code path")
+    if any(
+        path not in REQUIRED_TRACKED_CODE_PATHS
+        and Path(path).suffix.casefold() != ".py"
+        for path in tracked_paths
+    ):
+        raise ValueError("revision_binding contains an extra non-code binding")
+
+    if not isinstance(value["declared_inputs"], list):
+        raise ValueError("revision_binding declared_inputs must be a list")
+    declared: list[dict[str, str]] = []
+    for raw_entry in value["declared_inputs"]:
+        if not isinstance(raw_entry, dict) or set(raw_entry) != {
+            "label",
+            "path",
+            "mode",
+            "object_type",
+            "blob_oid",
+            "sha256",
+        }:
+            raise ValueError("revision_binding declared input fields are invalid")
+        label = raw_entry["label"]
+        if not isinstance(label, str) or not label:
+            raise ValueError("revision_binding declared input label is invalid")
+        declared.append(
+            {
+                "label": label,
+                **_validated_bound_entry(
+                    {key: nested for key, nested in raw_entry.items() if key != "label"},
+                    field=f"revision_binding declared input {label}",
+                ),
+            }
+        )
+    _require_unique_bound_paths(declared, field="revision_binding declared_inputs")
+    if declared != sorted(declared, key=lambda entry: entry["label"]):
+        raise ValueError("revision_binding declared_inputs must use canonical order")
+    if {entry["label"]: entry["path"] for entry in declared} != DECLARED_INPUT_PATHS:
+        raise ValueError("revision_binding declared_inputs must equal approved inputs")
+    return {
+        "format_version": "1",
+        "revision": revision,
+        "tracked_files": tracked,
+        "declared_inputs": declared,
+    }
+
+
+def _safe_binding_string(value: object, *, field: str) -> str:
+    if not isinstance(value, str) or not value or "\x00" in value:
+        raise ValueError(f"{field} must be a non-blank string")
+    if Path(value).is_absolute() or re.match(r"^[A-Za-z]:[\\/]", value):
+        raise ValueError(f"{field} must not contain an absolute path")
+    return value
+
+
+def _validated_package_inventory(value: object, *, field: str) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        raise ValueError(f"{field} must be a list")
+    normalized: list[dict[str, str]] = []
+    for entry in value:
+        if not isinstance(entry, dict) or set(entry) != {"name", "version"}:
+            raise ValueError(f"{field} entry fields are invalid")
+        name = _safe_binding_string(entry["name"], field=f"{field}.name")
+        if re.sub(r"[-_.]+", "-", name).lower() != name or not re.fullmatch(
+            r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", name
+        ):
+            raise ValueError(f"{field} names must be PEP 503 normalized")
+        version = _safe_binding_string(entry["version"], field=f"{field}.version")
+        normalized.append({"name": name, "version": version})
+    if normalized != sorted(normalized, key=lambda entry: entry["name"]):
+        raise ValueError(f"{field} must use canonical name order")
+    names = [entry["name"] for entry in normalized]
+    if len(names) != len(set(names)):
+        raise ValueError(f"{field} contains a duplicate normalized name")
+    return normalized
+
+
+def _validated_environment_binding(value: object) -> dict[str, Any]:
+    fields = {
+        "format_version",
+        "interpreter",
+        "pyvenv",
+        "site_layout",
+        "lock_selection",
+        "installed_distributions",
+    }
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ValueError("environment_binding fields are invalid")
+    if value["format_version"] != "1":
+        raise ValueError("environment_binding format_version must equal 1")
+    interpreter_fields = {
+        "implementation",
+        "full_version",
+        "abi",
+        "os_name",
+        "sys_platform",
+        "platform_system",
+        "platform_machine",
+        "executable_layout",
+    }
+    interpreter = value["interpreter"]
+    if not isinstance(interpreter, dict) or set(interpreter) != interpreter_fields:
+        raise ValueError("environment_binding interpreter fields are invalid")
+    normalized_interpreter = {
+        field: _safe_binding_string(
+            interpreter[field], field=f"environment_binding.interpreter.{field}"
+        )
+        for field in sorted(interpreter_fields)
+    }
+    if normalized_interpreter["implementation"] != "cpython":
+        raise ValueError("environment_binding interpreter must be CPython")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", normalized_interpreter["full_version"]):
+        raise ValueError("environment_binding full Python version is invalid")
+    if normalized_interpreter["os_name"] == "nt":
+        expected_executable = "Scripts/python.exe"
+        expected_sites = ["Lib/site-packages"]
+    elif normalized_interpreter["os_name"] == "posix":
+        major, minor, _patch = normalized_interpreter["full_version"].split(".")
+        expected_executable = "bin/python"
+        expected_sites = [f"lib/python{major}.{minor}/site-packages"]
+    else:
+        raise ValueError("environment_binding os_name is invalid")
+    if normalized_interpreter["executable_layout"] != expected_executable:
+        raise ValueError("environment_binding executable layout is invalid")
+    if value["pyvenv"] != {"include_system_site_packages": False}:
+        raise ValueError("environment_binding pyvenv contract is invalid")
+    if value["site_layout"] != expected_sites:
+        raise ValueError("environment_binding site layout is invalid")
+
+    lock_fields = {
+        "lock_sha256",
+        "offline",
+        "frozen",
+        "no_dev",
+        "selected_dependency_groups",
+        "excluded_dependency_groups",
+        "markers",
+        "active_resolution_markers",
+        "selected_packages",
+    }
+    lock = value["lock_selection"]
+    if not isinstance(lock, dict) or set(lock) != lock_fields:
+        raise ValueError("environment_binding lock_selection fields are invalid")
+    for flag in ("offline", "frozen", "no_dev"):
+        if lock[flag] is not True:
+            raise ValueError(f"environment_binding lock_selection {flag} must be true")
+    if lock["selected_dependency_groups"] != []:
+        raise ValueError("environment_binding must select no dependency groups")
+    excluded_groups = lock["excluded_dependency_groups"]
+    if (
+        not isinstance(excluded_groups, list)
+        or excluded_groups != sorted(set(excluded_groups))
+        or not all(isinstance(group, str) and group for group in excluded_groups)
+    ):
+        raise ValueError("environment_binding excluded dependency groups are invalid")
+    marker_fields = {
+        "implementation_name",
+        "os_name",
+        "platform_machine",
+        "platform_python_implementation",
+        "platform_system",
+        "python_full_version",
+        "python_version",
+        "sys_platform",
+    }
+    markers = lock["markers"]
+    if not isinstance(markers, dict) or set(markers) != marker_fields:
+        raise ValueError("environment_binding marker fields are invalid")
+    normalized_markers = {
+        field: _safe_binding_string(
+            markers[field], field=f"environment_binding.marker.{field}"
+        )
+        for field in sorted(marker_fields)
+    }
+    active_markers = lock["active_resolution_markers"]
+    if (
+        not isinstance(active_markers, list)
+        or active_markers != sorted(set(active_markers))
+        or not all(isinstance(marker, str) and marker for marker in active_markers)
+    ):
+        raise ValueError("environment_binding active resolution markers are invalid")
+    selected_packages = _validated_package_inventory(
+        lock["selected_packages"], field="environment_binding selected_packages"
+    )
+    installed = _validated_package_inventory(
+        value["installed_distributions"],
+        field="environment_binding installed_distributions",
+    )
+    if installed != selected_packages:
+        raise ValueError("environment_binding installed inventory must equal selected lock")
+    return {
+        "format_version": "1",
+        "interpreter": normalized_interpreter,
+        "pyvenv": {"include_system_site_packages": False},
+        "site_layout": list(expected_sites),
+        "lock_selection": {
+            "lock_sha256": _hex(
+                lock["lock_sha256"], field="environment_binding.lock_sha256", length=64
+            ),
+            "offline": True,
+            "frozen": True,
+            "no_dev": True,
+            "selected_dependency_groups": [],
+            "excluded_dependency_groups": list(excluded_groups),
+            "markers": normalized_markers,
+            "active_resolution_markers": list(active_markers),
+            "selected_packages": selected_packages,
+        },
+        "installed_distributions": installed,
+    }
+
+
 def _validated_provenance(provenance: object) -> dict[str, Any]:
     if not isinstance(provenance, dict) or set(provenance) != _PROVENANCE_FIELDS:
         raise ValueError(f"provenance fields must equal {sorted(_PROVENANCE_FIELDS)}")
@@ -1961,15 +1441,32 @@ def _validated_provenance(provenance: object) -> dict[str, Any]:
         field: _hex(source_hashes[field], field=field, length=64)
         for field in sorted(_SOURCE_ARTIFACT_FIELDS)
     }
-    decision_code_hashes = provenance["decision_code_sha256"]
-    if not isinstance(decision_code_hashes, dict) or set(
-        decision_code_hashes
-    ) != set(DECISION_CODE_PATHS):
-        raise ValueError("decision_code_sha256 fields are invalid")
-    normalized_code_hashes = {
-        field: _hex(decision_code_hashes[field], field=field, length=64)
-        for field in sorted(DECISION_CODE_PATHS)
+    code_revision = _hex(
+        provenance["code_revision"], field="code_revision", length=40
+    )
+    revision_binding = _validated_revision_binding(
+        provenance["revision_binding"], code_revision=code_revision
+    )
+    environment_binding = _validated_environment_binding(
+        provenance["environment_binding"]
+    )
+    declared_hashes = {
+        entry["label"]: entry["sha256"]
+        for entry in revision_binding["declared_inputs"]
     }
+    if declared_hashes != {
+        "corpus_snapshot": provenance["corpus_snapshot_sha256"],
+        "formal_dataset": normalized_hashes["formal_dataset"],
+        "stress_dataset": normalized_hashes["stress_dataset"],
+        "target_dataset": provenance["dataset_sha256"],
+    }:
+        raise ValueError("revision_binding declared input hashes are inconsistent")
+    tracked_hashes = {
+        entry["path"]: entry["sha256"]
+        for entry in revision_binding["tracked_files"]
+    }
+    if environment_binding["lock_selection"]["lock_sha256"] != tracked_hashes["uv.lock"]:
+        raise ValueError("environment_binding lock hash is inconsistent with revision_binding")
     exact_strings = {
         "embedding_model": _EMBEDDING_MODEL,
         "embedding_revision": _EMBEDDING_REVISION,
@@ -2016,7 +1513,8 @@ def _validated_provenance(provenance: object) -> dict[str, Any]:
             length=64,
         ),
         "source_artifact_sha256": normalized_hashes,
-        "decision_code_sha256": normalized_code_hashes,
+        "revision_binding": revision_binding,
+        "environment_binding": environment_binding,
         **exact_strings,
         "retrieval_configuration": dict(_RETRIEVAL_CONFIGURATION),
         "execution_device": execution_device,
@@ -2026,9 +1524,7 @@ def _validated_provenance(provenance: object) -> dict[str, Any]:
         "merge_policy_version": _MERGE_POLICY_VERSION,
         "primary_score_semantics": _PRIMARY_SCORE_SEMANTICS,
         "source_tree_clean": True,
-        "code_revision": _hex(
-            provenance["code_revision"], field="code_revision", length=40
-        ),
+        "code_revision": code_revision,
         "run_origin": _RUN_ORIGIN,
         "provider_adapters": 0,
         "provider_requests": 0,
@@ -2096,7 +1592,6 @@ _PUBLIC_KEYS = {
     "outcome_contract_passed",
     *_PROVENANCE_FIELDS,
     *_SOURCE_ARTIFACT_FIELDS,
-    *DECISION_CODE_PATHS,
     *_RETRIEVAL_CONFIGURATION,
     *_CANONICAL_SOURCE_KEYS,
 }
@@ -2136,7 +1631,8 @@ def _validate_public_tree(value: object) -> None:
         for key, nested in value.items():
             if not isinstance(key, str) or key not in _PUBLIC_KEYS:
                 raise ValueError("public artifact contains a non-allowlisted key")
-            _validate_public_tree(nested)
+            if key not in {"revision_binding", "environment_binding"}:
+                _validate_public_tree(nested)
     elif isinstance(value, list):
         for nested in value:
             _validate_public_tree(nested)

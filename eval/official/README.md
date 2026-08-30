@@ -35,10 +35,17 @@ Task 5 defines official schema `1.3` and its model-free replay/release-verifier
 contract. It preserves full-precision primary-query scores, exact target and
 guard routes, per-query retrieval/reranker call counts, `rrf_k`, pinned
 local-only model revisions, the semantic-view hash, merge-policy version,
-CPU/FP32 execution, a clean committed code revision, source hashes, privacy
-allowlisting, and zero provider construction/requests. The official artifact
-is not created by Task 5; only the fresh committed CPU/FP32 Task 6 acceptance
-run may export `severance_refusal_policy_v0.3.6.json`.
+CPU/FP32 execution, privacy allowlisting, and zero provider
+construction/requests. Its authoritative bootstrap binds every tracked Python
+file plus the declared configuration/data inputs to the exact revision, Git
+index, object metadata, and checkout bytes. It also binds a dedicated external
+`python -I -S` environment to the approved interpreter/platform, frozen
+production-only lock selection, and exact duplicate-free installed package
+inventory before any project or third-party import. Absolute environment paths
+and raw `pyvenv.cfg` contents are not published. The official artifact is not
+created by Task 5; only the fresh committed CPU/FP32 Task 6 acceptance run in
+that dedicated environment may export
+`severance_refusal_policy_v0.3.6.json`.
 
 Case `severance-policy-027` is an exact positive-hit `threshold` outcome below
 the unchanged `0.03` production gate. A `no_hits` outcome or generation
@@ -95,6 +102,23 @@ Retrieval、answerability、refusal、citation、ablation、reliability stress �
 uv run python scripts/verify_release.py
 uv run pytest tests/test_official_artifacts.py tests/test_release_verification.py -q
 ```
+
+The legacy command above continues to verify the already-published releases.
+Once the v0.3.6 artifact exists, its only authoritative entry point is the
+committed bootstrap, invoked with an explicitly named environment outside the
+repository:
+
+```powershell
+<external-environment>\Scripts\python.exe -I -S `
+  scripts/v036_authoritative_bootstrap.py `
+  --project-root . `
+  --environment-root <external-environment> `
+  --mode verify-release
+```
+
+Task 7 uses the same validation path read-only; verification must not rewrite,
+delete, regenerate, or normalize either the official artifact or repository
+inputs.
 
 這條路徑不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,並會核對 canonical dataset hash、40/30/10 組成、60 題壓力集、10 題 compact portfolio regression、8×40 grid、全部彙總算術、15 部／884 條 snapshot、provider complete contract、strict trace fields 與 privacy/secret patterns。
 

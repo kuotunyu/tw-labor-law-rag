@@ -2,7 +2,6 @@ import hashlib
 import json
 import math
 import os
-import shutil
 import stat
 import subprocess
 import sys
@@ -326,7 +325,8 @@ def test_runner_rejects_nonapproved_diagnostics_output_before_models_or_writes(
                 "--offline",
                 "--diagnostics-output",
                 str(protected),
-            ]
+            ],
+            trusted_runtime=_trusted_runtime(),
         )
 
     if before is None:
@@ -356,7 +356,8 @@ def test_runner_rejects_approved_output_aliased_as_a_source_before_models(
                 str(runner.DIAGNOSTIC_RESULT),
                 source_option,
                 str(runner.DIAGNOSTIC_RESULT),
-            ]
+            ],
+            trusted_runtime=_trusted_runtime(),
         )
 
 
@@ -382,7 +383,8 @@ def test_runner_rejects_hardlink_alias_collision_before_models(
                 str(source),
                 "--diagnostics-output",
                 str(approved),
-            ]
+            ],
+            trusted_runtime=_trusted_runtime(),
         )
 
     assert source.read_text(encoding="utf-8") == "source evidence\n"
@@ -425,7 +427,10 @@ def test_runner_rejects_approved_path_through_symlink_before_models(
     )
 
     with pytest.raises(SystemExit):
-        runner.main(["--offline", "--diagnostics-output", str(approved)])
+        runner.main(
+            ["--offline", "--diagnostics-output", str(approved)],
+            trusted_runtime=_trusted_runtime(),
+        )
 
     after = (
         tuple(arbitrary_target.iterdir())
@@ -463,7 +468,10 @@ def test_runner_rejects_approved_path_through_windows_junction_before_models(
     )
 
     with pytest.raises(SystemExit):
-        runner.main(["--offline", "--diagnostics-output", str(approved)])
+        runner.main(
+            ["--offline", "--diagnostics-output", str(approved)],
+            trusted_runtime=_trusted_runtime(),
+        )
 
     assert tuple(arbitrary_target.iterdir()) == ()
 
@@ -875,7 +883,10 @@ def test_runner_binds_exact_input_hashes_models_settings_and_zero_providers(
         device="cpu",
     )
 
-    provenance = runner._build_provenance(args, settings, "a" * 40)
+    trusted_runtime = _trusted_runtime("a" * 40)
+    provenance = runner._build_provenance(
+        args, settings, "a" * 40, trusted_runtime=trusted_runtime
+    )
 
     assert provenance == {
         "dataset_sha256": hashlib.sha256(b"target\n").hexdigest(),
@@ -884,10 +895,8 @@ def test_runner_binds_exact_input_hashes_models_settings_and_zero_providers(
             "stress_dataset": hashlib.sha256(b"stress\n").hexdigest(),
             "formal_dataset": hashlib.sha256(b"formal\n").hexdigest(),
         },
-        "decision_code_sha256": {
-            name: hashlib.sha256((PROJECT_ROOT / path).read_bytes()).hexdigest()
-            for name, path in policy.DECISION_CODE_PATHS.items()
-        },
+        "revision_binding": trusted_runtime["revision_binding"],
+        "environment_binding": trusted_runtime["environment_binding"],
         "embedding_model": "BAAI/bge-m3",
         "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
         "reranker_model": "BAAI/bge-reranker-v2-m3",
@@ -927,6 +936,19 @@ def test_runner_refuses_to_cite_a_dirty_candidate_source_revision(
 
     with pytest.raises(RuntimeError, match="clean tracked and untracked tree"):
         runner._clean_git_revision()
+
+
+def test_runner_rejects_missing_bootstrap_attestation_before_model_preflight(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        runner,
+        "_offline_preflight",
+        lambda _args: pytest.fail("missing bootstrap binding must precede model preflight"),
+    )
+
+    with pytest.raises(RuntimeError, match="authoritative bootstrap"):
+        runner.main(["--offline"])
 
 
 def test_runner_main_uses_one_retrieval_only_pipeline_and_exports_after_acceptance(
@@ -1051,7 +1073,14 @@ def test_runner_main_uses_one_retrieval_only_pipeline_and_exports_after_acceptan
             "--device",
             "cpu",
             "--export-official",
-        ]
+        ],
+        trusted_runtime=_trusted_runtime_for_inputs(
+            target=target,
+            stress=stress,
+            formal=formal,
+            snapshot=snapshot,
+            revision="a" * 40,
+        ),
     )
 
     assert exit_code == 0
@@ -1150,7 +1179,14 @@ def test_runner_main_persists_replayable_no_go_without_official_export(
             "--device",
             "cpu",
             "--export-official",
-        ]
+        ],
+        trusted_runtime=_trusted_runtime_for_inputs(
+            target=target,
+            stress=stress,
+            formal=formal,
+            snapshot=snapshot,
+            revision="a" * 40,
+        ),
     )
 
     assert exit_code == 1
@@ -1266,7 +1302,14 @@ def test_runner_main_no_go_keeps_real_retrieval_factory_provider_free(
             "--device",
             "cpu",
             "--export-official",
-        ]
+        ],
+        trusted_runtime=_trusted_runtime_for_inputs(
+            target=target,
+            stress=stress,
+            formal=formal,
+            snapshot=snapshot,
+            revision="a" * 40,
+        ),
     )
 
     assert exit_code == 1
@@ -1429,6 +1472,122 @@ def _canonical_sha256(value) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _bound_entry(path: str, seed: str) -> dict:
+    return {
+        "path": path,
+        "mode": "100644",
+        "object_type": "blob",
+        "blob_oid": seed * 40,
+        "sha256": seed * 64,
+    }
+
+
+def _revision_binding(revision: str = "f" * 40) -> dict:
+    paths = [
+        ".python-version",
+        "Dockerfile",
+        "pyproject.toml",
+        "scripts/v036_authoritative_bootstrap.py",
+        "src/rag/indexing/dict/legal_terms.txt",
+        "src/rag/severance_refusal_policy.py",
+        "uv.lock",
+    ]
+    tracked = [
+        _bound_entry(path, f"{index + 1:x}") for index, path in enumerate(paths)
+    ]
+    tracked[-1]["sha256"] = "e" * 64
+    declared_paths = {
+        "corpus_snapshot": "release/corpus_snapshot.json",
+        "formal_dataset": "eval/dataset/eval_set.jsonl",
+        "stress_dataset": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "target_dataset": "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
+    }
+    hashes = {
+        "corpus_snapshot": "b",
+        "formal_dataset": "d",
+        "stress_dataset": "c",
+        "target_dataset": "a",
+    }
+    declared = []
+    for index, (label, path) in enumerate(declared_paths.items()):
+        entry = _bound_entry(path, f"{index + 8:x}")
+        entry["sha256"] = hashes[label] * 64
+        declared.append({"label": label, **entry})
+    return {
+        "format_version": "1",
+        "revision": revision,
+        "tracked_files": tracked,
+        "declared_inputs": declared,
+    }
+
+
+def _environment_binding() -> dict:
+    return {
+        "format_version": "1",
+        "interpreter": {
+            "implementation": "cpython",
+            "full_version": "3.11.15",
+            "abi": "cpython-311:",
+            "os_name": "nt",
+            "sys_platform": "win32",
+            "platform_system": "Windows",
+            "platform_machine": "AMD64",
+            "executable_layout": "Scripts/python.exe",
+        },
+        "pyvenv": {"include_system_site_packages": False},
+        "site_layout": ["Lib/site-packages"],
+        "lock_selection": {
+            "lock_sha256": "e" * 64,
+            "offline": True,
+            "frozen": True,
+            "no_dev": True,
+            "selected_dependency_groups": [],
+            "excluded_dependency_groups": ["dev"],
+            "markers": {
+                "implementation_name": "cpython",
+                "os_name": "nt",
+                "platform_machine": "AMD64",
+                "platform_python_implementation": "CPython",
+                "platform_system": "Windows",
+                "python_full_version": "3.11.15",
+                "python_version": "3.11",
+                "sys_platform": "win32",
+            },
+            "active_resolution_markers": [
+                "python_full_version < '3.12' and sys_platform == 'win32'"
+            ],
+            "selected_packages": [
+                {"name": "example-package", "version": "1.0"}
+            ],
+        },
+        "installed_distributions": [
+            {"name": "example-package", "version": "1.0"}
+        ],
+    }
+
+
+def _trusted_runtime(revision: str = "f" * 40) -> dict:
+    return {
+        "revision_binding": _revision_binding(revision),
+        "environment_binding": _environment_binding(),
+    }
+
+
+def _trusted_runtime_for_inputs(
+    *, target: Path, stress: Path, formal: Path, snapshot: Path, revision: str
+) -> dict:
+    runtime = _trusted_runtime(revision)
+    paths = {
+        "corpus_snapshot": snapshot,
+        "formal_dataset": formal,
+        "stress_dataset": stress,
+        "target_dataset": target,
+    }
+    for entry in runtime["revision_binding"]["declared_inputs"]:
+        entry["sha256"] = hashlib.sha256(paths[entry["label"]].read_bytes()).hexdigest()
+    return runtime
+
+
 def _provenance():
     return {
         "dataset_sha256": "a" * 64,
@@ -1437,10 +1596,8 @@ def _provenance():
             "stress_dataset": "c" * 64,
             "formal_dataset": "d" * 64,
         },
-        "decision_code_sha256": {
-            name: f"{index % 16:x}" * 64
-            for index, name in enumerate(policy.DECISION_CODE_PATHS)
-        },
+        "revision_binding": _revision_binding(),
+        "environment_binding": _environment_binding(),
         "embedding_model": "BAAI/bge-m3",
         "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
         "reranker_model": "BAAI/bge-reranker-v2-m3",
@@ -2371,6 +2528,70 @@ def test_official_artifact_replays_without_retrieval_or_model_execution(
     assert policy.replay_official_artifact(artifact) == artifact
 
 
+def test_release_verifier_requires_exact_bootstrap_bindings_before_project_checks(
+    monkeypatch, tmp_path, cases
+) -> None:
+    source_paths = {
+        "corpus_snapshot": PROJECT_ROOT / "release/corpus_snapshot.json",
+        "formal_dataset": PROJECT_ROOT / "eval/dataset/eval_set.jsonl",
+        "stress_dataset": PROJECT_ROOT
+        / "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "target_dataset": DATASET,
+    }
+    provenance = _provenance()
+    provenance["dataset_sha256"] = hashlib.sha256(
+        source_paths["target_dataset"].read_bytes()
+    ).hexdigest()
+    provenance["corpus_snapshot_sha256"] = hashlib.sha256(
+        source_paths["corpus_snapshot"].read_bytes()
+    ).hexdigest()
+    provenance["source_artifact_sha256"] = {
+        "formal_dataset": hashlib.sha256(
+            source_paths["formal_dataset"].read_bytes()
+        ).hexdigest(),
+        "stress_dataset": hashlib.sha256(
+            source_paths["stress_dataset"].read_bytes()
+        ).hexdigest(),
+    }
+    for entry in provenance["revision_binding"]["declared_inputs"]:
+        entry["sha256"] = hashlib.sha256(
+            source_paths[entry["label"]].read_bytes()
+        ).hexdigest()
+    observations = _observations(cases)
+    artifact = build_official_artifact(
+        observations=observations,
+        candidate_results=_candidate_results(observations),
+        provenance=provenance,
+    )
+    artifact_path = tmp_path / "artifact.json"
+    runner._write_public_json(artifact_path, artifact)
+    trusted_runtime = {
+        "revision_binding": artifact["provenance"]["revision_binding"],
+        "environment_binding": artifact["provenance"]["environment_binding"],
+    }
+    monkeypatch.setattr(
+        runner,
+        "_build_local_pipeline",
+        lambda *_args, **_kwargs: pytest.fail("release replay must not construct models"),
+    )
+
+    summary = release_verification._verify_severance_refusal_policy_artifact(
+        PROJECT_ROOT, artifact_path, trusted_runtime=trusted_runtime
+    )
+    assert summary["schema_version"] == "1.3"
+    assert summary["target_cases"] == 30
+
+    drifted = json.loads(json.dumps(trusted_runtime))
+    drifted["environment_binding"]["interpreter"]["abi"] = "drifted"
+    with pytest.raises(
+        release_verification.ReleaseVerificationError,
+        match="environment binding",
+    ):
+        release_verification._verify_severance_refusal_policy_artifact(
+            PROJECT_ROOT, artifact_path, trusted_runtime=drifted
+        )
+
+
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
@@ -2434,10 +2655,10 @@ def test_official_artifact_replays_without_retrieval_or_model_execution(
             "retrieval_configuration",
         ),
         (
-            lambda artifact: artifact["provenance"]["decision_code_sha256"].update(
-                severance_policy="z" * 64
-            ),
-            "severance_policy must be a lowercase",
+            lambda artifact: artifact["provenance"]["revision_binding"][
+                "tracked_files"
+            ][0].update(sha256="z" * 64),
+            "tracked_file.sha256 must be a lowercase",
         ),
         (
             lambda artifact: artifact["provenance"].update(provider_requests=1),
@@ -2489,771 +2710,6 @@ def test_official_replay_rejects_schema_provenance_gate_and_evidence_tampering(
 
     with pytest.raises(ValueError, match=message):
         policy.replay_official_artifact(artifact)
-
-
-def test_static_local_import_closure_covers_authoritative_execution_roots() -> None:
-    validator = getattr(policy, "validate_decision_import_closure", None)
-    assert callable(validator), "policy must validate its static local import closure"
-
-    discovered = validator(PROJECT_ROOT)
-
-    assert {
-        "src/rag/portfolio_demo_regression.py",
-        "src/rag/__init__.py",
-        "src/rag/generation/__init__.py",
-        "src/rag/indexing/__init__.py",
-        "src/rag/ingestion/__init__.py",
-        "src/rag/retrieval/__init__.py",
-    } <= discovered
-
-
-def test_static_local_import_closure_rejects_new_omitted_dependency(tmp_path) -> None:
-    validator = getattr(policy, "validate_decision_import_closure", None)
-    assert callable(validator), "policy must validate its static local import closure"
-    runner_path = tmp_path / "runner.py"
-    package = tmp_path / "src/rag"
-    package.mkdir(parents=True)
-    runner_path.write_text("from rag import newly_imported\n", encoding="utf-8")
-    (package / "__init__.py").write_text("", encoding="utf-8")
-    (package / "newly_imported.py").write_text("VALUE = 1\n", encoding="utf-8")
-    manifest = {
-        "runner": "runner.py",
-        "rag_package": "src/rag/__init__.py",
-    }
-
-    with pytest.raises(ValueError, match="src/rag/newly_imported.py"):
-        validator(tmp_path, roots=("runner.py",), manifest=manifest)
-
-
-def test_static_local_import_closure_rejects_unallowlisted_dynamic_import(
-    tmp_path,
-) -> None:
-    validator = getattr(policy, "validate_decision_import_closure", None)
-    assert callable(validator), "policy must validate its static local import closure"
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(
-        "import importlib\nimportlib.import_module('rag.hidden')\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ValueError, match="dynamic import.*runner.py"):
-        validator(
-            tmp_path,
-            roots=("runner.py",),
-            manifest={"runner": "runner.py"},
-        )
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "import importlib as loader\nloader.import_module('rag.hidden')\n",
-        "from importlib import import_module as loader\nloader('rag.hidden')\n",
-        "import builtins as loader\nloader.__import__('rag.hidden')\n",
-        "from builtins import __import__ as loader\nloader('rag.hidden')\n",
-        "import importlib as il\nload = il.import_module\nload('rag.hidden')\n",
-        "import builtins as bi\nload = bi.__import__\nload('rag.hidden')\n",
-        "import importlib as il\ngetattr(il, 'import_module')('rag.hidden')\n",
-        "import builtins as bi\ngetattr(bi, '__import__')('rag.hidden')\n",
-        "getattr(__builtins__, '__import__')('rag.hidden')\n",
-        (
-            "import importlib\n"
-            "getattr(getattr(importlib, 'import_module'), '__call__')"
-            "('rag.hidden')\n"
-        ),
-        (
-            "from builtins import getattr as pick\n"
-            "import importlib as il\n"
-            "pick(il, 'import_module')('rag.hidden')\n"
-        ),
-        "__import__('rag.hidden')\n",
-        "import_module('rag.hidden')\n",
-        "eval(\"__import__('rag.hidden')\")\n",
-        "exec(\"import rag.hidden\")\n",
-        "compile(\"import rag.hidden\", '<dynamic>', 'exec')\n",
-        "from builtins import eval as run\nrun(\"__import__('rag.hidden')\")\n",
-        "run = exec\nrun(\"import rag.hidden\")\n",
-        "import builtins as bi\nbi.exec(\"import rag.hidden\")\n",
-        (
-            "import builtins as bi\n"
-            "getattr(bi, 'compile')(\"import rag.hidden\", '<dynamic>', 'exec')\n"
-        ),
-        "value: eval(\"__import__('rag.hidden')\") = None\n",
-        (
-            "def evaluate(value: eval(\"__import__('rag.hidden')\")):\n"
-            "    return value\n"
-        ),
-    ],
-    ids=(
-        "renamed-importlib-module",
-        "renamed-importlib-function",
-        "renamed-builtins-module",
-        "renamed-builtins-function",
-        "assigned-importlib-function",
-        "assigned-builtins-function",
-        "getattr-importlib-alias",
-        "getattr-builtins-alias",
-        "getattr-dunder-builtins",
-        "nested-getattr",
-        "renamed-getattr",
-        "bare-dunder-import",
-        "bare-import-module",
-        "eval",
-        "exec",
-        "compile",
-        "renamed-eval",
-        "assigned-exec",
-        "builtins-exec-attribute",
-        "getattr-builtins-compile",
-        "annotated-assignment-eval",
-        "parameter-annotation-eval",
-    ),
-)
-def test_static_local_import_closure_rejects_dynamic_aliases_and_code_execution(
-    tmp_path, source
-) -> None:
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(source, encoding="utf-8")
-
-    with pytest.raises(ValueError, match="dynamic import or code execution"):
-        policy.validate_decision_import_closure(
-            tmp_path,
-            roots=("runner.py",),
-            manifest={"runner": "runner.py"},
-        )
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        (
-            "def import_module(name):\n"
-            "    return name\n"
-            "import_module('harmless')\n"
-        ),
-        (
-            "def __import__(name):\n"
-            "    return name\n"
-            "__import__('harmless')\n"
-        ),
-        (
-            "class Helper:\n"
-            "    def import_module(self, name):\n"
-            "        return name\n"
-            "helper = Helper()\n"
-            "helper.import_module('harmless')\n"
-        ),
-        (
-            "class Helper:\n"
-            "    def compile(self, value):\n"
-            "        return value\n"
-            "helper = Helper()\n"
-            "helper.compile('harmless')\n"
-        ),
-        "(lambda eval: eval('harmless'))(lambda value: value)\n",
-    ],
-    ids=(
-        "user-import-module",
-        "user-dunder-import",
-        "user-import-module-attribute",
-        "user-compile-attribute",
-        "lambda-argument-eval",
-    ),
-)
-def test_static_local_import_closure_allows_clearly_user_bound_similar_names(
-    tmp_path, source
-) -> None:
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(source, encoding="utf-8")
-
-    assert policy.validate_decision_import_closure(
-        tmp_path,
-        roots=("runner.py",),
-        manifest={"runner": "runner.py"},
-    ) == frozenset({"runner.py"})
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        (
-            "def run():\n"
-            "    return loader('rag.hidden')\n"
-            "from importlib import import_module as loader\n"
-            "run()\n"
-        ),
-        (
-            "def outer():\n"
-            "    def inner():\n"
-            "        return loader('rag.hidden')\n"
-            "    from importlib import import_module as loader\n"
-            "    return inner()\n"
-            "outer()\n"
-        ),
-        (
-            "import importlib as loader\n"
-            "class C:\n"
-            "    loader = object()\n"
-            "    def run(self):\n"
-            "        return loader.import_module('rag.hidden')\n"
-            "C().run()\n"
-        ),
-        (
-            "import importlib as il\n"
-            "flag = True\n"
-            "if flag:\n"
-            "    load = il.import_module\n"
-            "else:\n"
-            "    load = lambda value: value\n"
-            "load('rag.hidden')\n"
-        ),
-        (
-            "try:\n"
-            "    from importlib import import_module as load\n"
-            "except ImportError:\n"
-            "    load = lambda value: value\n"
-            "load('rag.hidden')\n"
-        ),
-        (
-            "def eval(value):\n"
-            "    return value\n"
-            "del eval\n"
-            "eval(\"__import__('rag.hidden')\")\n"
-        ),
-        (
-            "import importlib as il\n"
-            "flag = True\n"
-            "load = il.import_module if flag else (lambda value: value)\n"
-            "load('rag.hidden')\n"
-        ),
-        (
-            "import importlib as il\n"
-            "load, = (il.import_module,)\n"
-            "load('rag.hidden')\n"
-        ),
-        "eval: object\neval(\"__import__('rag.hidden')\")\n",
-    ],
-    ids=(
-        "late-module-alias",
-        "late-enclosing-alias",
-        "class-namespace-not-method-closure",
-        "branch-join",
-        "try-join",
-        "delete-restores-builtin",
-        "conditional-expression-alias",
-        "destructured-alias",
-        "value-less-annotation",
-    ),
-)
-def test_static_local_import_closure_rejects_exact_reviewed_scope_bypasses(
-    tmp_path, source
-) -> None:
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(source, encoding="utf-8")
-
-    with pytest.raises(ValueError, match="dynamic import or code execution"):
-        policy.validate_decision_import_closure(
-            tmp_path,
-            roots=("runner.py",),
-            manifest={"runner": "runner.py"},
-        )
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        (
-            "def run():\n"
-            "    return import_module('harmless')\n"
-            "def import_module(value):\n"
-            "    return value\n"
-            "run()\n"
-        ),
-        (
-            "def run():\n"
-            "    return eval('harmless')\n"
-            "def eval(value):\n"
-            "    return value\n"
-            "run()\n"
-        ),
-    ],
-    ids=("forward-user-import-module", "forward-user-eval"),
-)
-def test_static_local_import_closure_allows_exact_reviewed_forward_bindings(
-    tmp_path, source
-) -> None:
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(source, encoding="utf-8")
-
-    assert policy.validate_decision_import_closure(
-        tmp_path,
-        roots=("runner.py",),
-        manifest={"runner": "runner.py"},
-    ) == frozenset({"runner.py"})
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "import importlib as loader\n",
-        "from importlib import import_module as loader\n",
-        "import builtins as loader\n",
-        "from builtins import eval as loader\n",
-        "dangerous = eval\n",
-        "dangerous = getattr(__builtins__, 'eval')\n",
-        (
-            "dangerous = eval\n"
-            "def eval(value):\n"
-            "    return value\n"
-        ),
-    ],
-    ids=(
-        "importlib-module",
-        "importlib-from",
-        "builtins-module",
-        "builtins-from",
-        "builtin-reference",
-        "dynamic-getattr-acquisition",
-        "direct-reference-before-user-binding",
-    ),
-)
-def test_static_local_import_closure_rejects_dynamic_api_acquisition_without_call(
-    tmp_path, source
-) -> None:
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(source, encoding="utf-8")
-
-    with pytest.raises(ValueError, match="dynamic import or code execution"):
-        policy.validate_decision_import_closure(
-            tmp_path,
-            roots=("runner.py",),
-            manifest={"runner": "runner.py"},
-        )
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        (
-            "def run():\n"
-            "    return eval('40 + 2')\n"
-            "run()\n"
-            "def eval(value):\n"
-            "    return value\n"
-        ),
-        (
-            "def run():\n"
-            "    exec('answer = 42')\n"
-            "run()\n"
-            "def exec(value):\n"
-            "    return value\n"
-        ),
-        (
-            "def run():\n"
-            "    return compile('40 + 2', '<value>', 'eval')\n"
-            "run()\n"
-            "def compile(*values):\n"
-            "    return values\n"
-        ),
-        (
-            "def run():\n"
-            "    return __import__('rag.hidden')\n"
-            "run()\n"
-            "def __import__(value):\n"
-            "    return value\n"
-        ),
-        (
-            "def execute():\n"
-            "    return eval('40 + 2')\n"
-            "run = execute\n"
-            "run()\n"
-            "def eval(value):\n"
-            "    return value\n"
-        ),
-        (
-            "def execute():\n"
-            "    return eval('40 + 2')\n"
-            "flag = True\n"
-            "if flag:\n"
-            "    run = execute\n"
-            "else:\n"
-            "    run = lambda: None\n"
-            "run()\n"
-            "def eval(value):\n"
-            "    return value\n"
-        ),
-        (
-            "def execute():\n"
-            "    return eval('40 + 2')\n"
-            "try:\n"
-            "    run = execute\n"
-            "except RuntimeError:\n"
-            "    run = lambda: None\n"
-            "run()\n"
-            "def eval(value):\n"
-            "    return value\n"
-        ),
-        (
-            "def outer():\n"
-            "    return inner()\n"
-            "def inner():\n"
-            "    return eval('40 + 2')\n"
-            "outer()\n"
-            "def eval(value):\n"
-            "    return value\n"
-        ),
-        (
-            "run = lambda: eval('40 + 2')\n"
-            "run()\n"
-            "def eval(value):\n"
-            "    return value\n"
-        ),
-        (
-            "(lambda: eval('40 + 2'))()\n"
-            "def eval(value):\n"
-            "    return value\n"
-        ),
-        (
-            "def run():\n"
-            "    return eval('40 + 2')\n"
-            "class ImportTimeBody:\n"
-            "    result = run()\n"
-            "def eval(value):\n"
-            "    return value\n"
-        ),
-    ],
-    ids=(
-        "eval-before-late-shadow",
-        "exec-before-late-shadow",
-        "compile-before-late-shadow",
-        "dunder-import-before-late-shadow",
-        "aliased-module-call",
-        "branch-joined-call",
-        "try-joined-call",
-        "nested-local-call-chain",
-        "lambda-alias-call",
-        "immediate-lambda-call",
-        "class-body-call",
-    ),
-)
-def test_static_local_import_closure_rejects_import_time_calls_before_safe_shadow(
-    tmp_path, source
-) -> None:
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(source, encoding="utf-8")
-
-    with pytest.raises(ValueError, match="dynamic import or code execution"):
-        policy.validate_decision_import_closure(
-            tmp_path,
-            roots=("runner.py",),
-            manifest={"runner": "runner.py"},
-        )
-
-
-@pytest.mark.parametrize(
-    ("api", "body"),
-    [
-        ("eval", "return eval('harmless')"),
-        ("exec", "return exec('harmless')"),
-        ("compile", "return compile('harmless')"),
-        ("__import__", "return __import__('harmless')"),
-    ],
-)
-def test_static_local_import_closure_allows_import_time_calls_after_safe_shadow(
-    tmp_path, api, body
-) -> None:
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(
-        f"def run():\n    {body}\n"
-        f"def {api}(*values):\n    return values\n"
-        "run()\n",
-        encoding="utf-8",
-    )
-
-    assert policy.validate_decision_import_closure(
-        tmp_path,
-        roots=("runner.py",),
-        manifest={"runner": "runner.py"},
-    ) == frozenset({"runner.py"})
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "globals()['eval']('40 + 2')\n",
-        "globals().get('eval')('40 + 2')\n",
-        "import sys\nsys.modules['builtins'].__dict__['eval']('40 + 2')\n",
-        "import sys\nvars(sys.modules['builtins'])['eval']('40 + 2')\n",
-        "namespace = globals\nnamespace()['exec']('answer = 42')\n",
-        "namespace = locals()\nnamespace.get('compile')('x', 'y', 'eval')\n",
-        "namespace = vars()\nnamespace['__import__']('rag.hidden')\n",
-        "import sys as runtime\nruntime.modules.get('builtins').eval('40 + 2')\n",
-        "from sys import modules as registry\nregistry['builtins'].exec('x = 1')\n",
-        "import builtins as namespace\nnamespace.__dict__['compile']('x', 'y', 'eval')\n",
-    ],
-    ids=(
-        "globals-subscript",
-        "globals-get",
-        "sys-modules-builtins-dict",
-        "vars-sys-modules",
-        "globals-alias",
-        "locals-get",
-        "vars-subscript",
-        "sys-alias-modules-get",
-        "sys-modules-import-alias",
-        "builtins-dict",
-    ),
-)
-def test_static_local_import_closure_rejects_dynamic_namespace_acquisition(
-    tmp_path, source
-) -> None:
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(source, encoding="utf-8")
-
-    with pytest.raises(ValueError, match="dynamic import or code execution"):
-        policy.validate_decision_import_closure(
-            tmp_path,
-            roots=("runner.py",),
-            manifest={"runner": "runner.py"},
-        )
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "values = {'eval': 'harmless'}\nvalues['eval']\n",
-        "values = {'compile': 'harmless'}\nvalues.get('compile')\n",
-    ],
-    ids=("ordinary-dict-subscript", "ordinary-dict-get"),
-)
-def test_static_local_import_closure_allows_proven_ordinary_mapping_access(
-    tmp_path, source
-) -> None:
-    runner_path = tmp_path / "runner.py"
-    runner_path.write_text(source, encoding="utf-8")
-
-    assert policy.validate_decision_import_closure(
-        tmp_path,
-        roots=("runner.py",),
-        manifest={"runner": "runner.py"},
-    ) == frozenset({"runner.py"})
-
-
-@pytest.mark.parametrize(
-    "changed_dependency",
-    [
-        "retrieval_refusal_policy",
-        "retrieval_fusion",
-        "index_embedder",
-        "runner_severance",
-        "release_verifier_wrapper",
-    ],
-)
-def test_release_verifier_invalidates_representative_dependency_changes(
-    tmp_path, cases, changed_dependency
-):
-    repository = tmp_path / "repository"
-    repository.mkdir()
-    source_paths = (
-        "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
-        "eval/dataset/reliability_stress_v0.3.1.jsonl",
-        "eval/dataset/eval_set.jsonl",
-        "release/corpus_snapshot.json",
-        *policy.DECISION_CODE_PATHS.values(),
-    )
-    for relative_path in source_paths:
-        destination = repository / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(PROJECT_ROOT / relative_path, destination)
-    subprocess.run(["git", "init"], cwd=repository, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=repository,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.email", "test@example.invalid"],
-        cwd=repository,
-        check=True,
-    )
-    subprocess.run(["git", "add", "."], cwd=repository, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", "fixture"],
-        cwd=repository,
-        check=True,
-        capture_output=True,
-    )
-    observations = _observations(cases)
-    provenance = _provenance()
-    provenance.update(
-        dataset_sha256=hashlib.sha256(
-            (repository / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl").read_bytes()
-        ).hexdigest(),
-        corpus_snapshot_sha256=hashlib.sha256(
-            (repository / "release/corpus_snapshot.json").read_bytes()
-        ).hexdigest(),
-        source_artifact_sha256={
-            "stress_dataset": hashlib.sha256(
-                (repository / "eval/dataset/reliability_stress_v0.3.1.jsonl").read_bytes()
-            ).hexdigest(),
-            "formal_dataset": hashlib.sha256(
-                (repository / "eval/dataset/eval_set.jsonl").read_bytes()
-            ).hexdigest(),
-        },
-        decision_code_sha256={
-            name: hashlib.sha256((repository / path).read_bytes()).hexdigest()
-            for name, path in policy.DECISION_CODE_PATHS.items()
-        },
-        code_revision=subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repository,
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        ).stdout.strip(),
-    )
-    artifact = build_official_artifact(
-        observations=observations,
-        candidate_results=_candidate_results(observations),
-        provenance=provenance,
-    )
-    path = repository / "severance-policy.json"
-    runner._write_public_json(path, artifact)
-
-    summary = release_verification._verify_severance_refusal_policy_artifact(
-        repository, path
-    )
-
-    assert summary == {
-        "schema_version": "1.3",
-        "production_threshold": 0.03,
-        "highest_passing_candidate": 0.03,
-        "target_cases": 30,
-        "stress_cases": 60,
-        "formal_cases": 40,
-        "execution_device": "cpu",
-        "precision_mode": "fp32",
-        "provider_adapters": 0,
-        "provider_requests": 0,
-    }
-
-    changed_path = repository / policy.DECISION_CODE_PATHS[changed_dependency]
-    changed_path.write_bytes(changed_path.read_bytes() + b"\n")
-    provenance["decision_code_sha256"][changed_dependency] = hashlib.sha256(
-        changed_path.read_bytes()
-    ).hexdigest()
-    mismatched = build_official_artifact(
-        observations=observations,
-        candidate_results=_candidate_results(observations),
-        provenance=provenance,
-    )
-    runner._write_public_json(path, mismatched)
-    with pytest.raises(
-        release_verification.ReleaseVerificationError,
-        match=f"committed revision.*{changed_dependency}",
-    ):
-        release_verification._verify_severance_refusal_policy_artifact(
-            repository, path
-        )
-
-
-def test_release_verifier_rejects_missing_or_untracked_relevant_files(
-    tmp_path, cases
-):
-    repository = tmp_path / "repository"
-    repository.mkdir()
-    source_paths = (
-        "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
-        "eval/dataset/reliability_stress_v0.3.1.jsonl",
-        "eval/dataset/eval_set.jsonl",
-        "release/corpus_snapshot.json",
-        *policy.DECISION_CODE_PATHS.values(),
-    )
-    for relative_path in source_paths:
-        destination = repository / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(PROJECT_ROOT / relative_path, destination)
-    subprocess.run(["git", "init"], cwd=repository, check=True, capture_output=True)
-    subprocess.run(["git", "config", "user.name", "Test"], cwd=repository, check=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@example.invalid"],
-        cwd=repository,
-        check=True,
-    )
-    subprocess.run(["git", "add", "."], cwd=repository, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", "fixture"],
-        cwd=repository,
-        check=True,
-        capture_output=True,
-    )
-    observations = _observations(cases)
-    provenance = _provenance()
-    provenance.update(
-        dataset_sha256=hashlib.sha256(
-            (repository / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl").read_bytes()
-        ).hexdigest(),
-        corpus_snapshot_sha256=hashlib.sha256(
-            (repository / "release/corpus_snapshot.json").read_bytes()
-        ).hexdigest(),
-        source_artifact_sha256={
-            "stress_dataset": hashlib.sha256(
-                (repository / "eval/dataset/reliability_stress_v0.3.1.jsonl").read_bytes()
-            ).hexdigest(),
-            "formal_dataset": hashlib.sha256(
-                (repository / "eval/dataset/eval_set.jsonl").read_bytes()
-            ).hexdigest(),
-        },
-        decision_code_sha256={
-            name: hashlib.sha256((repository / relative).read_bytes()).hexdigest()
-            for name, relative in policy.DECISION_CODE_PATHS.items()
-        },
-        code_revision=subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repository,
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        ).stdout.strip(),
-    )
-    artifact = build_official_artifact(
-        observations=observations,
-        candidate_results=_candidate_results(observations),
-        provenance=provenance,
-    )
-    artifact_path = repository / "severance-policy.json"
-    runner._write_public_json(artifact_path, artifact)
-    relevant = repository / policy.DECISION_CODE_PATHS["release_verifier_wrapper"]
-    subprocess.run(
-        [
-            "git",
-            "rm",
-            "--cached",
-            policy.DECISION_CODE_PATHS["release_verifier_wrapper"],
-        ],
-        cwd=repository,
-        check=True,
-        capture_output=True,
-    )
-
-    with pytest.raises(
-        release_verification.ReleaseVerificationError,
-        match="committed revision.*release_verifier_wrapper",
-    ):
-        release_verification._verify_severance_refusal_policy_artifact(
-            repository, artifact_path
-        )
-
-    relevant.unlink()
-    with pytest.raises(
-        release_verification.ReleaseVerificationError,
-        match="missing.*release_verifier_wrapper",
-    ):
-        release_verification._verify_severance_refusal_policy_artifact(
-            repository, artifact_path
-        )
 
 
 def test_official_artifact_rejects_hidden_self_hashed_guard_evidence(cases):
