@@ -71,9 +71,6 @@ DECISION_IMPORT_ROOTS = (
     "src/rag/release_verification.py",
     "scripts/verify_release.py",
 )
-# No dynamic local imports are required by the authoritative execution closure.
-# Any future exception must name the importing file and document its rationale.
-DYNAMIC_LOCAL_IMPORT_ALLOWLIST: dict[str, str] = {}
 EXPECTED_QIDS = tuple(
     f"severance-policy-{number:03d}" for number in range(1, 31)
 )
@@ -430,24 +427,230 @@ def _imported_local_paths(
     return imported
 
 
-def _uses_dynamic_import(tree: ast.AST) -> bool:
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        function = node.func
-        if isinstance(function, ast.Name) and function.id in {
-            "__import__",
-            "import_module",
-        }:
-            return True
-        if (
-            isinstance(function, ast.Attribute)
-            and isinstance(function.value, ast.Name)
-            and function.value.id == "importlib"
-            and function.attr == "import_module"
+_SAFE_BINDING = "safe"
+_IMPORTLIB_BINDING = "importlib"
+_BUILTINS_BINDING = "builtins"
+_GETATTR_BINDING = "getattr"
+_DYNAMIC_IMPORT_BINDING = "dynamic_import"
+_DYNAMIC_CODE_BINDING = "dynamic_code"
+_DYNAMIC_BINDINGS = {_DYNAMIC_IMPORT_BINDING, _DYNAMIC_CODE_BINDING}
+_BUILTIN_DYNAMIC_BINDINGS = {
+    "__import__": _DYNAMIC_IMPORT_BINDING,
+    "eval": _DYNAMIC_CODE_BINDING,
+    "exec": _DYNAMIC_CODE_BINDING,
+    "compile": _DYNAMIC_CODE_BINDING,
+}
+
+
+class _DynamicExecutionVisitor(ast.NodeVisitor):
+    """Conservatively resolve aliases of Python's dynamic execution APIs."""
+
+    def __init__(self) -> None:
+        self._scopes: list[dict[str, str]] = [{}]
+        self.reason: str | None = None
+
+    def _bind(self, name: str, binding: str) -> None:
+        self._scopes[-1][name] = binding
+
+    def _lookup(self, name: str) -> str:
+        for scope in reversed(self._scopes):
+            if name in scope:
+                return scope[name]
+        if name == "import_module":
+            return _DYNAMIC_IMPORT_BINDING
+        if name == "getattr":
+            return _GETATTR_BINDING
+        if name in {"builtins", "__builtins__"}:
+            return _BUILTINS_BINDING
+        return _BUILTIN_DYNAMIC_BINDINGS.get(name, _SAFE_BINDING)
+
+    @staticmethod
+    def _literal_attribute(node: ast.AST) -> str | None:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        return None
+
+    def _attribute_binding(self, base: str, attribute: str | None) -> str:
+        if base == _IMPORTLIB_BINDING:
+            if attribute is None or attribute == "import_module":
+                return _DYNAMIC_IMPORT_BINDING
+            return _SAFE_BINDING
+        if base == _BUILTINS_BINDING:
+            if attribute is None:
+                return _DYNAMIC_CODE_BINDING
+            if attribute == "getattr":
+                return _GETATTR_BINDING
+            return _BUILTIN_DYNAMIC_BINDINGS.get(attribute, _SAFE_BINDING)
+        if base in _DYNAMIC_BINDINGS and (
+            attribute is None or attribute == "__call__"
         ):
-            return True
-    return False
+            return base
+        return _SAFE_BINDING
+
+    def _expression_binding(self, node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return self._lookup(node.id)
+        if isinstance(node, ast.Attribute):
+            return self._attribute_binding(
+                self._expression_binding(node.value), node.attr
+            )
+        if isinstance(node, ast.Subscript):
+            return self._attribute_binding(
+                self._expression_binding(node.value),
+                self._literal_attribute(node.slice),
+            )
+        if isinstance(node, ast.Call):
+            if self._expression_binding(node.func) != _GETATTR_BINDING:
+                return _SAFE_BINDING
+            if len(node.args) < 2:
+                return _SAFE_BINDING
+            return self._attribute_binding(
+                self._expression_binding(node.args[0]),
+                self._literal_attribute(node.args[1]),
+            )
+        return _SAFE_BINDING
+
+    def _bind_target(self, target: ast.AST, binding: str) -> None:
+        if isinstance(target, ast.Name):
+            self._bind(target.id, binding)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            for element in target.elts:
+                self._bind_target(element, _SAFE_BINDING)
+
+    def visit_Import(self, node: ast.Import) -> None:
+        for alias in node.names:
+            bound_name = alias.asname or alias.name.split(".", maxsplit=1)[0]
+            root_module = alias.name.split(".", maxsplit=1)[0]
+            if root_module == "importlib":
+                binding = _IMPORTLIB_BINDING
+            elif root_module == "builtins":
+                binding = _BUILTINS_BINDING
+            else:
+                binding = _SAFE_BINDING
+            self._bind(bound_name, binding)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        for alias in node.names:
+            bound_name = alias.asname or alias.name
+            if node.module == "importlib" and alias.name == "import_module":
+                binding = _DYNAMIC_IMPORT_BINDING
+            elif node.module == "builtins" and alias.name == "getattr":
+                binding = _GETATTR_BINDING
+            elif node.module == "builtins":
+                binding = _BUILTIN_DYNAMIC_BINDINGS.get(
+                    alias.name, _SAFE_BINDING
+                )
+            else:
+                binding = _SAFE_BINDING
+            self._bind(bound_name, binding)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        self.visit(node.value)
+        binding = self._expression_binding(node.value)
+        for target in node.targets:
+            self._bind_target(target, binding)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        self.visit(node.annotation)
+        if node.value is not None:
+            self.visit(node.value)
+            binding = self._expression_binding(node.value)
+        else:
+            binding = _SAFE_BINDING
+        self._bind_target(node.target, binding)
+
+    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+        self.visit(node.value)
+        self._bind_target(node.target, self._expression_binding(node.value))
+
+    def _visit_function(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> None:
+        self._bind(node.name, _SAFE_BINDING)
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for default in (*node.args.defaults, *node.args.kw_defaults):
+            if default is not None:
+                self.visit(default)
+        annotated_arguments = (
+            *node.args.posonlyargs,
+            *node.args.args,
+            *node.args.kwonlyargs,
+            node.args.vararg,
+            node.args.kwarg,
+        )
+        for argument in annotated_arguments:
+            if argument is not None and argument.annotation is not None:
+                self.visit(argument.annotation)
+        if node.returns is not None:
+            self.visit(node.returns)
+        self._scopes.append({})
+        arguments = (
+            *node.args.posonlyargs,
+            *node.args.args,
+            *node.args.kwonlyargs,
+        )
+        for argument in arguments:
+            self._bind(argument.arg, _SAFE_BINDING)
+        if node.args.vararg is not None:
+            self._bind(node.args.vararg.arg, _SAFE_BINDING)
+        if node.args.kwarg is not None:
+            self._bind(node.args.kwarg.arg, _SAFE_BINDING)
+        for statement in node.body:
+            self.visit(statement)
+        self._scopes.pop()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._visit_function(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._visit_function(node)
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        for default in (*node.args.defaults, *node.args.kw_defaults):
+            if default is not None:
+                self.visit(default)
+        self._scopes.append({})
+        arguments = (
+            *node.args.posonlyargs,
+            *node.args.args,
+            *node.args.kwonlyargs,
+        )
+        for argument in arguments:
+            self._bind(argument.arg, _SAFE_BINDING)
+        if node.args.vararg is not None:
+            self._bind(node.args.vararg.arg, _SAFE_BINDING)
+        if node.args.kwarg is not None:
+            self._bind(node.args.kwarg.arg, _SAFE_BINDING)
+        self.visit(node.body)
+        self._scopes.pop()
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        self._bind(node.name, _SAFE_BINDING)
+        for expression in (*node.decorator_list, *node.bases, *node.keywords):
+            self.visit(expression)
+        self._scopes.append({})
+        for statement in node.body:
+            self.visit(statement)
+        self._scopes.pop()
+
+    def visit_Call(self, node: ast.Call) -> None:
+        binding = self._expression_binding(node.func)
+        if binding in _DYNAMIC_BINDINGS and self.reason is None:
+            self.reason = (
+                "dynamic import"
+                if binding == _DYNAMIC_IMPORT_BINDING
+                else "dynamic code execution"
+            )
+        self.generic_visit(node)
+
+
+def _dynamic_execution_reason(tree: ast.AST) -> str | None:
+    # Deliberately no file-level allowlist: a future exception must resolve and
+    # bind an exact target rather than exempting an importer wholesale.
+    visitor = _DynamicExecutionVisitor()
+    visitor.visit(tree)
+    return visitor.reason
 
 
 def validate_decision_import_closure(
@@ -470,11 +673,12 @@ def validate_decision_import_closure(
             continue
         discovered.add(relative)
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
-        if (
-            _uses_dynamic_import(tree)
-            and relative not in DYNAMIC_LOCAL_IMPORT_ALLOWLIST
-        ):
-            raise ValueError(f"unallowlisted dynamic import in {relative}")
+        dynamic_reason = _dynamic_execution_reason(tree)
+        if dynamic_reason is not None:
+            raise ValueError(
+                "dynamic import or code execution in "
+                f"{relative}: {dynamic_reason} is forbidden"
+            )
         pending.extend(_package_initializers(root, path))
         pending.extend(_imported_local_paths(root, path, tree))
     omissions = discovered - set(manifest.values())

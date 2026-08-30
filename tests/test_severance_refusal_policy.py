@@ -2545,6 +2545,135 @@ def test_static_local_import_closure_rejects_unallowlisted_dynamic_import(
 
 
 @pytest.mark.parametrize(
+    "source",
+    [
+        "import importlib as loader\nloader.import_module('rag.hidden')\n",
+        "from importlib import import_module as loader\nloader('rag.hidden')\n",
+        "import builtins as loader\nloader.__import__('rag.hidden')\n",
+        "from builtins import __import__ as loader\nloader('rag.hidden')\n",
+        "import importlib as il\nload = il.import_module\nload('rag.hidden')\n",
+        "import builtins as bi\nload = bi.__import__\nload('rag.hidden')\n",
+        "import importlib as il\ngetattr(il, 'import_module')('rag.hidden')\n",
+        "import builtins as bi\ngetattr(bi, '__import__')('rag.hidden')\n",
+        "getattr(__builtins__, '__import__')('rag.hidden')\n",
+        (
+            "import importlib\n"
+            "getattr(getattr(importlib, 'import_module'), '__call__')"
+            "('rag.hidden')\n"
+        ),
+        (
+            "from builtins import getattr as pick\n"
+            "import importlib as il\n"
+            "pick(il, 'import_module')('rag.hidden')\n"
+        ),
+        "__import__('rag.hidden')\n",
+        "import_module('rag.hidden')\n",
+        "eval(\"__import__('rag.hidden')\")\n",
+        "exec(\"import rag.hidden\")\n",
+        "compile(\"import rag.hidden\", '<dynamic>', 'exec')\n",
+        "from builtins import eval as run\nrun(\"__import__('rag.hidden')\")\n",
+        "run = exec\nrun(\"import rag.hidden\")\n",
+        "import builtins as bi\nbi.exec(\"import rag.hidden\")\n",
+        (
+            "import builtins as bi\n"
+            "getattr(bi, 'compile')(\"import rag.hidden\", '<dynamic>', 'exec')\n"
+        ),
+        "value: eval(\"__import__('rag.hidden')\") = None\n",
+        (
+            "def evaluate(value: eval(\"__import__('rag.hidden')\")):\n"
+            "    return value\n"
+        ),
+    ],
+    ids=(
+        "renamed-importlib-module",
+        "renamed-importlib-function",
+        "renamed-builtins-module",
+        "renamed-builtins-function",
+        "assigned-importlib-function",
+        "assigned-builtins-function",
+        "getattr-importlib-alias",
+        "getattr-builtins-alias",
+        "getattr-dunder-builtins",
+        "nested-getattr",
+        "renamed-getattr",
+        "bare-dunder-import",
+        "bare-import-module",
+        "eval",
+        "exec",
+        "compile",
+        "renamed-eval",
+        "assigned-exec",
+        "builtins-exec-attribute",
+        "getattr-builtins-compile",
+        "annotated-assignment-eval",
+        "parameter-annotation-eval",
+    ),
+)
+def test_static_local_import_closure_rejects_dynamic_aliases_and_code_execution(
+    tmp_path, source
+) -> None:
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(source, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="dynamic import or code execution"):
+        policy.validate_decision_import_closure(
+            tmp_path,
+            roots=("runner.py",),
+            manifest={"runner": "runner.py"},
+        )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        (
+            "def import_module(name):\n"
+            "    return name\n"
+            "import_module('harmless')\n"
+        ),
+        (
+            "def __import__(name):\n"
+            "    return name\n"
+            "__import__('harmless')\n"
+        ),
+        (
+            "class Helper:\n"
+            "    def import_module(self, name):\n"
+            "        return name\n"
+            "helper = Helper()\n"
+            "helper.import_module('harmless')\n"
+        ),
+        (
+            "class Helper:\n"
+            "    def compile(self, value):\n"
+            "        return value\n"
+            "helper = Helper()\n"
+            "helper.compile('harmless')\n"
+        ),
+        "(lambda eval: eval('harmless'))(lambda value: value)\n",
+    ],
+    ids=(
+        "user-import-module",
+        "user-dunder-import",
+        "user-import-module-attribute",
+        "user-compile-attribute",
+        "lambda-argument-eval",
+    ),
+)
+def test_static_local_import_closure_allows_clearly_user_bound_similar_names(
+    tmp_path, source
+) -> None:
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(source, encoding="utf-8")
+
+    assert policy.validate_decision_import_closure(
+        tmp_path,
+        roots=("runner.py",),
+        manifest={"runner": "runner.py"},
+    ) == frozenset({"runner.py"})
+
+
+@pytest.mark.parametrize(
     "changed_dependency",
     [
         "retrieval_refusal_policy",
