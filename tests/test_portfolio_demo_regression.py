@@ -213,6 +213,7 @@ def test_runner_with_fake_retrieval_is_content_free_and_deterministic(
     assert artifact["summary"]["source_recall_at_5"] == 1.0
     assert len(artifact["cases"]) == 10
     serialized = output.read_text(encoding="utf-8")
+    assert b"\r\n" not in output.read_bytes()
     assert serialized.endswith("\n")
     assert serialized == json.dumps(
         artifact, ensure_ascii=False, indent=2, sort_keys=True
