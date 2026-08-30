@@ -73,3 +73,67 @@ plan/reports/evidence are not yet in `release/public-files.txt`.
 - Task 7 owns `release/public-files.txt`, the final public file set, and the two
   currently failing public-tree allowlist tests. Task 5 intentionally did not
   edit release packaging or claim release-verifier completion.
+
+## Review-fix round 1
+
+Review-fix implementation commit:
+`95d8f57dba5839df8922f42ab0be08cbeadbbaee`.
+
+### Root causes and RED evidence
+
+- The first schema `1.3` implementation treated six directly named files as
+  the complete decision-code closure. It omitted dynamic runner dependencies,
+  index/retrieval/fusion code, configuration and factory wiring, model/device
+  resolution, reliability helpers, the release wrapper, and the runtime lock.
+  Five representative post-run mutation cases plus a missing/untracked case
+  failed at the incomplete provenance schema: `6 failed`.
+- Six unsafe output cases reached the model preflight because
+  `--diagnostics-output` accepted arbitrary historical, official, source,
+  relative, traversal, and absolute paths: `6 failed`.
+- Four cases that aliased the approved output as a source input also reached
+  model preflight: `4 failed`.
+- A hardlink alias from the approved pivot filename to a source artifact
+  bypassed resolved-path comparison and reached model preflight: `1 failed`.
+
+### Fix
+
+- `decision_code_sha256` now uses an explicit 36-entry manifest covering the
+  authoritative configuration, factory/provider-isolation imports, models,
+  indexing/ingestion/retrieval/fusion/reranking, evaluator and reliability
+  helpers, evidence/replay logic, release verifier and wrapper, `pyproject.toml`,
+  `uv.lock`, and the legal-term dictionary.
+- Release verification requires every manifest member and source artifact to
+  exist, remain Git-tracked, have no staged/unstaged/untracked state, match its
+  recorded hash, and match the recorded committed revision. Representative
+  threshold-wiring, fusion, device/model, evaluator, and wrapper mutations are
+  rejected without model execution.
+- The runner resolves the diagnostics output before offline preflight and
+  permits only the distinct pivot diagnostic path. It rejects normalized-path
+  and filesystem-identity collisions with historical, official, target,
+  stress, formal, and corpus-snapshot artifacts before any write or model
+  construction.
+
+### GREEN evidence
+
+```text
+.venv\Scripts\python.exe -m pytest tests\test_severance_refusal_policy.py -q -p no:cacheprovider -k "nonapproved_diagnostics_output or approved_output_aliased_as_a_source or invalidates_representative_dependency_changes or missing_or_untracked_relevant_files"
+16 passed, 117 deselected in 36.96s
+
+.venv\Scripts\python.exe -m pytest tests\test_severance_refusal_policy.py -q -p no:cacheprovider -k "nonapproved_diagnostics_output or approved_output_aliased_as_a_source or hardlink_alias_collision"
+11 passed, 123 deselected in 0.98s
+
+.venv\Scripts\python.exe -m pytest tests\test_config.py tests\test_refusal_policy.py tests\test_answerer.py tests\test_reliability.py tests\test_portfolio_demo_regression.py tests\test_provider_crosscheck.py tests\test_pipeline.py tests\test_severance_refusal_policy.py -q -p no:cacheprovider
+338 passed in 54.71s
+
+.venv\Scripts\python.exe -m pytest tests\test_release_verification.py -q -p no:cacheprovider -k "not test_release_verifier_recomputes_committed_evidence and not test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions"
+105 passed, 2 deselected in 9.28s
+
+.venv\Scripts\ruff.exe check src\rag\severance_refusal_policy.py src\rag\release_verification.py eval\run_severance_refusal_policy.py tests\test_severance_refusal_policy.py
+All checks passed!
+
+git diff --check
+```
+
+The immutable historical NO-GO still matches Git blob
+`2cdb13b36d98b5ebfbfcd2cec877e571f3ab2dd4`; no model, provider, network,
+acceptance, official-export, or pivot-diagnostic action occurred.
