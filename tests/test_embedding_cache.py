@@ -73,6 +73,16 @@ def test_embedder_uses_cache_without_model(tmp_path):
     np.testing.assert_array_equal(vectors[1], np.ones(4, dtype=np.float32))
 
 
+def test_embedder_close_releases_embedding_cache_file(tmp_path):
+    cache_path = tmp_path / "emb.sqlite"
+    embedder = BGEM3Embedder(cache_path=cache_path)
+
+    embedder.close()
+    cache_path.unlink()
+
+    assert not cache_path.exists()
+
+
 def test_embedder_pins_revision_and_disables_remote_code(monkeypatch):
     captured = {}
     revision = "a" * 40

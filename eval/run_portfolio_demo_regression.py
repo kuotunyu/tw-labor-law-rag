@@ -180,6 +180,7 @@ def _run_with_local_index(args: argparse.Namespace) -> tuple[list[dict], dict]:
             results = run_cases(cases, evaluate)
         finally:
             store.close()
+            embedder.close()
     configuration = {
         "chunking": "structure",
         "retrieval": "hybrid",

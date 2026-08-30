@@ -89,6 +89,12 @@ class EmbeddingCache:
         with self._lock:
             return self.conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
 
+    def close(self) -> None:
+        """Release the SQLite handle so temporary cache files can be removed."""
+
+        with self._lock:
+            self.conn.close()
+
 
 def resolve_device(device: str) -> str:
     if device != "auto":
@@ -165,3 +171,10 @@ class BGEM3Embedder:
 
     def encode_query(self, query: str) -> np.ndarray:
         return self.encode([query])[0]
+
+    def close(self) -> None:
+        """Release resources owned by the optional embedding cache."""
+
+        if self.cache is not None:
+            self.cache.close()
+            self.cache = None
