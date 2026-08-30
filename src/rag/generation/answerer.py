@@ -1,11 +1,12 @@
 """Assembles the final answer: retrieval -> LLM -> citation parsing -> refusal.
 
 Two refusal layers (see ``DESIGN.md``, section 4):
-  1. Retrieval layer — if the reranked top score is below
-     ``refusal_threshold``, refuse without ever calling the LLM. Only applied
-     when a reranker is in the pipeline: raw vector/BM25/RRF scores are not
-     calibrated for this gate. The cross-encoder is useful as a coarse filter,
-     but high-scoring unanswerable questions can still reach the second layer.
+  1. Retrieval layer — the shared route-aware policy selects either the global
+     threshold or the severance-comparison threshold for reranked results,
+     refusing without an LLM call when the top score is below that threshold.
+     Raw vector/BM25/RRF scores are not calibrated for this gate. The
+     cross-encoder is useful as a coarse filter, but high-scoring unanswerable
+     questions can still reach the second layer.
   2. Generation layer — the prompt instructs the LLM to emit
      ``REFUSAL_PHRASE`` verbatim when the retrieved context can't answer the
      question, even if retrieval itself passed the threshold.
@@ -21,6 +22,7 @@ from rag.generation.llm import LLMAdapter
 from rag.generation.prompts import REFUSAL_PHRASE, SYSTEM_PROMPT, build_user_prompt
 from rag.generation.router import RoutedLLM
 from rag.retrieval.pipeline import RetrievalPipeline, RetrievalResult
+from rag.retrieval.refusal_policy import decide_retrieval_refusal
 
 # Models writing Traditional Chinese sometimes emit full-width brackets ［1］
 # instead of ASCII [1] (observed with gpt-5.1), so match both.
@@ -51,19 +53,32 @@ class Answerer:
         llm: LLMAdapter | RoutedLLM,
         refusal_threshold: float = 0.0,
         temperature: float = 0.0,
+        *,
+        severance_comparison_threshold: float | None = None,
     ):
         self.pipeline = pipeline
         self.llm = llm
         self.refusal_threshold = refusal_threshold
         self.temperature = temperature
+        self.severance_comparison_threshold = (
+            refusal_threshold
+            if severance_comparison_threshold is None
+            else severance_comparison_threshold
+        )
 
     def answer(self, question: str) -> Answer:
         retrieval = self.pipeline.run(question)
 
-        if not retrieval.hits:
-            return self._refuse(retrieval, stage="no_hits")
-        if self.pipeline.reranker is not None and retrieval.top_score < self.refusal_threshold:
-            return self._refuse(retrieval, stage="threshold")
+        decision = decide_retrieval_refusal(
+            has_hits=bool(retrieval.hits),
+            reranker_enabled=self.pipeline.reranker is not None,
+            applied_routes=retrieval.applied_routes,
+            top_score=retrieval.top_score,
+            global_threshold=self.refusal_threshold,
+            severance_comparison_threshold=self.severance_comparison_threshold,
+        )
+        if decision.refusal_stage is not None:
+            return self._refuse(retrieval, stage=decision.refusal_stage)
 
         generation = self.llm.generate(
             SYSTEM_PROMPT, build_user_prompt(question, retrieval.hits), temperature=self.temperature

@@ -1,12 +1,14 @@
 from types import SimpleNamespace
 
+import pytest
+
 from rag import factory
 from rag.generation.answerer import Answerer
 from rag.generation.llm import LLMOutput
 from rag.generation.prompts import REFUSAL_PHRASE
 from rag.generation.router import RoutedLLM
 from rag.models import RetrievedChunk
-from rag.retrieval.pipeline import RetrievalPipeline
+from rag.retrieval.pipeline import RetrievalPipeline, RetrievalResult
 
 
 def make_hit(chunk_id, doc_title, article_label, content, score=0.9):
@@ -83,6 +85,15 @@ class FakeConcreteLLM:
 
 def make_pipeline(hits, reranker=None, top_k_final=5):
     return RetrievalPipeline(FakeRetriever(hits), reranker=reranker, top_k_retrieve=20, top_k_final=top_k_final)
+
+
+class StaticPipeline:
+    def __init__(self, result, *, reranker):
+        self.result = result
+        self.reranker = reranker
+
+    def run(self, question):
+        return self.result
 
 
 def test_answerer_parses_citations():
@@ -283,7 +294,11 @@ def test_routed_llm_refusal_reports_primary_without_generation():
 def test_factory_uses_injected_routed_llm_for_refusal(monkeypatch):
     pipeline = make_pipeline([])
     llm = RoutedLLM(FakeConcreteLLM())
-    settings = SimpleNamespace(rerank_score_threshold=0.5, llm_temperature=0.0)
+    settings = SimpleNamespace(
+        rerank_score_threshold=0.5,
+        severance_comparison_score_threshold=0.015,
+        llm_temperature=0.0,
+    )
     monkeypatch.setattr(factory, "build_retrieval_pipeline", lambda *args, **kwargs: pipeline)
 
     def fail_if_default_llm_is_built(settings):
@@ -300,7 +315,11 @@ def test_factory_uses_injected_routed_llm_for_refusal(monkeypatch):
 def test_factory_default_concrete_llm_refusal_is_compatible(monkeypatch):
     pipeline = make_pipeline([])
     llm = FakeConcreteLLM()
-    settings = SimpleNamespace(rerank_score_threshold=0.5, llm_temperature=0.0)
+    settings = SimpleNamespace(
+        rerank_score_threshold=0.5,
+        severance_comparison_score_threshold=0.015,
+        llm_temperature=0.0,
+    )
     monkeypatch.setattr(factory, "build_retrieval_pipeline", lambda *args, **kwargs: pipeline)
     monkeypatch.setattr(factory, "build_llm", lambda settings: llm)
 
@@ -310,6 +329,27 @@ def test_factory_default_concrete_llm_refusal_is_compatible(monkeypatch):
     assert result.requested_provider == "gemini"
     assert result.provider is None
     assert llm.calls == []
+
+
+def test_factory_forwards_special_severance_threshold(monkeypatch):
+    hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.02)]
+    pipeline = StaticPipeline(
+        RetrievalResult(hits=hits, top_score=0.02, applied_routes=("severance_comparison",)),
+        reranker=object(),
+    )
+    llm = FakeLLM("依 [1] 回答。")
+    settings = SimpleNamespace(
+        rerank_score_threshold=0.03,
+        severance_comparison_score_threshold=0.015,
+        llm_temperature=0.0,
+    )
+    monkeypatch.setattr(factory, "build_retrieval_pipeline", lambda *args, **kwargs: pipeline)
+
+    result = factory.build_answerer(settings, object(), object(), llm=llm).answer("問題")
+
+    assert not result.refused
+    assert result.generation_called is True
+    assert len(llm.calls) == 1
 
 
 def test_answerer_retrieval_layer_passes_threshold_when_high_enough():
@@ -330,6 +370,90 @@ def test_answerer_score_equal_to_threshold_calls_llm():
     assert not result.refused
     assert result.refusal_stage is None
     assert len(llm.calls) == 1
+
+
+def test_answerer_refuses_severance_comparison_just_below_special_threshold():
+    hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.014999)]
+    llm = FakeLLM("should not be called")
+    result = Answerer(
+        StaticPipeline(
+            RetrievalResult(hits=hits, top_score=0.014999, applied_routes=("severance_comparison",)),
+            reranker=object(),
+        ),
+        llm,
+        refusal_threshold=0.03,
+        severance_comparison_threshold=0.015,
+    ).answer("問題")
+
+    assert result.refused
+    assert result.refusal_stage == "threshold"
+    assert result.generation_called is False
+    assert llm.calls == []
+
+
+def test_answerer_calls_llm_at_severance_comparison_special_threshold():
+    hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.015)]
+    llm = FakeLLM("依 [1] 回答。")
+    result = Answerer(
+        StaticPipeline(
+            RetrievalResult(hits=hits, top_score=0.015, applied_routes=("severance_comparison",)),
+            reranker=object(),
+        ),
+        llm,
+        refusal_threshold=0.03,
+        severance_comparison_threshold=0.015,
+    ).answer("問題")
+
+    assert not result.refused
+    assert result.refusal_stage is None
+    assert result.generation_called is True
+    assert len(llm.calls) == 1
+
+
+def test_answerer_preserves_legacy_positional_constructor_arguments():
+    hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.3)]
+    llm = FakeLLM("should not be called")
+    result = Answerer(
+        StaticPipeline(
+            RetrievalResult(hits=hits, top_score=0.3, applied_routes=("severance_comparison",)),
+            reranker=object(),
+        ),
+        llm,
+        0.5,
+        0.25,
+    ).answer("問題")
+
+    assert result.refused
+    assert result.refusal_stage == "threshold"
+    assert llm.calls == []
+
+
+@pytest.mark.parametrize(
+    "applied_routes",
+    [
+        (),
+        ("unknown_route",),
+        ("severance_comparison", "severance_comparison"),
+        ("severance_comparison", "wage_arrears_termination"),
+    ],
+)
+def test_answerer_uses_global_threshold_unless_routes_are_exactly_severance_comparison(applied_routes):
+    hits = [make_hit("c1", "勞基法", "第 17 條", "內容", score=0.02)]
+    llm = FakeLLM("should not be called")
+    result = Answerer(
+        StaticPipeline(
+            RetrievalResult(hits=hits, top_score=0.02, applied_routes=applied_routes),
+            reranker=object(),
+        ),
+        llm,
+        refusal_threshold=0.03,
+        severance_comparison_threshold=0.015,
+    ).answer("問題")
+
+    assert result.refused
+    assert result.refusal_stage == "threshold"
+    assert result.generation_called is False
+    assert llm.calls == []
 
 
 def test_answerer_threshold_ignored_without_reranker():
