@@ -466,6 +466,7 @@ class _AccessScope:
         self.node = node
         self.table = table
         self.parent = parent
+        self._children = list(table.get_children())
         self._used_children: set[int] = set()
         self.final_bindings = self._final_bindings()
 
@@ -693,15 +694,15 @@ class _AccessScope:
             expected_type, expected_name = "class", node.name
         else:
             raise ValueError(f"unsupported decision scope: {type(node).__name__}")
-        for child in self.table.get_children():
-            if id(child) in self._used_children:
+        for index, child in enumerate(self._children):
+            if index in self._used_children:
                 continue
             if (
                 child.get_type() == expected_type
                 and child.get_name() == expected_name
                 and child.get_lineno() == node.lineno
             ):
-                self._used_children.add(id(child))
+                self._used_children.add(index)
                 return _AccessScope(node, child, self)
         raise ValueError(
             f"cannot resolve decision scope {expected_name!r} at line {node.lineno}"
