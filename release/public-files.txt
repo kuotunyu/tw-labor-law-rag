@@ -142,9 +142,11 @@ tests/test_space_runner.py
 tests/test_tokenizer.py
 tests/test_ui_api_client.py
 tests/test_ui_byok_app.py
+tests/test_ui_content.py
 tests/test_vector_store.py
 tests/test_wage_arrears_regression.py
 ui/api_client.py
 ui/app.py
+ui/content.py
 ui/refusal_labels.py
 uv.lock
