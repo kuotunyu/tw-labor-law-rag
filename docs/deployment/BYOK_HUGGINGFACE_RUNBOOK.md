@@ -111,7 +111,7 @@ DEPLOYMENT_MODE=public_byok
 QDRANT_MODE=server
 QDRANT_URL=<cluster endpoint; non-secret>
 QDRANT_TIMEOUT_SECONDS=60
-COLLECTION_NAME=labor_laws
+COLLECTION_NAME=labor_laws_20260830_3ec5ade
 API_URL=http://127.0.0.1:8000
 GEMINI_GENERATION_MODEL=gemini-3.5-flash-lite
 OPENAI_GENERATION_MODEL=gpt-5.6-luna
@@ -158,6 +158,15 @@ git push "https://huggingface.co/spaces/$hfUser/tw-labor-law-rag-demo" HEAD:main
 GitHub `main`、release tags 與其他 worktrees 在此步保持不變。
 
 ## 6. Private acceptance
+
+先執行兩個只讀、redacted preflight：
+
+```powershell
+uv run python scripts/verify_private_space.py --repo-id steven0226/tw-labor-law-rag-demo --json
+uv run python scripts/verify_qdrant_reader.py --candidate-base labor_laws_20260830_3ec5ade --legacy-base labor_laws --fixed-count 481 --structure-count 884 --json
+```
+
+第一個命令只讀 Space visibility、runtime stage、硬體、Variable 名稱／`COLLECTION_NAME` 與 Secret 名稱；不讀 Secret 值、不重啟、不調整硬體或設定。第二個命令只以 `GET` 讀取 candidate point counts 並確認同一 runtime key 無法讀舊 pair；不送出 Qdrant write、不回傳 endpoint 或 key。兩者任一失敗都停止部署。
 
 依序留下不含秘密值的證據：
 
