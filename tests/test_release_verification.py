@@ -991,6 +991,17 @@ def test_release_verifier_recomputes_committed_evidence():
             "openai": "0.0026414",
         },
     }
+    assert report["deployment"] == {
+        "candidate_source_sha": "7f38d6ec0fe4ba203dc0c7a2feadc691b4a02ae9",
+        "space_revision_sha": "c441bd6e2d62705cb8cf7093e3de681320545fbc",
+        "visibility": "private",
+        "hardware": "cpu-basic",
+        "collection_base": "labor_laws_20260830_3ec5ade",
+        "fixed_points": 481,
+        "structure_points": 884,
+        "provider_requests": 0,
+        "local_qdrant_probe": False,
+    }
     assert report["privacy"] == {
         "official_trace_issues": 0,
         "public_scan_issues": 0,
@@ -1021,7 +1032,7 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
-    assert report["publication"]["files"] == 169
+    assert report["publication"]["files"] == 170
     expected_history = len(
         {
             line
@@ -1271,6 +1282,102 @@ def test_article_snapshot_verifier_rejects_tampering(tmp_path, tamper):
         match="article snapshot",
     ):
         release_module()._verify_article_snapshot(tmp_path, contract)
+
+
+def deployment_receipt_payload() -> dict:
+    return {
+        "schema_version": "1.0",
+        "date": "2026-08-30",
+        "candidate_source_sha": "7f38d6ec0fe4ba203dc0c7a2feadc691b4a02ae9",
+        "space_revision_sha": "c441bd6e2d62705cb8cf7093e3de681320545fbc",
+        "visibility": "private",
+        "hardware": "cpu-basic",
+        "replicas": 1,
+        "persistent_storage": False,
+        "collection_base": "labor_laws_20260830_3ec5ade",
+        "point_counts": {"fixed": 481, "structure": 884},
+        "space_policy_preflight": True,
+        "qdrant_runtime_evidence": {
+            "candidate_read_observed": True,
+            "legacy_scope_configured": True,
+            "local_live_probe": False,
+            "local_probe_reason": "runtime_credential_non_exportable_after_rotation",
+        },
+        "byok_fallback_policy": True,
+        "no_provider_acceptance": {
+            "private_app_loaded": True,
+            "remote_inventory_exact": True,
+            "api_contract_tests": True,
+            "provider_requests": 0,
+        },
+    }
+
+
+def write_deployment_receipt(path: Path, payload: dict) -> None:
+    path.write_text(
+        "# v0.3.5 Private Deployment Receipt\n\n"
+        "<!-- receipt-json:start -->\n"
+        + json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+        + "\n<!-- receipt-json:end -->\n",
+        encoding="utf-8",
+    )
+
+
+def deployment_receipt_contract(path: Path) -> dict:
+    return {
+        "path": path.name,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "candidate_source_sha": "7f38d6ec0fe4ba203dc0c7a2feadc691b4a02ae9",
+        "space_revision_sha": "c441bd6e2d62705cb8cf7093e3de681320545fbc",
+        "date": "2026-08-30",
+    }
+
+
+def test_deployment_receipt_verifier_proves_private_free_candidate(tmp_path):
+    path = tmp_path / "receipt.md"
+    write_deployment_receipt(path, deployment_receipt_payload())
+
+    assert release_module()._verify_deployment_receipt(
+        tmp_path,
+        deployment_receipt_contract(path),
+    ) == {
+        "candidate_source_sha": "7f38d6ec0fe4ba203dc0c7a2feadc691b4a02ae9",
+        "space_revision_sha": "c441bd6e2d62705cb8cf7093e3de681320545fbc",
+        "visibility": "private",
+        "hardware": "cpu-basic",
+        "collection_base": "labor_laws_20260830_3ec5ade",
+        "fixed_points": 481,
+        "structure_points": 884,
+        "provider_requests": 0,
+        "local_qdrant_probe": False,
+    }
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("candidate_source_sha", "0" * 40),
+        ("space_revision_sha", "1" * 40),
+        ("visibility", "public"),
+        ("hardware", "t4-small"),
+        ("collection_base", "labor_laws"),
+        ("replicas", 2),
+    ],
+)
+def test_deployment_receipt_verifier_rejects_tampering(tmp_path, field, value):
+    payload = deployment_receipt_payload()
+    payload[field] = value
+    path = tmp_path / "receipt.md"
+    write_deployment_receipt(path, payload)
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="deployment receipt",
+    ):
+        release_module()._verify_deployment_receipt(
+            tmp_path,
+            deployment_receipt_contract(path),
+        )
 
 
 def test_design_does_not_expand_observed_corpus_scale():

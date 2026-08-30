@@ -222,6 +222,15 @@
       }
     ]
   },
+  "deployment": {
+    "receipt": {
+      "path": "docs/release/V035_DEPLOYMENT_RECEIPT.md",
+      "sha256": "54e4eac29719896618c90462b9e94b3591b149006dd833e00fb107e25ce228a0",
+      "candidate_source_sha": "7f38d6ec0fe4ba203dc0c7a2feadc691b4a02ae9",
+      "space_revision_sha": "c441bd6e2d62705cb8cf7093e3de681320545fbc",
+      "date": "2026-08-30"
+    }
+  },
   "publication": {
     "allowlist": "release/public-files.txt",
     "tracked_excluded": [],
