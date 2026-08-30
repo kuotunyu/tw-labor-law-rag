@@ -51,6 +51,7 @@ eval/official/ablation_results.json
 eval/official/ablation_trace.jsonl
 eval/official/e2e_results.json
 eval/official/e2e_trace.jsonl
+eval/official/portfolio_demo_v0.3.5.json
 eval/official/provider_crosscheck_results.json
 eval/official/provider_crosscheck_trace.jsonl
 eval/official/reliability_formal_trace.jsonl

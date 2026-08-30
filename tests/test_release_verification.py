@@ -94,6 +94,120 @@ def release_module():
     return importlib.import_module("rag.release_verification")
 
 
+def write_portfolio_demo_fixture(root: Path) -> dict:
+    from rag.portfolio_demo_regression import (
+        build_artifact,
+        build_result,
+        load_cases,
+    )
+
+    dataset_relative = "eval/dataset/portfolio_demo_v0.3.5.jsonl"
+    snapshot_relative = "release/corpus_snapshot.json"
+    results_relative = "eval/official/portfolio_demo_v0.3.5.json"
+    dataset_path = root / dataset_relative
+    snapshot_path = root / snapshot_relative
+    dataset_path.parent.mkdir(parents=True, exist_ok=True)
+    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+    dataset_path.write_bytes((PROJECT_ROOT / dataset_relative).read_bytes())
+    snapshot_path.write_bytes((PROJECT_ROOT / snapshot_relative).read_bytes())
+    cases = load_cases(dataset_path)
+    results = [
+        build_result(
+            case,
+            retrieved=[
+                (source["law"], source["article"], rank)
+                for rank, source in enumerate(case.sources, 1)
+            ],
+            applied_routes=list(case.required_routes),
+            threshold_refused=case.expect_threshold_refusal,
+            top_score=0.0 if case.expect_threshold_refusal else 0.5,
+        )
+        for case in cases
+    ]
+    configuration = {"chunking": "structure", "retrieval": "hybrid"}
+    artifact = build_artifact(
+        dataset_path=dataset_path,
+        snapshot_path=snapshot_path,
+        code_revision="b" * 40,
+        configuration=configuration,
+        results=results,
+    )
+    results_path = root / results_relative
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    results_path.write_text(
+        json.dumps(artifact, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "dataset": {
+            "path": dataset_relative,
+            "sha256": hashlib.sha256(dataset_path.read_bytes()).hexdigest(),
+            "questions": 10,
+            "answerable": 6,
+            "unanswerable": 4,
+        },
+        "results_path": results_relative,
+        "results_sha256": hashlib.sha256(results_path.read_bytes()).hexdigest(),
+        "corpus_snapshot": {
+            "path": snapshot_relative,
+            "sha256": hashlib.sha256(snapshot_path.read_bytes()).hexdigest(),
+        },
+        "code_revision": "b" * 40,
+        "configuration": configuration,
+        "summary": artifact["summary"],
+    }
+
+
+def test_portfolio_demo_verifier_recomputes_content_free_evidence(tmp_path):
+    module = release_module()
+    contract = write_portfolio_demo_fixture(tmp_path)
+
+    assert module._verify_portfolio_demo_evidence(tmp_path, contract) == {
+        "total": 10,
+        "answerable": 6,
+        "unanswerable": 4,
+        "source_recall_at_5": 1.0,
+        "answerable_pass_rate": 1.0,
+        "threshold_refusal_accuracy": 1.0,
+        "route_accuracy": 1.0,
+        "passed": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    ["rank", "refusal", "qid", "dataset_hash", "snapshot_hash", "summary"],
+)
+def test_portfolio_demo_verifier_rejects_tampering(tmp_path, tamper):
+    module = release_module()
+    contract = write_portfolio_demo_fixture(tmp_path)
+    result_path = tmp_path / contract["results_path"]
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    if tamper == "rank":
+        result["cases"][0]["source_ranks"]["勞動基準法|第 30 條"] = 6
+    elif tamper == "refusal":
+        result["cases"][8]["threshold_refused"] = False
+    elif tamper == "qid":
+        result["cases"][0]["qid"] = "portfolio-999"
+    elif tamper == "dataset_hash":
+        contract["dataset"]["sha256"] = "0" * 64
+    elif tamper == "snapshot_hash":
+        contract["corpus_snapshot"]["sha256"] = "0" * 64
+    elif tamper == "summary":
+        result["summary"]["route_accuracy"] = 0.9
+    if tamper in {"rank", "refusal", "qid", "summary"}:
+        result_path.write_text(
+            json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        contract["results_sha256"] = hashlib.sha256(
+            result_path.read_bytes()
+        ).hexdigest()
+
+    with pytest.raises(module.ReleaseVerificationError, match="portfolio"):
+        module._verify_portfolio_demo_evidence(tmp_path, contract)
+
+
 def public_paths() -> set[str]:
     return {
         line.strip().replace("\\", "/")
@@ -885,7 +999,7 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
-    assert report["publication"]["files"] == 162
+    assert report["publication"]["files"] == 163
     expected_history = len(
         {
             line

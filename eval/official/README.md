@@ -12,6 +12,13 @@
 - `reliability_results.json`：60 題可靠性壓力集的 Hit@5、MRR、延遲、拒答門檻掃描，以及既有 40 題正式集 guard 結果。
 - `reliability_trace.jsonl`：60 筆只含 qid、answerable、rank、top score、threshold decision 與 latency 的隱私精簡 trace；不含問題文字、檢索內容或模型輸出。
 - `reliability_formal_trace.jsonl`：40 筆正式 guard 的同格式隱私精簡 trace，供 verifier 獨立重算 guard 指標與 Pareto 決策。
+- `portfolio_demo_v0.3.5.json`：10 題履歷／面試展示路徑的 content-free 離線檢索邊界證據；不含問題、答案、法條內文或 provider 請求。
+
+## v0.3.5 compact portfolio regression
+
+10 題包含 6 題可回答案例與 4 題知識邊界案例。在不建立 LLM、不呼叫 provider、不連線 Qdrant Cloud 的情況下，可回答題必要法源 Hit@5 `1.0`、可回答邊界通過率 `1.0`、定向路由契約 `1.0`、檢索階段決策契約 `1.0`。兩題明確跨領域問題在 `0.03` threshold 下停止；「現行最低工資金額」與「失業給付」和庫內法規語意相近，因此正確通過檢索層、留給後段引用完整性規則判斷。
+
+此 artifact 對後兩題只證明「未被檢索層誤停」，並不宣稱已執行或驗證 LLM 拒答；每題均固定 `generation_called=false`。它是快速展示用 regression，不取代 40 題 formal baseline、60 題 reliability stress suite 或 archived provider evidence。`release/manifest.json` 綁定 dataset、snapshot、result、model revisions、runtime config 與精確彙總；release verifier 會重算每題排名、路由與邊界算術。
 
 ## v0.3.2 provider safety cross-check
 
@@ -42,7 +49,7 @@ uv run python scripts/verify_release.py
 uv run pytest tests/test_official_artifacts.py tests/test_release_verification.py -q
 ```
 
-這條路徑不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,並會核對 canonical dataset hash、40/30/10 組成、60 題壓力集、8×40 grid、全部彙總算術、15 部／884 條 snapshot、provider complete contract、strict trace fields 與 privacy/secret patterns。
+這條路徑不載入模型、不呼叫 provider、不啟動 Qdrant/Docker,並會核對 canonical dataset hash、40/30/10 組成、60 題壓力集、10 題 compact portfolio regression、8×40 grid、全部彙總算術、15 部／884 條 snapshot、provider complete contract、strict trace fields 與 privacy/secret patterns。
 
 ## 從 retained private raw runs 重新匯出
 

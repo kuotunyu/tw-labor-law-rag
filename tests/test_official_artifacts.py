@@ -17,6 +17,7 @@ STRESS_DATASET = PROJECT_ROOT / "eval" / "dataset" / "reliability_stress_v0.3.1.
 WAGE_ARREARS_DATASET = (
     PROJECT_ROOT / "eval" / "dataset" / "wage_arrears_regression_v0.3.4.jsonl"
 )
+PORTFOLIO_DATASET = PROJECT_ROOT / "eval/dataset/portfolio_demo_v0.3.5.jsonl"
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -189,6 +190,47 @@ def test_official_wage_arrears_regression_is_complete_and_content_free():
     )
 
 
+def test_official_portfolio_regression_is_complete_and_content_free():
+    dataset = read_jsonl(PORTFOLIO_DATASET)
+    result_path = OFFICIAL / "portfolio_demo_v0.3.5.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+
+    assert result["schema_version"] == "1.0"
+    assert result["dataset"]["questions"] == 10
+    assert [case["qid"] for case in result["cases"]] == [
+        row["qid"] for row in dataset
+    ]
+    assert result["summary"]["total"] == 10
+    assert result["summary"]["answerable"] == 6
+    assert result["summary"]["unanswerable"] == 4
+    assert result["summary"]["source_recall_at_5"] == 1.0
+    assert result["summary"]["answerable_pass_rate"] == 1.0
+    assert result["summary"]["threshold_refusal_accuracy"] == 1.0
+    assert result["summary"]["route_accuracy"] == 1.0
+    assert result["summary"]["passed"] is True
+    assert all(case["generation_called"] is False for case in result["cases"])
+    unanswerable = [case for case in result["cases"] if not case["answerable"]]
+    assert sum(case["expected_refusal_stage"] == "threshold" for case in unanswerable) == 2
+    assert sum(case["expected_refusal_stage"] == "llm" for case in unanswerable) == 2
+    assert all(
+        case["generation_allowed"] is (case["expected_refusal_stage"] == "llm")
+        for case in unanswerable
+    )
+    serialized = result_path.read_text(encoding="utf-8")
+    for prohibited in (
+        '"answer"',
+        '"content"',
+        '"prompt"',
+        '"api_key"',
+        '"endpoint"',
+    ):
+        assert prohibited not in serialized.casefold()
+    assert not re.search(
+        r"(?i)(?:(?<![A-Za-z0-9])[A-Z]:[\\/]|(?<![:/])/(?:Users|home)/)",
+        serialized,
+    )
+
+
 def test_official_artifacts_have_no_local_paths_or_secret_fields():
     combined = "\n".join(
         path.read_text(encoding="utf-8")
@@ -211,6 +253,7 @@ def test_official_artifacts_have_no_local_paths_or_secret_fields():
         "reliability_formal_trace.jsonl",
         "provider_crosscheck_results.json",
         "provider_crosscheck_trace.jsonl",
+        "portfolio_demo_v0.3.5.json",
         "wage_arrears_regression_v0.3.4.json",
     ],
 )

@@ -17,6 +17,7 @@
 | 誤拒率(30 題可答問題) | 1/30(見失敗案例 1) |
 | v0.3.1 壓力集 Hit@5 / MRR@10 | **0.950 / 0.908** |
 | v0.3.1 門檻直接誤拒 / 不可答直接攔截 | **1/40 / 17/20** |
+| v0.3.5 compact portfolio regression | **6/6 可答來源契約、10/10 檢索邊界契約** |
 
 ## 評估集設計
 
@@ -50,6 +51,22 @@
 | v0.1.0 formal guard（30 可答／10 不可答） | 0.967 | 0.906 | 0/30 | 9/10 |
 
 門檻 sweep 為 0、0.005、0.01、0.02、0.03、0.04、0.05、0.1。沒有候選能在 stress 與 formal guard 的直接誤拒率及不可答攔截率上同時全面不劣、且至少改善一項，因此結果是 `retain_0.03`，沒有自動改 production config。壓力集的 1/40 直接誤拒確認舊有口語問法風險是真實邊界，但 60 題仍不足以估計自然流量發生率。
+
+## v0.3.5 compact portfolio regression
+
+`eval/dataset/portfolio_demo_v0.3.5.jsonl` 策展 10 題可在 3–5 分鐘面試中說清楚的代表性路徑：6 題可回答題覆蓋工時、請假、特別休假、資遣費與欠薪路由；4 題不可答題覆蓋時效性與知識庫邊界。正式離線 run 重建 15 部法規的 local Qdrant 索引，使用 pinned BGE-M3 與 reranker，不建立 LLM、不呼叫 provider、不連線 Qdrant Cloud。
+
+| 契約 | 結果 |
+|---|---:|
+| 必要法源 Hit@5 | 6/6 案例全數通過（source recall `1.0`） |
+| 可回答邊界 | 6/6（`1.0`） |
+| 定向／禁止路由 | 10/10（`1.0`） |
+| 檢索階段決策 | 10/10（`1.0`） |
+| provider 呼叫 | 0（每題 `generation_called=false`） |
+
+不可答案例中，著作權與公司資本額在 `0.03` 門檻下直接停止。現行最低工資金額與失業給付和庫內法規語意接近，實測分數足以通過門檻，因此應留給後段引用完整性規則，不應為了讓 compact regression 全綠而拉高全域門檻。既有 60 題壓力證據有一題可回答案例僅 `0.0369`，證明這類門檻變更會導致真實誤拒。
+
+此 regression 只聲明已觀察的 retrieval/routing/boundary 行為；後兩題的 final LLM refusal 並未在這個離線 artifact 中執行或評分。它不取代 40 題 formal baseline、60 題 reliability suite 或 archived provider judgments。
 
 ## v0.3.2 provider safety cross-check
 
