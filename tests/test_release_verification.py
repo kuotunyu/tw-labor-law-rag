@@ -885,7 +885,7 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
-    assert report["publication"]["files"] == 146
+    assert report["publication"]["files"] == 154
     expected_history = len(
         {
             line
@@ -1027,17 +1027,20 @@ def test_readme_first_screen_links_english_and_ci():
     assert "actions/workflows/ci.yml/badge.svg?branch=main" in first_screen
 
 
-def test_readmes_link_the_live_demo_without_stale_private_status():
+def test_readmes_present_the_private_demo_and_reviewer_paths_truthfully():
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (PROJECT_ROOT / "README.en.md").read_text(encoding="utf-8")
     live_url = "https://steven0226-tw-labor-law-rag-demo.hf.space"
 
-    assert live_url in readme
-    assert live_url in readme_en
-    assert "尚未公開" not in readme
-    assert "not public yet" not in readme_en
-    assert "bm25_*.pkl" not in readme
-    assert "bm25_*.pkl" not in readme_en
+    for content in (readme, readme_en):
+        assert "V035_REVIEWER_TOUR.md" in content
+        assert "V035_INTERVIEW_DEMO.md" in content
+        assert "2026-08-29" in content
+        assert "private Space" in content
+        assert live_url not in content
+        assert "bm25_*.pkl" not in content
+    assert "公開 BYOK Docker Space（已上線）" not in readme
+    assert "Public BYOK Docker Space (live)" not in readme_en
 
 
 def test_full_corpus_snapshot_verifier_proves_all_15_laws_and_article_arithmetic():
