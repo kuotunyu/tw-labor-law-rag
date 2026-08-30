@@ -26,6 +26,7 @@ _SEVERANCE_LEGAL_TERMS = "資遣費 勞工退休金條例 勞動基準法 工作
 _OLD_REGIME_SEVERANCE_RERANK_VIEW = (
     "勞基法舊制 資遣費 每滿一年 一個月平均工資 未滿一年 比例計給"
 )
+_MAX_CANDIDATE_POOL = 20
 _WAGE_NONPAYMENT_CUES = (
     "欠薪",
     "沒發薪",
@@ -137,6 +138,10 @@ class RetrievalPipeline:
         top_k_retrieve: int,
         top_k_final: int,
     ):
+        if top_k_retrieve > _MAX_CANDIDATE_POOL:
+            raise ValueError(
+                f"top_k_retrieve must not exceed {_MAX_CANDIDATE_POOL} candidates"
+            )
         self.retriever = retriever
         self.reranker = reranker
         self.top_k_retrieve = top_k_retrieve
@@ -145,6 +150,10 @@ class RetrievalPipeline:
     def run(self, query: str) -> RetrievalResult:
         plan = plan_retrieval_query(query)
         candidates = self.retriever.retrieve(plan.search_query, top_k=self.top_k_retrieve)
+        if len(candidates) > _MAX_CANDIDATE_POOL:
+            raise ValueError(
+                f"candidate pool must not exceed {_MAX_CANDIDATE_POOL} candidates"
+            )
         if self.reranker is not None and candidates:
             if plan.rerank_only_views:
                 primary_ranking = self.reranker.rerank_all(

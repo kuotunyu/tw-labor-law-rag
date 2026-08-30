@@ -1,3 +1,7 @@
+import hashlib
+import json
+from pathlib import Path
+
 import pytest
 
 from rag.models import RetrievedChunk
@@ -340,90 +344,182 @@ def test_pipeline_empty_candidates_makes_no_reranker_call():
     assert [call[0] for call in calls] == ["retrieve"]
 
 
-_CACHED_SEVERANCE_CASES = (
-    (
-        "severance-policy-010",
-        "公司開的 termination package 要怎麼計算？我同時有勞退新制和勞基法舊制年資？",
-    ),
-    (
-        "severance-policy-014",
-        "勞退新制＋勞基法舊制：被資遣時，年資、平均工資、最高上限如何計算？",
-    ),
-    (
-        "severance-policy-015",
-        "我想校對資遣費試算：勞退新制與勞基法舊制年資都存在時，公式有何差異？",
-    ),
+def test_pipeline_allows_exactly_twenty_candidates_for_each_exact_route_rerank():
+    question = "請比較勞退新制與勞基法舊制的資遣費計算公式、工作年資及最高上限。"
+    candidates = [hit(f"candidate-{index}") for index in range(20)]
+    calls = []
+
+    class TwentyCandidateRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(("retrieve", query, top_k))
+            return candidates
+
+    class CountingReranker:
+        def rerank_all(self, query, received_candidates):
+            calls.append(("rerank", query, len(received_candidates)))
+            return received_candidates
+
+    result = RetrievalPipeline(
+        TwentyCandidateRetriever(),
+        reranker=CountingReranker(),
+        top_k_retrieve=20,
+        top_k_final=5,
+    ).run(question)
+
+    assert len(result.hits) == 5
+    assert [call[0] for call in calls] == ["retrieve", "rerank", "rerank"]
+    assert [call[2] for call in calls[1:]] == [20, 20]
+
+
+def test_pipeline_rejects_an_over_twenty_candidate_configuration_before_retrieval():
+    calls = []
+
+    class NeverCalledRetriever:
+        def retrieve(self, *_args, **_kwargs):
+            calls.append("retrieve")
+            return []
+
+    with pytest.raises(ValueError, match="top_k_retrieve.*20"):
+        RetrievalPipeline(
+            NeverCalledRetriever(), reranker=None, top_k_retrieve=21, top_k_final=5
+        )
+
+    assert calls == []
+
+
+def test_pipeline_rejects_a_retriever_pool_over_twenty_before_reranking():
+    calls = []
+    candidates = [hit(f"candidate-{index}") for index in range(21)]
+
+    class OversizedRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(("retrieve", query, top_k))
+            return candidates
+
+    class NeverCalledReranker:
+        def rerank_all(self, *_args, **_kwargs):
+            calls.append(("rerank_all",))
+            return candidates
+
+        def rerank(self, *_args, **_kwargs):
+            calls.append(("rerank",))
+            return candidates
+
+    pipeline = RetrievalPipeline(
+        OversizedRetriever(),
+        reranker=NeverCalledReranker(),
+        top_k_retrieve=20,
+        top_k_final=5,
+    )
+
+    with pytest.raises(ValueError, match="candidate pool.*20"):
+        pipeline.run("請比較勞退新制與勞基法舊制的資遣費計算公式、工作年資及最高上限。")
+
+    assert [call[0] for call in calls] == ["retrieve"]
+
+
+_STAGE_REPLAY_PATH = (
+    Path(__file__).parent / "fixtures" / "v036_severance_retrieval_stage_replay.json"
 )
+_STAGE_REPLAY = json.loads(_STAGE_REPLAY_PATH.read_text(encoding="utf-8"))
 
 
-def _cached_authority(chunk_id, law, article):
+def _replay_authority(chunk_id, authority_chunk_ids):
+    if chunk_id == authority_chunk_ids["new"]:
+        law, article = "勞工退休金條例", "第 12 條"
+    elif chunk_id == authority_chunk_ids["old"]:
+        law, article = "勞動基準法", "第 17 條"
+    else:
+        law, article = "fixture", ""
     return RetrievedChunk(
         score=1.0,
         payload={
             "chunk_id": chunk_id,
-            "text": f"cached {chunk_id}",
+            "text": "offline stage replay chunk",
             "doc_title": law,
-            "articles": [article],
+            "articles": [article] if article else [],
         },
     )
 
 
-def _authority_stage_ranks(hits):
-    ranks = {}
-    for rank, item in enumerate(hits, start=1):
-        key = (item.payload.get("doc_title"), tuple(item.payload.get("articles", [])))
-        ranks.setdefault(key, rank)
-    return ranks
+def _ranks_for_authorities(items, authority_chunk_ids):
+    ids = [item.payload["chunk_id"] for item in items]
+    return {
+        authority: ids.index(chunk_id) + 1
+        for authority, chunk_id in authority_chunk_ids.items()
+    }
 
 
-@pytest.mark.parametrize(("qid", "question"), _CACHED_SEVERANCE_CASES)
-def test_pipeline_cached_severance_cases_keep_both_authorities_in_top_five(qid, question):
-    new_regime = _cached_authority("cached-new", "勞工退休金條例", "第 12 條")
-    old_regime = _cached_authority("cached-old", "勞動基準法", "第 17 條")
-    noise = [hit(f"cached-noise-{index}") for index in range(4)]
-    candidates = [new_regime, *noise, old_regime]
+@pytest.mark.parametrize("case", _STAGE_REPLAY["cases"], ids=lambda case: case["qid"])
+def test_pipeline_replays_provenance_bound_severance_stage_evidence(case):
+    provenance = _STAGE_REPLAY["provenance"]
+    dataset = Path(__file__).parents[1] / provenance["current_dataset"]
+    source_artifact = Path(__file__).parents[1] / provenance["source_artifact"]
+    assert hashlib.sha256(dataset.read_bytes()).hexdigest() == provenance[
+        "current_dataset_sha256"
+    ]
+    assert hashlib.sha256(source_artifact.read_bytes()).hexdigest() == provenance[
+        "source_artifact_sha256"
+    ]
+    assert _STAGE_REPLAY["fixture_kind"] == "deterministic_stage_replay"
+    assert _STAGE_REPLAY["purpose"].startswith("Offline pipeline integration")
+
+    questions = {
+        json.loads(line)["qid"]: json.loads(line)["question"]
+        for line in dataset.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+    question = questions[case["qid"]]
+    candidates = [
+        _replay_authority(chunk_id, case["authority_chunk_ids"])
+        for chunk_id in case["candidate_pool"]
+    ]
+    by_id = {item.payload["chunk_id"]: item for item in candidates}
     primary = [
-        RetrievedChunk(score=0.91 - index / 100, payload=item.payload)
-        for index, item in enumerate(candidates)
+        RetrievedChunk(score=1.0 - index / 100, payload=by_id[chunk_id].payload)
+        for index, chunk_id in enumerate(case["primary_ranking"])
     ]
     secondary = [
-        RetrievedChunk(score=0.80 - index / 100, payload=item.payload)
-        for index, item in enumerate([old_regime, new_regime, *noise])
+        RetrievedChunk(score=0.5 - index / 100, payload=by_id[chunk_id].payload)
+        for index, chunk_id in enumerate(case["secondary_ranking"])
     ]
     calls = []
 
-    class CachedRetriever:
+    class ReplayRetriever:
         def retrieve(self, query, top_k):
             calls.append(("retrieve", query, top_k))
             return candidates[:top_k]
 
-    class CachedReranker:
+    class ReplayReranker:
         def rerank_all(self, query, received_candidates):
             calls.append(("rerank", query, len(received_candidates)))
             assert received_candidates == candidates
             return primary if query == plan_retrieval_query(question).search_query else secondary
 
     result = RetrievalPipeline(
-        CachedRetriever(), CachedReranker(), top_k_retrieve=20, top_k_final=5
+        ReplayRetriever(), ReplayReranker(), top_k_retrieve=20, top_k_final=5
     ).run(question)
 
     stage_ranks = {
-        "candidate_pool": _authority_stage_ranks(result.candidates),
-        "final_top_five": _authority_stage_ranks(result.hits),
-    }
-    required_authorities = {
-        ("勞工退休金條例", ("第 12 條",)),
-        ("勞動基準法", ("第 17 條",)),
+        "candidate_pool": _ranks_for_authorities(
+            result.candidates, case["authority_chunk_ids"]
+        ),
+        "primary_ranking": _ranks_for_authorities(
+            primary, case["authority_chunk_ids"]
+        ),
+        "secondary_ranking": _ranks_for_authorities(
+            secondary, case["authority_chunk_ids"]
+        ),
+        "final_top_five": _ranks_for_authorities(
+            result.hits, case["authority_chunk_ids"]
+        ),
     }
 
-    assert qid not in " ".join(call[1] for call in calls)
+    assert case["qid"] not in " ".join(call[1] for call in calls)
     assert "第 12 條" not in " ".join(call[1] for call in calls)
     assert "第 17 條" not in " ".join(call[1] for call in calls)
-    assert stage_ranks["candidate_pool"][("勞動基準法", ("第 17 條",))] == 6
-    assert all(
-        stage_ranks["final_top_five"][authority] <= 5
-        for authority in required_authorities
-    )
+    assert stage_ranks == case["expected_stage_ranks"]
+    assert all(rank <= 5 for rank in stage_ranks["final_top_five"].values())
     assert calls[0][0] == "retrieve"
     assert [call[0] for call in calls[1:]] == ["rerank", "rerank"]
     assert all(call[2] <= 20 for call in calls[1:])
