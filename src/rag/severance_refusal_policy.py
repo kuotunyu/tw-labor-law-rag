@@ -30,13 +30,20 @@ _DATASET_FIELDS = {
     "expect_generation",
     "style_tags",
 }
-_OBSERVATION_FIELDS = {"qid", "source_ranks", "applied_routes", "top_score"}
+_OBSERVATION_FIELDS = {
+    "qid",
+    "source_ranks",
+    "applied_routes",
+    "hit_count",
+    "top_score",
+}
 _CASE_RESULT_FIELDS = {
     "qid",
     "case_type",
     "answerable",
     "source_ranks",
     "applied_routes",
+    "hit_count",
     "top_score",
     "effective_threshold",
     "refused",
@@ -80,6 +87,7 @@ _PROVENANCE_FIELDS = {
     "reranker_model",
     "reranker_revision",
     "retrieval_configuration",
+    "execution_device",
     "code_revision",
     "run_origin",
     "provider_adapters",
@@ -96,6 +104,7 @@ _RETRIEVAL_CONFIGURATION = {
     "reranker": True,
     "top_k_retrieve": 20,
     "top_k_final": _TOP_K_FINAL,
+    "rrf_k": 60,
 }
 _EMBEDDING_MODEL = "BAAI/bge-m3"
 _EMBEDDING_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
@@ -484,6 +493,7 @@ def build_case_observation(
     source_ranks: dict[str, int],
     applied_routes: tuple[str, ...],
     top_score: float,
+    hit_count: int,
 ) -> dict[str, Any]:
     """Return one validated content-free retrieval observation."""
 
@@ -494,11 +504,27 @@ def build_case_observation(
         source_ranks, qid=case.qid, allowed=contract.source_keys
     )
     routes = _routes(applied_routes, field="applied_routes", require_tuple=True)
+    if type(hit_count) is not int or not 0 <= hit_count <= _TOP_K_FINAL:
+        raise ValueError(
+            f"{case.qid}: hit_count must be between zero and {_TOP_K_FINAL}"
+        )
+    score = _unit_interval(top_score, field="top_score")
+    if hit_count == 0 and (ranks or score != 0.0):
+        raise ValueError(
+            f"{case.qid}: zero-hit observation requires no ranks and zero score"
+        )
+    if hit_count > 0 and score == 0.0:
+        raise ValueError(
+            f"{case.qid}: positive hit_count requires a positive score"
+        )
+    if any(rank > hit_count for rank in ranks.values()):
+        raise ValueError(f"{case.qid}: source rank must not exceed hit_count")
     return {
         "qid": case.qid,
         "source_ranks": ranks,
         "applied_routes": list(routes),
-        "top_score": _unit_interval(top_score, field="top_score"),
+        "hit_count": hit_count,
+        "top_score": score,
     }
 
 
@@ -528,9 +554,27 @@ def _validated_observations(observations: object) -> list[dict[str, Any]]:
                         require_tuple=False,
                     )
                 ),
+                "hit_count": row["hit_count"],
                 "top_score": _unit_interval(row["top_score"], field="top_score"),
             }
         )
+        hit_count = normalized[-1]["hit_count"]
+        if type(hit_count) is not int or not 0 <= hit_count <= _TOP_K_FINAL:
+            raise ValueError(
+                f"{qid}: hit_count must be between zero and {_TOP_K_FINAL}"
+            )
+        if hit_count == 0 and (
+            normalized[-1]["source_ranks"] or normalized[-1]["top_score"] != 0.0
+        ):
+            raise ValueError(
+                f"{qid}: zero-hit observation requires no ranks and zero score"
+            )
+        if hit_count > 0 and normalized[-1]["top_score"] == 0.0:
+            raise ValueError(f"{qid}: positive hit_count requires a positive score")
+        if any(
+            rank > hit_count for rank in normalized[-1]["source_ranks"].values()
+        ):
+            raise ValueError(f"{qid}: source rank must not exceed hit_count")
     return normalized
 
 
@@ -655,7 +699,7 @@ def _evaluate_target(
             set(contract.prohibited_routes) & applied_routes
         )
         decision = _decision(
-            has_hits=True,
+            has_hits=row["hit_count"] > 0,
             routes=row["applied_routes"],
             score=row["top_score"],
             candidate=candidate,
@@ -673,6 +717,7 @@ def _evaluate_target(
                 "answerable": contract.answerable,
                 "source_ranks": dict(row["source_ranks"]),
                 "applied_routes": list(row["applied_routes"]),
+                "hit_count": row["hit_count"],
                 "top_score": row["top_score"],
                 "effective_threshold": decision.effective_threshold,
                 "refused": decision.refused,
@@ -837,6 +882,7 @@ def _observations_from_case_results(cases: object) -> list[dict[str, Any]]:
                 "qid": row["qid"],
                 "source_ranks": row["source_ranks"],
                 "applied_routes": row["applied_routes"],
+                "hit_count": row["hit_count"],
                 "top_score": row["top_score"],
             }
         )
@@ -984,6 +1030,9 @@ def _validated_provenance(provenance: object) -> dict[str, Any]:
         raise ValueError("retrieval_configuration must equal the approved primitives")
     if provenance["run_origin"] != _RUN_ORIGIN:
         raise ValueError("run_origin must equal fresh_offline_retrieval")
+    execution_device = provenance["execution_device"]
+    if execution_device not in {"cpu", "cuda"}:
+        raise ValueError("execution_device must be the resolved cpu or cuda value")
     for field in ("provider_adapters", "provider_requests"):
         if type(provenance[field]) is not int or provenance[field] != 0:
             raise ValueError(f"{field} must be zero")
@@ -999,6 +1048,7 @@ def _validated_provenance(provenance: object) -> dict[str, Any]:
         "source_artifact_sha256": normalized_hashes,
         **exact_strings,
         "retrieval_configuration": dict(_RETRIEVAL_CONFIGURATION),
+        "execution_device": execution_device,
         "code_revision": _hex(
             provenance["code_revision"], field="code_revision", length=40
         ),
@@ -1018,6 +1068,13 @@ _PUBLIC_KEYS = {
     "guard_evidence_binding_sha256",
     "candidates",
     "cases",
+    "evidence_class",
+    "outcome",
+    "official_export_allowed",
+    "expected_threshold",
+    "target_observations",
+    "failed_gates",
+    "gates",
     "candidate_threshold",
     "target",
     "stress",
@@ -1060,10 +1117,18 @@ _PUBLIC_KEYS = {
     *_CANONICAL_SOURCE_KEYS,
 }
 _PUBLIC_STRINGS = {
+    "1.0",
     "1.2",
+    "non_release_no_go",
+    "no_go",
+    "target",
+    "stress",
+    "formal",
+    "selection",
     "positive",
     "collision_negative",
     "threshold",
+    "no_hits",
     "structure",
     "hybrid",
     _EMBEDDING_MODEL,
@@ -1071,6 +1136,8 @@ _PUBLIC_STRINGS = {
     _RERANKER_MODEL,
     _RERANKER_REVISION,
     _RUN_ORIGIN,
+    "cpu",
+    "cuda",
     *EXPECTED_QIDS,
     *_STRESS_QIDS,
     *_FORMAL_QIDS,
@@ -1137,7 +1204,11 @@ def build_official_artifact(
             "source_ranks": dict(row["source_ranks"]),
             "applied_routes": list(row["applied_routes"]),
             "top_score": round(row["top_score"], 6),
-            "effective_threshold": round(row["effective_threshold"], 6),
+            "effective_threshold": (
+                round(row["effective_threshold"], 6)
+                if row["effective_threshold"] is not None
+                else None
+            ),
         }
         for row in selected["cases"]
     ]
@@ -1164,3 +1235,147 @@ def build_official_artifact(
     }
     _validate_public_tree(artifact)
     return artifact
+
+
+_NO_GO_FIELDS = {
+    "schema_version",
+    "evidence_class",
+    "outcome",
+    "official_export_allowed",
+    "expected_threshold",
+    "selected_threshold",
+    "provenance",
+    "candidate_thresholds",
+    "global_threshold",
+    "target_observations",
+    "guard_evidence",
+    "candidates",
+    "failed_gates",
+}
+
+
+def _guard_inputs(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            key: row[key]
+            for key in _GUARD_INPUT_FIELDS
+        }
+        for row in rows
+    ]
+
+
+def _candidate_summaries(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "candidate_threshold": result["candidate_threshold"],
+            "target": dict(result["target"]),
+            "stress": dict(result["stress"]),
+            "formal": dict(result["formal"]),
+            "passed": result["passed"],
+        }
+        for result in candidates
+    ]
+
+
+def build_no_go_evidence(
+    *,
+    observations: list[dict[str, Any]],
+    candidate_results: list[dict[str, Any]],
+    provenance: dict[str, Any],
+    expected_threshold: float,
+) -> dict[str, Any]:
+    """Build deterministic, replayable evidence for a non-release NO-GO."""
+
+    target_evidence = _validated_observations(observations)
+    candidates = _validated_candidate_results(candidate_results)
+    if _observations_from_case_results(candidates[0]["cases"]) != target_evidence:
+        raise ValueError("candidate target evidence does not match observations")
+    expected = _unit_interval(expected_threshold, field="expected_threshold")
+    if expected != 0.015:
+        raise ValueError("expected_threshold must equal the approved 0.015")
+    passing = [
+        result["candidate_threshold"] for result in candidates if result["passed"]
+    ]
+    selected = max(passing) if passing else None
+    if selected == expected:
+        raise ValueError("passing expected threshold requires the official artifact")
+    normalized_provenance = _validated_provenance(provenance)
+    guard_evidence = {
+        label: [dict(row) for row in candidates[0][f"{label}_evidence"]]
+        for label in ("stress", "formal")
+    }
+    failed_gates = []
+    for result in candidates:
+        gates = [
+            label
+            for label in ("target", "stress", "formal")
+            if not result[label]["passed"]
+        ]
+        if result["candidate_threshold"] == selected and selected != expected:
+            gates.append("selection")
+        if gates:
+            failed_gates.append(
+                {
+                    "candidate_threshold": result["candidate_threshold"],
+                    "gates": gates,
+                }
+            )
+    envelope = {
+        "schema_version": "1.0",
+        "evidence_class": "non_release_no_go",
+        "outcome": "no_go",
+        "official_export_allowed": False,
+        "expected_threshold": expected,
+        "selected_threshold": selected,
+        "provenance": normalized_provenance,
+        "candidate_thresholds": list(CANDIDATE_THRESHOLDS),
+        "global_threshold": candidates[0]["global_threshold"],
+        "target_observations": target_evidence,
+        "guard_evidence": guard_evidence,
+        "candidates": _candidate_summaries(candidates),
+        "failed_gates": failed_gates,
+    }
+    _validate_public_tree(envelope)
+    return envelope
+
+
+def replay_no_go_evidence(envelope: object) -> dict[str, Any]:
+    """Recompute a NO-GO envelope without retrieval or model construction."""
+
+    if not isinstance(envelope, dict) or set(envelope) != _NO_GO_FIELDS:
+        raise ValueError("NO-GO evidence fields are invalid")
+    provenance = _validated_provenance(envelope["provenance"])
+    observations = _validated_observations(envelope["target_observations"])
+    guard_evidence = envelope["guard_evidence"]
+    if not isinstance(guard_evidence, dict) or set(guard_evidence) != {
+        "stress",
+        "formal",
+    }:
+        raise ValueError("NO-GO guard evidence fields are invalid")
+    stress = _validated_guard_rows(
+        guard_evidence["stress"], label="stress", published_evidence=True
+    )
+    formal = _validated_guard_rows(
+        guard_evidence["formal"], label="formal", published_evidence=True
+    )
+    candidates = [
+        evaluate_candidate(
+            observations,
+            candidate_threshold=threshold,
+            global_threshold=envelope["global_threshold"],
+            stress_rows=_guard_inputs(stress),
+            formal_rows=_guard_inputs(formal),
+        )
+        for threshold in CANDIDATE_THRESHOLDS
+    ]
+    rebuilt = build_no_go_evidence(
+        observations=observations,
+        candidate_results=candidates,
+        provenance=provenance,
+        expected_threshold=envelope["expected_threshold"],
+    )
+    if envelope != rebuilt:
+        raise ValueError("NO-GO evidence replay mismatch")
+    return rebuilt

@@ -28,6 +28,13 @@ LLM adapter 或送出 provider request。七個候選門檻都通過 stress 與 
 但 target 都只有 `27/30`，因此沒有候選通過完整 gate，也沒有發布
 `severance_refusal_policy_v0.3.6.json` official artifact。
 
+Task 5 schema `1.2` 與 `eval/dataset/README.md` 是本次校準的現行契約，取代
+原 Task 6 brief 中重算 v0.3.1 捨入分數與 schema `1.0` 的舊文字。Stress 與
+formal guard 和 target 都由同一 fresh offline pipeline 產生，v0.3.1 公開 trace
+只作 metric baseline，從未作 decision input。完整未捨入、content-free 的 NO-GO
+證據保存在 `../diagnostics/severance_refusal_policy_v0.3.6_no_go.json`；這是可離線
+重播的 non-release diagnostic，刻意不列入 `release/public-files.txt`。
+
 失敗與候選門檻無關：`severance-policy-010` 與 `severance-policy-014` 的兩個必要
 法源只有一個進入 Top 5；`severance-policy-027` 沒有套用目標 route，但其 top
 score `0.02350945240753301` 低於維持不變的 global `0.03`，因此未符合預期的

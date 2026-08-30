@@ -188,6 +188,35 @@ def test_reranker_pins_revision_and_disables_remote_code(monkeypatch):
     assert captured["trust_remote_code"] is False
 
 
+def test_offline_reranker_resolves_snapshot_local_only(monkeypatch):
+    captured = {}
+    revision = "b" * 40
+
+    def fake_snapshot_download(**kwargs):
+        captured["snapshot"] = kwargs
+        return "immutable-bge-reranker-v2-m3-snapshot"
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "FlagEmbedding",
+        SimpleNamespace(FlagReranker=lambda *_args, **_kwargs: object()),
+    )
+    monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snapshot_download)
+    reranker = Reranker(
+        model_name="BAAI/bge-reranker-v2-m3",
+        model_revision=revision,
+        device="cpu",
+        local_files_only=True,
+    )
+
+    assert reranker.model is not None
+    assert captured["snapshot"] == {
+        "repo_id": "BAAI/bge-reranker-v2-m3",
+        "revision": revision,
+        "local_files_only": True,
+    }
+
+
 def test_model_snapshot_requires_full_commit_sha(monkeypatch):
     called = False
 

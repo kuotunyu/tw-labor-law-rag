@@ -75,10 +75,12 @@ class Reranker:
         model_name: str = "BAAI/bge-reranker-v2-m3",
         model_revision: str = DEFAULT_RERANKER_MODEL_REVISION,
         device: str = "auto",
+        local_files_only: bool = False,
     ):
         self.model_name = model_name
         self.model_revision = model_revision
         self.device = resolve_device(device)
+        self.local_files_only = local_files_only
         self._model = None
 
     @property
@@ -86,7 +88,11 @@ class Reranker:
         if self._model is None:  # lazy: avoid loading the cross-encoder until first use
             from FlagEmbedding import FlagReranker
 
-            model_path = resolve_model_snapshot(self.model_name, self.model_revision)
+            model_path = resolve_model_snapshot(
+                self.model_name,
+                self.model_revision,
+                local_files_only=self.local_files_only,
+            )
             self._model = FlagReranker(
                 model_path,
                 use_fp16=self.device.startswith("cuda"),

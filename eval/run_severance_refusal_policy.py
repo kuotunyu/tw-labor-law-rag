@@ -12,6 +12,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+if "--offline" in sys.argv[1:]:
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    os.environ["HF_HUB_OFFLINE"] = "1"
+
 try:
     from eval import _bootstrap as _eval_bootstrap
 except ModuleNotFoundError:  # Direct execution starts with eval/ as import root.
@@ -25,6 +29,7 @@ from rag.severance_refusal_policy import (  # noqa: E402
     CANDIDATE_THRESHOLDS,
     SeverancePolicyCase,
     build_case_observation,
+    build_no_go_evidence,
     build_official_artifact,
     evaluate_candidate,
     load_cases,
@@ -42,6 +47,10 @@ DEFAULT_SNAPSHOT = PROJECT_ROOT / "release/corpus_snapshot.json"
 OFFICIAL_RESULT = (
     PROJECT_ROOT / "eval/official/severance_refusal_policy_v0.3.6.json"
 )
+DIAGNOSTIC_RESULT = (
+    PROJECT_ROOT
+    / "eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json"
+)
 RUNS_DIR = PROJECT_ROOT / "eval/runs"
 
 
@@ -56,6 +65,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--snapshot", type=Path, default=DEFAULT_SNAPSHOT)
     parser.add_argument("--work-dir", type=Path)
+    parser.add_argument("--diagnostics-output", type=Path, default=DIAGNOSTIC_RESULT)
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
     parser.add_argument("--export-official", action="store_true")
@@ -106,6 +116,7 @@ def _run_target_cases(
                 source_ranks=_source_ranks(retrieval.hits, case.sources),
                 applied_routes=retrieval.applied_routes,
                 top_score=retrieval.top_score,
+                hit_count=len(retrieval.hits),
             )
         )
         print(f"[target] {index}/{len(cases)} {case.qid}", flush=True)
@@ -130,6 +141,9 @@ def _run_guard_cases(
     evidence = []
     for index, row in enumerate(rows, start=1):
         retrieval = pipeline.run(row["question"])
+        planned_routes = plan_retrieval_query(row["question"]).routes
+        if retrieval.applied_routes != planned_routes:
+            raise RuntimeError(f"route mismatch for {row['qid']}")
         evidence.append(
             {
                 "qid": row["qid"],
@@ -141,9 +155,7 @@ def _run_guard_cases(
                 ),
                 "hit_count": len(retrieval.hits),
                 "top_score": retrieval.top_score,
-                "applied_routes": list(
-                    plan_retrieval_query(row["question"]).routes
-                ),
+                "applied_routes": list(retrieval.applied_routes),
             }
         )
         print(f"[guard] {index}/{len(rows)} {row['qid']}", flush=True)
@@ -173,8 +185,11 @@ def _build_accepted_artifact(
     stress_rows: list[dict[str, Any]],
     formal_rows: list[dict[str, Any]],
     provenance: dict[str, Any],
+    candidate_results: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    candidates = _evaluate_candidates(observations, stress_rows, formal_rows)
+    candidates = candidate_results or _evaluate_candidates(
+        observations, stress_rows, formal_rows
+    )
     try:
         artifact = build_official_artifact(
             observations=observations,
@@ -226,7 +241,9 @@ def _build_provenance(
             "reranker": True,
             "top_k_retrieve": settings.top_k_retrieve,
             "top_k_final": settings.top_k_final,
+            "rrf_k": settings.rrf_k,
         },
+        "execution_device": settings.device,
         "code_revision": code_revision,
         "run_origin": "fresh_offline_retrieval",
         "provider_adapters": 0,
@@ -245,8 +262,20 @@ def _load_dataset(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _git_revision() -> str:
-    completed = subprocess.run(
+def _clean_git_revision() -> str:
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    )
+    if status.stdout:
+        raise RuntimeError(
+            "calibration requires a clean tracked and untracked tree"
+        )
+    revision = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=PROJECT_ROOT,
         capture_output=True,
@@ -254,7 +283,7 @@ def _git_revision() -> str:
         encoding="utf-8",
         check=True,
     )
-    return completed.stdout.strip()
+    return revision.stdout.strip()
 
 
 def _reliability_helpers():
@@ -276,17 +305,23 @@ def _materialize_audited_corpus(work_dir: Path, committed: dict) -> Path:
     return materialize(work_dir, committed)
 
 
-def _build_indexes(settings: Settings, corpus_dir: Path):
+def _build_indexes(
+    settings: Settings, corpus_dir: Path, *, local_files_only: bool = False
+):
     _, build_indexes = _reliability_helpers()
-    return build_indexes(settings, corpus_dir)
+    return build_indexes(
+        settings, corpus_dir, local_files_only=local_files_only
+    )
 
 
 def _build_local_pipeline(
     args: argparse.Namespace, work_dir: Path, corpus_dir: Path
 ):
     from rag.factory import build_retrieval_pipeline  # noqa: PLC0415
+    from rag.indexing.embedder import resolve_device  # noqa: PLC0415
     from rag.retrieval.reranker import Reranker  # noqa: PLC0415
 
+    execution_device = resolve_device(args.device)
     settings = Settings(
         _env_file=None,
         qdrant_mode="local",
@@ -294,17 +329,20 @@ def _build_local_pipeline(
         storage_dir=work_dir / "storage",
         data_dir=work_dir / "data",
         collection_name="severance_refusal_policy",
-        device=args.device,
+        device=execution_device,
         chunking_strategy="structure",
         retrieval_mode="hybrid",
         use_reranker=True,
     )
-    embedder, store = _build_indexes(settings, corpus_dir)
+    embedder, store = _build_indexes(
+        settings, corpus_dir, local_files_only=True
+    )
     try:
         reranker = Reranker(
             model_name=settings.reranker_model,
             model_revision=settings.reranker_model_revision,
             device=settings.device,
+            local_files_only=True,
         )
         pipeline = build_retrieval_pipeline(
             settings,
@@ -328,6 +366,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.offline:
         parser.error("--offline is required for calibration")
     _offline_preflight(args)
+    candidate_revision = _clean_git_revision()
     default_work_dir = RUNS_DIR / (
         f"{datetime.now():%Y%m%d-%H%M%S}-severance-refusal-policy"
     )
@@ -344,12 +383,40 @@ def main(argv: list[str] | None = None) -> int:
         observations = _run_target_cases(pipeline, cases)
         stress_evidence = _run_guard_cases(pipeline, stress_rows)
         formal_evidence = _run_guard_cases(pipeline, formal_rows)
-        artifact = _build_accepted_artifact(
-            observations=observations,
-            stress_rows=stress_evidence,
-            formal_rows=formal_evidence,
-            provenance=_build_provenance(args, settings, _git_revision()),
+        candidates = _evaluate_candidates(
+            observations, stress_evidence, formal_evidence
         )
+        provenance = _build_provenance(args, settings, candidate_revision)
+        try:
+            artifact = _build_accepted_artifact(
+                observations=observations,
+                stress_rows=stress_evidence,
+                formal_rows=formal_evidence,
+                provenance=provenance,
+                candidate_results=candidates,
+            )
+        except RuntimeError:
+            artifact = None
+        if artifact is None or artifact["selected_threshold"] != 0.015:
+            diagnostic = build_no_go_evidence(
+                observations=observations,
+                candidate_results=candidates,
+                provenance=provenance,
+                expected_threshold=0.015,
+            )
+            _write_public_json(args.diagnostics_output, diagnostic)
+            print(
+                json.dumps(
+                    {
+                        "outcome": "no_go",
+                        "selected_threshold": diagnostic["selected_threshold"],
+                        "failed_gates": diagnostic["failed_gates"],
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+            return 1
         _write_public_json(work_dir / "results.json", artifact)
         if args.export_official:
             _write_public_json(OFFICIAL_RESULT, artifact)

@@ -11,6 +11,9 @@ import pytest
 
 import rag.severance_refusal_policy as policy
 from eval import run_severance_refusal_policy as runner
+from rag import factory
+from rag.indexing import embedder as embedder_module
+from rag.retrieval import reranker as reranker_module
 from rag.retrieval.pipeline import plan_retrieval_query
 from rag.severance_refusal_policy import (
     build_case_observation,
@@ -85,13 +88,20 @@ SEVERANCE_SOURCE_KEYS = {
     "勞工退休金條例|第 12 條",
     "勞動基準法|第 17 條",
 }
-OBSERVATION_FIELDS = {"qid", "source_ranks", "applied_routes", "top_score"}
+OBSERVATION_FIELDS = {
+    "qid",
+    "source_ranks",
+    "applied_routes",
+    "hit_count",
+    "top_score",
+}
 OFFICIAL_CASE_FIELDS = {
     "qid",
     "case_type",
     "answerable",
     "source_ranks",
     "applied_routes",
+    "hit_count",
     "top_score",
     "effective_threshold",
     "refused",
@@ -176,6 +186,46 @@ def test_offline_runner_exposes_complete_cli_without_loading_models() -> None:
         assert option in stdout
 
 
+def test_offline_flag_precedes_every_hugging_face_import_snapshot(
+    tmp_path,
+) -> None:
+    sitecustomize = tmp_path / "sitecustomize.py"
+    sitecustomize.write_text(
+        """import builtins
+import os
+
+original_import = builtins.__import__
+
+def guarded_import(name, *args, **kwargs):
+    if name.split('.')[0] in {'huggingface_hub', 'transformers', 'FlagEmbedding'}:
+        if os.environ.get('TRANSFORMERS_OFFLINE') != '1':
+            raise RuntimeError('TRANSFORMERS_OFFLINE was not forced before import')
+        if os.environ.get('HF_HUB_OFFLINE') != '1':
+            raise RuntimeError('HF_HUB_OFFLINE was not forced before import')
+    return original_import(name, *args, **kwargs)
+
+builtins.__import__ = guarded_import
+""",
+        encoding="utf-8",
+    )
+    environment = os.environ.copy()
+    environment.pop("TRANSFORMERS_OFFLINE", None)
+    environment.pop("HF_HUB_OFFLINE", None)
+    environment["PYTHONPATH"] = str(tmp_path)
+
+    completed = subprocess.run(
+        [sys.executable, str(RUNNER), "--offline", "--help"],
+        cwd=PROJECT_ROOT,
+        env=environment,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+
 def test_runner_forces_offline_mode_before_cached_model_preflight(
     monkeypatch,
 ) -> None:
@@ -196,6 +246,75 @@ def test_runner_forces_offline_mode_before_cached_model_preflight(
     assert os.environ["TRANSFORMERS_OFFLINE"] == "1"
     assert os.environ["HF_HUB_OFFLINE"] == "1"
     assert calls == [settings]
+
+
+def test_local_pipeline_forces_both_model_loaders_local_only_without_llm(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    calls = []
+    settings = SimpleNamespace(
+        reranker_model="BAAI/bge-reranker-v2-m3",
+        reranker_model_revision="b" * 40,
+        device="cpu",
+    )
+    embedder = SimpleNamespace(close=lambda: None)
+    store = SimpleNamespace(close=lambda: None)
+    pipeline = object()
+
+    monkeypatch.setattr(
+        runner,
+        "Settings",
+        lambda **kwargs: calls.append(("settings", kwargs)) or settings,
+    )
+    monkeypatch.setattr(
+        embedder_module,
+        "resolve_device",
+        lambda requested: calls.append(("resolve_device", requested)) or "cpu",
+    )
+    monkeypatch.setattr(
+        runner,
+        "_build_indexes",
+        lambda actual_settings, corpus_dir, *, local_files_only: (
+            calls.append(
+                (
+                    "indexes",
+                    actual_settings,
+                    corpus_dir,
+                    local_files_only,
+                )
+            )
+            or (embedder, store)
+        ),
+    )
+    monkeypatch.setattr(
+        reranker_module,
+        "Reranker",
+        lambda **kwargs: calls.append(("reranker", kwargs)) or object(),
+    )
+    monkeypatch.setattr(
+        factory,
+        "build_retrieval_pipeline",
+        lambda *_args, **kwargs: calls.append(("retrieval", kwargs)) or pipeline,
+    )
+    monkeypatch.setattr(
+        factory,
+        "build_llm",
+        lambda *_args, **_kwargs: pytest.fail("LLM construction is forbidden"),
+    )
+
+    result = runner._build_local_pipeline(
+        SimpleNamespace(device="auto"), tmp_path / "work", tmp_path / "corpus"
+    )
+
+    assert result == (settings, embedder, store, pipeline)
+    assert ("resolve_device", "auto") in calls
+    assert next(call for call in calls if call[0] == "settings")[1]["device"] == "cpu"
+    assert next(call for call in calls if call[0] == "indexes")[3] is True
+    assert next(call for call in calls if call[0] == "reranker")[1][
+        "local_files_only"
+    ] is True
+    assert [call[0] for call in calls].count("retrieval") == 1
 
 
 def test_runner_rejects_nonempty_work_directory_before_retrieval(tmp_path) -> None:
@@ -241,11 +360,12 @@ def test_runner_retrieves_each_target_once_and_records_unrounded_observation(
             "勞工退休金條例|第 12 條": 1,
         },
         "applied_routes": ["severance_comparison"],
+        "hit_count": 2,
         "top_score": 0.0150004,
     }
 
 
-def test_runner_builds_guard_rows_from_fresh_scores_and_planned_routes() -> None:
+def test_runner_builds_guard_rows_from_fresh_scores_and_authoritative_routes() -> None:
     row = json.loads(STRESS_DATASET.read_text(encoding="utf-8").splitlines()[2])
     expected_source = row["sources"][0]
     retrieval = SimpleNamespace(
@@ -258,7 +378,7 @@ def test_runner_builds_guard_rows_from_fresh_scores_and_planned_routes() -> None
                 }
             ),
         ],
-        applied_routes=("not_used_as_guard_truth",),
+        applied_routes=("severance_comparison",),
         top_score=0.0175004,
     )
 
@@ -276,6 +396,20 @@ def test_runner_builds_guard_rows_from_fresh_scores_and_planned_routes() -> None
             "applied_routes": ["severance_comparison"],
         }
     ]
+
+
+def test_runner_rejects_guard_route_disagreement_instead_of_replacing_it() -> None:
+    row = json.loads(STRESS_DATASET.read_text(encoding="utf-8").splitlines()[2])
+    retrieval = SimpleNamespace(
+        hits=[SimpleNamespace(payload={"doc_title": "other", "articles": []})],
+        applied_routes=(),
+        top_score=0.0175004,
+    )
+
+    with pytest.raises(RuntimeError, match="route mismatch.*stress-003"):
+        runner._run_guard_cases(
+            SimpleNamespace(run=lambda _question: retrieval), [row]
+        )
 
 
 def test_runner_sweeps_every_candidate_over_the_same_retrieval_evidence(
@@ -336,7 +470,11 @@ def test_runner_reports_no_go_and_builds_no_artifact_when_any_gate_fails(
     cases,
 ) -> None:
     observations = _observations(cases)
-    observations[0] = {**observations[0], "source_ranks": {}}
+    observations[0] = {
+        **observations[0],
+        "source_ranks": {},
+        "top_score": 0.0150004,
+    }
 
     with pytest.raises(RuntimeError, match="NO-GO"):
         runner._build_accepted_artifact(
@@ -345,6 +483,76 @@ def test_runner_reports_no_go_and_builds_no_artifact_when_any_gate_fails(
             formal_rows=_formal_rows(),
             provenance=_provenance(),
         )
+
+
+def test_no_go_envelope_is_content_free_unrounded_and_replayable(cases) -> None:
+    observations = _observations(cases)
+    observations[0] = {
+        **observations[0],
+        "source_ranks": {},
+        "top_score": 0.0150004,
+    }
+    candidates = _candidate_results(observations)
+
+    envelope = policy.build_no_go_evidence(
+        observations=observations,
+        candidate_results=candidates,
+        provenance=_provenance(),
+        expected_threshold=0.015,
+    )
+
+    assert envelope["schema_version"] == "1.0"
+    assert envelope["evidence_class"] == "non_release_no_go"
+    assert envelope["outcome"] == "no_go"
+    assert envelope["official_export_allowed"] is False
+    assert envelope["selected_threshold"] is None
+    assert envelope["target_observations"] == observations
+    assert envelope["target_observations"][0]["top_score"] == 0.0150004
+    assert len(envelope["guard_evidence"]["stress"]) == 60
+    assert len(envelope["guard_evidence"]["formal"]) == 40
+    assert len(envelope["candidates"]) == 7
+    assert envelope["failed_gates"] == [
+        {"candidate_threshold": 0.0, "gates": ["target"]},
+        {"candidate_threshold": 0.005, "gates": ["target"]},
+        {"candidate_threshold": 0.01, "gates": ["target"]},
+        {"candidate_threshold": 0.015, "gates": ["target"]},
+        {"candidate_threshold": 0.02, "gates": ["target", "stress"]},
+        {"candidate_threshold": 0.025, "gates": ["target", "stress"]},
+        {"candidate_threshold": 0.03, "gates": ["target", "stress"]},
+    ]
+    assert policy.replay_no_go_evidence(envelope) == envelope
+    serialized = json.dumps(envelope, ensure_ascii=False, sort_keys=True)
+    for forbidden_key in (
+        '"question"',
+        '"content"',
+        '"answer"',
+        '"endpoint"',
+        '"url"',
+        '"credential"',
+        '"secret"',
+        '"api_key"',
+    ):
+        assert forbidden_key not in serialized
+
+
+def test_no_go_replay_rejects_mutated_candidate_aggregate(cases) -> None:
+    observations = _observations(cases)
+    observations[0] = {
+        **observations[0],
+        "source_ranks": {},
+        "top_score": 0.0150004,
+    }
+    envelope = policy.build_no_go_evidence(
+        observations=observations,
+        candidate_results=_candidate_results(observations),
+        provenance=_provenance(),
+        expected_threshold=0.015,
+    )
+    mutated = json.loads(json.dumps(envelope))
+    mutated["candidates"][0]["target"]["passed_cases"] = 28
+
+    with pytest.raises(ValueError, match="replay mismatch"):
+        policy.replay_no_go_evidence(mutated)
 
 
 def test_runner_public_json_export_is_deterministic(tmp_path, cases) -> None:
@@ -394,6 +602,8 @@ def test_runner_binds_exact_input_hashes_models_settings_and_zero_providers(
         reranker_model_revision="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
         top_k_retrieve=20,
         top_k_final=5,
+        rrf_k=60,
+        device="cpu",
     )
 
     provenance = runner._build_provenance(args, settings, "a" * 40)
@@ -415,12 +625,27 @@ def test_runner_binds_exact_input_hashes_models_settings_and_zero_providers(
             "reranker": True,
             "top_k_retrieve": 20,
             "top_k_final": 5,
+            "rrf_k": 60,
         },
+        "execution_device": "cpu",
         "code_revision": "a" * 40,
         "run_origin": "fresh_offline_retrieval",
         "provider_adapters": 0,
         "provider_requests": 0,
     }
+
+
+def test_runner_refuses_to_cite_a_dirty_candidate_source_revision(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(stdout=" M tracked.py\n"),
+    )
+
+    with pytest.raises(RuntimeError, match="clean tracked and untracked tree"):
+        runner._clean_git_revision()
 
 
 def test_runner_main_uses_one_retrieval_only_pipeline_and_exports_after_acceptance(
@@ -449,6 +674,8 @@ def test_runner_main_uses_one_retrieval_only_pipeline_and_exports_after_acceptan
         reranker_model_revision="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
         top_k_retrieve=20,
         top_k_final=5,
+        rrf_k=60,
+        device="cpu",
     )
     target_cases = [object()]
     stress_rows = [{"qid": "stress"}]
@@ -505,7 +732,24 @@ def test_runner_main_uses_one_retrieval_only_pipeline_and_exports_after_acceptan
         "_build_accepted_artifact",
         lambda **kwargs: calls.append(("artifact", kwargs)) or artifact,
     )
-    monkeypatch.setattr(runner, "_git_revision", lambda: "a" * 40, raising=False)
+    monkeypatch.setattr(
+        runner,
+        "_evaluate_candidates",
+        lambda actual_observations, actual_stress, actual_formal: (
+            calls.append(
+                (
+                    "candidates",
+                    actual_observations,
+                    actual_stress,
+                    actual_formal,
+                )
+            )
+            or [{"candidate_threshold": 0.015}]
+        ),
+    )
+    monkeypatch.setattr(
+        runner, "_clean_git_revision", lambda: "a" * 40, raising=False
+    )
 
     exit_code = runner.main(
         [
@@ -535,6 +779,102 @@ def test_runner_main_uses_one_retrieval_only_pipeline_and_exports_after_acceptan
     assert ("guard", pipeline, formal_rows) in calls
 
 
+def test_runner_main_persists_replayable_no_go_without_official_export(
+    monkeypatch,
+    tmp_path,
+    cases,
+) -> None:
+    target = tmp_path / "target.jsonl"
+    stress = tmp_path / "stress.jsonl"
+    formal = tmp_path / "formal.jsonl"
+    snapshot = tmp_path / "snapshot.json"
+    for path in (target, stress, formal):
+        path.write_text("{}\n", encoding="utf-8")
+    snapshot.write_text("{}\n", encoding="utf-8")
+    work_dir = tmp_path / "run"
+    diagnostic = tmp_path / "diagnostics" / "no_go.json"
+    official = tmp_path / "official.json"
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    pipeline = object()
+    settings = SimpleNamespace(
+        embedding_model="BAAI/bge-m3",
+        embedding_model_revision="5617a9f61b028005a4858fdac845db406aefb181",
+        reranker_model="BAAI/bge-reranker-v2-m3",
+        reranker_model_revision="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        top_k_retrieve=20,
+        top_k_final=5,
+        rrf_k=60,
+        device="cpu",
+    )
+    observations = _observations(cases)
+    observations[0] = {**observations[0], "source_ranks": {}}
+    stress_evidence = _stress_rows()
+    formal_evidence = _formal_rows()
+    store = SimpleNamespace(close=lambda: None)
+    embedder = SimpleNamespace(close=lambda: None)
+
+    monkeypatch.setattr(runner, "OFFICIAL_RESULT", official)
+    monkeypatch.setattr(runner, "_offline_preflight", lambda _args: settings)
+    monkeypatch.setattr(runner, "_clean_git_revision", lambda: "a" * 40)
+    monkeypatch.setattr(
+        runner,
+        "_materialize_audited_corpus",
+        lambda _work, _snapshot: corpus,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_build_local_pipeline",
+        lambda _args, _work, _corpus: (
+            settings,
+            embedder,
+            store,
+            pipeline,
+        ),
+    )
+    monkeypatch.setattr(runner, "load_cases", lambda _path: cases)
+    monkeypatch.setattr(
+        runner,
+        "_load_dataset",
+        lambda path: stress_evidence if path == stress else formal_evidence,
+    )
+    monkeypatch.setattr(
+        runner, "_run_target_cases", lambda _pipeline, _cases: observations
+    )
+    monkeypatch.setattr(
+        runner,
+        "_run_guard_cases",
+        lambda _pipeline, rows: rows,
+    )
+
+    exit_code = runner.main(
+        [
+            "--dataset",
+            str(target),
+            "--stress-dataset",
+            str(stress),
+            "--formal-dataset",
+            str(formal),
+            "--snapshot",
+            str(snapshot),
+            "--work-dir",
+            str(work_dir),
+            "--diagnostics-output",
+            str(diagnostic),
+            "--offline",
+            "--device",
+            "cpu",
+            "--export-official",
+        ]
+    )
+
+    assert exit_code == 1
+    assert not official.exists()
+    envelope = json.loads(diagnostic.read_text(encoding="utf-8"))
+    assert policy.replay_no_go_evidence(envelope) == envelope
+    assert envelope["provenance"]["code_revision"] == "a" * 40
+
+
 def _source_key(source: dict[str, str]) -> str:
     return f"{source['law']}|{source['article']}"
 
@@ -554,6 +894,7 @@ def _observations(cases):
                 },
                 applied_routes=plan_retrieval_query(case.question).routes,
                 top_score=score,
+                hit_count=0 if case.qid == "severance-policy-023" else 5,
             )
         )
     return observations
@@ -658,7 +999,9 @@ def _provenance():
             "reranker": True,
             "top_k_retrieve": 20,
             "top_k_final": 5,
+            "rrf_k": 60,
         },
+        "execution_device": "cpu",
         "code_revision": "f" * 40,
         "run_origin": "fresh_offline_retrieval",
         "provider_adapters": 0,
@@ -751,9 +1094,35 @@ def test_observation_contains_only_raw_content_free_evidence(cases):
         },
         applied_routes=("severance_comparison",),
         top_score=0.0150004,
+        hit_count=5,
     )
     assert set(observation) == OBSERVATION_FIELDS
     assert observation["top_score"] == 0.0150004
+
+
+def test_target_no_hit_observation_uses_no_hits_policy_semantics(cases):
+    observations = _observations(cases)
+    observations[0] = build_case_observation(
+        cases[0],
+        source_ranks={},
+        applied_routes=("severance_comparison",),
+        top_score=0.0,
+        hit_count=0,
+    )
+
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    case = result["cases"][0]
+    assert case["hit_count"] == 0
+    assert case["refusal_stage"] == "no_hits"
+    assert case["effective_threshold"] is None
+    assert case["generation_allowed"] is False
 
 
 @pytest.mark.parametrize(
@@ -778,6 +1147,7 @@ def test_observation_rejects_invalid_content_free_inputs(cases, kwargs, message)
         },
         "applied_routes": ("severance_comparison",),
         "top_score": 0.1,
+        "hit_count": 5,
     }
     valid.update(kwargs)
     with pytest.raises(ValueError, match=message):

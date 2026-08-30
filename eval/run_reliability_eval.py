@@ -121,7 +121,12 @@ def _materialize_audited_corpus(work_dir: Path, committed: dict) -> Path:
     return corpus_dir
 
 
-def _build_indexes(settings: Settings, corpus_dir: Path) -> tuple[BGEM3Embedder, VectorStore]:
+def _build_indexes(
+    settings: Settings,
+    corpus_dir: Path,
+    *,
+    local_files_only: bool = False,
+) -> tuple[BGEM3Embedder, VectorStore]:
     units = load_corpus(corpus_dir)
     if len({unit.doc_id for unit in units}) != 15:
         raise RuntimeError("isolated corpus must contain exactly 15 laws")
@@ -130,6 +135,7 @@ def _build_indexes(settings: Settings, corpus_dir: Path) -> tuple[BGEM3Embedder,
         model_revision=settings.embedding_model_revision,
         device=settings.device,
         cache_path=settings.storage_dir / "emb_cache.sqlite",
+        local_files_only=local_files_only,
     )
     store = VectorStore(settings)
     for strategy in ("structure", "fixed"):

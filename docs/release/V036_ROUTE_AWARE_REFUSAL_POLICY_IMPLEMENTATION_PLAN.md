@@ -573,16 +573,28 @@ git commit -m "test: add severance refusal calibration contract"
 
 ### Task 6: Build fresh offline calibration evidence and select the threshold
 
+> **Approved Task 6 contract amendment (2026-08-30):** Task 5 schema `1.2`
+> and `eval/dataset/README.md` supersede the stale guard-reaggregation and
+> schema `1.0` instructions below. Target, stress, and formal rows must all be
+> produced by the same fresh offline retrieval pipeline with unrounded scores.
+> The rounded v0.3.1 public trace values remain metric baselines only and are
+> never calibration decision inputs. An accepted official artifact uses schema
+> `1.2`; a NO-GO instead durably records a replayable, content-free non-release
+> diagnostic envelope while leaving the official artifact absent.
+
 **Files:**
 
 - Create: `eval/run_severance_refusal_policy.py`
 - Create: `eval/official/severance_refusal_policy_v0.3.6.json`
+- Create on NO-GO: `eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json`
+- Create: `eval/diagnostics/README.md`
 - Modify: `eval/official/README.md`
 - Modify: `tests/test_severance_refusal_policy.py`
 
 - [ ] **Step 1: Add failing runner and deterministic rebuild tests**
 
-Test argument parsing, forced `TRANSFORMERS_OFFLINE=1` and `HF_HUB_OFFLINE=1`,
+Test argument parsing, forced `TRANSFORMERS_OFFLINE=1` and `HF_HUB_OFFLINE=1`
+before any Hugging Face import, cache-only embedder/reranker model resolution,
 cached-model preflight, no LLM construction, strict empty work directory,
 content-free export, deterministic result rebuilding after removing run time,
 and NO-GO when any gate fails.
@@ -591,24 +603,34 @@ and NO-GO when any gate fails.
 
 The runner must reuse `_materialize_audited_corpus`, `_build_indexes`, the
 committed corpus snapshot, and one pinned local pipeline. For each new case it
-records source ranks, `retrieval.applied_routes`, and unrounded `top_score`.
+records source ranks, `retrieval.applied_routes`, `hit_count`, and unrounded
+`top_score`. The returned `retrieval.applied_routes` value is authoritative and
+must equal the separately planned route contract; disagreement fails closed.
 Evaluate every candidate using `decide_retrieval_refusal` without rerunning
 retrieval.
 
-For guards, join the questions from the committed stress/formal datasets to
-their existing content-free official scores by qid, call
-`plan_retrieval_query(question).routes`, and reaggregate the committed ranks and
-top scores through the same refusal policy. Do not edit the v0.3.1 artifacts.
+For guards, run all committed stress/formal questions through that same fresh
+offline pipeline and preserve unrounded ranks, hit counts, applied routes, and
+top scores. Use the v0.3.1 published aggregates only as metric baselines. Do not
+edit the v0.3.1 artifacts or use their rounded trace scores as decision inputs.
 
-The official artifact uses schema `1.0` and contains:
+An accepted official artifact uses schema `1.2` and contains:
 
 - dataset/corpus/source-artifact canonical SHA-256 values;
-- exact pinned model names/revisions and retrieval settings;
+- exact pinned model names/revisions, retrieval settings, resolved execution
+  device, and `rrf_k`;
 - candidate grid and one selected threshold;
 - per-candidate target, stress, and formal gates;
 - thirty content-free case observations;
 - zero provider adapters and zero provider requests;
 - the candidate source Git SHA.
+
+The candidate source SHA must identify a clean committed implementation. If no
+candidate passes every gate or the selection is not `0.015`, write the complete
+raw content-free observations, fresh guard rows, seven candidate aggregates,
+failed gates, hashes, configuration, and provenance to the non-release
+diagnostic path. The diagnostic must replay without retrieval or model loading;
+it is deliberately excluded from `release/public-files.txt`.
 
 - [ ] **Step 3: Run the fresh offline calibration**
 
@@ -624,18 +646,20 @@ coverage is at least 17/20; formal Hit@5/MRR@10 meet the committed values and
 formal direct false refusals remain zero; provider adapters/requests are zero.
 
 If the selected value is not `0.015` or any gate fails, stop with NO-GO. Do not
-edit the artifact, setting, dataset, or gate to force acceptance.
+edit the artifact, setting, dataset, or gate to force acceptance. Preserve the
+diagnostic envelope and leave the official artifact absent.
 
 - [ ] **Step 4: Verify deterministic and privacy-safe evidence**
 
 ```powershell
 uv run pytest tests/test_severance_refusal_policy.py -q -p no:cacheprovider
-uv run python -m json.tool eval/official/severance_refusal_policy_v0.3.6.json | Out-Null
-rg -n "question|content|answer|endpoint|url|credential|secret|api_key|Users[/\\]|AI-Portfolio" eval/official/severance_refusal_policy_v0.3.6.json
+uv run python -m json.tool eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json | Out-Null
+rg -n '"(question|content|answer|endpoint|url|credential|secret|api_key)"|Users[/\\]|AI-Portfolio' eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json
 ```
 
-Expected: tests and JSON parse pass; privacy scan returns no matches. Document
-the artifact in `eval/official/README.md` without adding unverified claims.
+Expected: tests and JSON parse pass; privacy scan returns no matches. Replay the
+diagnostic and document the outcome without adding unverified claims. For an
+accepted run, apply the equivalent checks to the official artifact instead.
 
 - [ ] **Step 5: Commit accepted calibration evidence**
 
