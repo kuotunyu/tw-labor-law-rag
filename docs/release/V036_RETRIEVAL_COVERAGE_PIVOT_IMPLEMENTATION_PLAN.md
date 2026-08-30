@@ -122,12 +122,17 @@ Work:
    calibration responsibilities visibly separated.
 9. Bind the exact Git-revision set and hashes of every tracked `*.py` file,
    plus `pyproject.toml`, `uv.lock`, `.python-version`, the deployment
-   `Dockerfile`, and `legal_terms.txt`; delete the attempted import-closure and
+   `Dockerfile`, and `legal_terms.txt`; Python suffix matching is
+   case-insensitive. Delete the attempted import-closure and
    dynamic-execution analyzer. Use a committed stdlib-only `python -I -S`
-   bootstrap that validates recorded/current Git sets, modes/blobs, checkout
-   bytes, ignored/untracked importable artifacts, clean state, isolated
-   `sys.path`, interpreter/platform/ABI, and installed distributions before
-   importing project, cache, index, or model code. Tests must prove that a
+   bootstrap plus an explicit dedicated environment outside the repository,
+   synchronized offline/frozen/no-dev from the bound lock. The bootstrap takes
+   that validated environment root explicitly and validates recorded/current
+   Git sets, modes/blobs, checkout bytes, ignored/untracked importable artifacts
+   under exact code roots, clean state, isolated `sys.path`,
+   interpreter/platform/ABI, selected lock groups/markers, and the exact
+   normalized installed distribution inventory before importing project,
+   cache, index, or model code. Tests must prove that a
    changed, added, removed, renamed, untracked, ignored, aliased, or extra
    importable file invalidates replay with zero constructors called.
 

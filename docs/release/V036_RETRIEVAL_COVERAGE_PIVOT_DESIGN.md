@@ -236,8 +236,9 @@ effects that a small static analyzer cannot prove complete.
 
 Schema `1.3` therefore uses a simpler conservative contract:
 
-- bind the SHA-256 and Git blob identity of **every Git-tracked `*.py` file in
-  the repository at the recorded source revision**, including tests;
+- bind the SHA-256 and Git blob identity of **every Git-tracked file whose
+  suffix case-folds to `.py` in the repository at the recorded source
+  revision**, including tests;
 - additionally bind `pyproject.toml`, `uv.lock`, `.python-version`, the
   deployment `Dockerfile`, `legal_terms.txt`, and the separately declared
   corpus, dataset, model, and replay source artifacts;
@@ -250,33 +251,54 @@ Schema `1.3` therefore uses a simpler conservative contract:
   change, sparse/missing file, duplicate/case-fold collision, symlink, gitlink,
   submodule, path escape, or extra binding fails closed even if a blob is
   unchanged;
-- scan the repository before project imports and reject ignored or untracked
+- scan the verified repository code roots (`src`, `eval`, and `scripts`) before
+  project imports and reject ignored or untracked
   importable artifacts (`.py`, case variants such as `.PY`, `.pyc`, `.pyo`,
   platform extension modules, `.pth`, and importable archives) plus
-  `__pycache__`, virtual-environment, and cache trees inside repository import
-  roots;
+  `__pycache__` and cache trees. No repository virtual-environment or broad
+  repository root is placed on `sys.path`;
 - reject missing, extra, renamed, untracked, or changed bound code before any
   model construction.
 
-Acceptance and replay start through a committed stdlib-only bootstrap invoked
-with isolated Python (`-I -S`). Before adding the verified repository root or
-third-party paths to `sys.path`, it must:
+Task 6 creates a dedicated authoritative environment outside the repository
+from the bound lock, offline, frozen, and without development dependency
+groups; it must pass the equivalent of `uv sync --check --frozen --no-dev`.
+Acceptance and replay then start through a committed stdlib-only bootstrap
+invoked by that environment's interpreter with isolated Python (`-I -S`) and
+an explicit `--environment-root`. The bootstrap derives platform-specific
+site-package directories from that root and its `pyvenv.cfg`; it must not use
+`sys.prefix` or `sysconfig` under Python 3.11 `-S` to discover the environment.
+Before adding verified project or third-party paths to `sys.path`, it must:
 
 1. clear/reject `PYTHONPATH`, disable user-site and site customization, and
-   reject zip/`.pth`/unapproved external local import roots;
+   reject unapproved external local import roots. `.pth` files may exist in the
+   approved environment but are never processed and must not contribute
+   `sys.path` entries; the interpreter's own stdlib archive is trusted, while
+   other zip import roots are rejected;
 2. validate the recorded/current Git sets, blobs, checkout bytes, declared
    input artifacts, ignored/untracked importable scan, and clean tree;
-3. bind and verify Python implementation, full version, ABI, OS/platform, and
-   the exact installed distribution name/version inventory against the frozen
-   lock/environment used by `uv --frozen --no-sync`;
-4. add only the verified repository root and the recorded interpreter's
-   `purelib`/`platlib` directories directly, without processing `.pth` files,
+3. bind and verify Python implementation, full version, ABI, OS/platform, the
+   selected no-development lock groups and markers, and a PEP 503-normalized,
+   duplicate-free exact installed `{distribution: version}` inventory obtained
+   with `importlib.metadata.distributions(path=[approved sites])`. Every
+   inventory entry must be selected by the frozen lock for that environment;
+   validation imports no third-party package;
+4. add only the exact verified `src`, `eval`, and `scripts` roots plus approved
+   environment sites directly, without importing `site` or processing `.pth`,
    then import evaluator/model code.
 
 Tests monkeypatch every cache/model/index/provider constructor and prove zero
-calls for each bootstrap failure. The claim covers repository source plus the
-recorded frozen Python environment; it does not claim to defend a compromised
-OS, interpreter binary, or package installation outside that boundary.
+calls for each bootstrap failure. The trusted enforcement boundary is the OS,
+interpreter binary, bootstrap/launcher, and approved third-party installation;
+the artifact detects honest repository and environment-resolution drift. The
+distribution inventory proves selected versions, not installed wheel bytes,
+and the claim does not defend a malicious verifier, compromised interpreter,
+or modified package installation that retains the same metadata.
+
+The bound Dockerfile records deployment setup semantics, but its floating base
+tag is not a bit-for-bit image receipt. CPU/FP32 acceptance plus the later
+private Space smoke establish behavioral compatibility, not base-image digest
+equivalence.
 
 This conservative superset deliberately invalidates acceptance after any
 tracked Python change, even when that file might not execute in one run. It
