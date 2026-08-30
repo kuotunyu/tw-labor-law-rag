@@ -1,15 +1,13 @@
+import hashlib
 import json
 import math
 from pathlib import Path
 
 import pytest
 
+import rag.severance_refusal_policy as policy
 from rag.retrieval.pipeline import plan_retrieval_query
 from rag.severance_refusal_policy import (
-    CANDIDATE_THRESHOLDS,
-    EXPECTED_QIDS,
-    FORMAL_HIT_AT_5_BASELINE,
-    FORMAL_MRR_AT_10_BASELINE,
     build_case_observation,
     build_official_artifact,
     evaluate_candidate,
@@ -19,6 +17,39 @@ from rag.severance_refusal_policy import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATASET = PROJECT_ROOT / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl"
+EXPECTED_QIDS = (
+    "severance-policy-001",
+    "severance-policy-002",
+    "severance-policy-003",
+    "severance-policy-004",
+    "severance-policy-005",
+    "severance-policy-006",
+    "severance-policy-007",
+    "severance-policy-008",
+    "severance-policy-009",
+    "severance-policy-010",
+    "severance-policy-011",
+    "severance-policy-012",
+    "severance-policy-013",
+    "severance-policy-014",
+    "severance-policy-015",
+    "severance-policy-016",
+    "severance-policy-017",
+    "severance-policy-018",
+    "severance-policy-019",
+    "severance-policy-020",
+    "severance-policy-021",
+    "severance-policy-022",
+    "severance-policy-023",
+    "severance-policy-024",
+    "severance-policy-025",
+    "severance-policy-026",
+    "severance-policy-027",
+    "severance-policy-028",
+    "severance-policy-029",
+    "severance-policy-030",
+)
+EXPECTED_CANDIDATES = (0.0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03)
 POSITIVE_STYLES = {
     "statutory_chinese",
     "colloquial_chinese",
@@ -43,17 +74,11 @@ SEVERANCE_SOURCES = (
     {"law": "勞工退休金條例", "article": "第 12 條"},
     {"law": "勞動基準法", "article": "第 17 條"},
 )
-OBSERVATION_FIELDS = {
-    "qid",
-    "case_type",
-    "answerable",
-    "source_ranks",
-    "applied_routes",
-    "top_score",
-    "source_contract_passed",
-    "route_contract_passed",
-    "generation_expected",
+SEVERANCE_SOURCE_KEYS = {
+    "勞工退休金條例|第 12 條",
+    "勞動基準法|第 17 條",
 }
+OBSERVATION_FIELDS = {"qid", "source_ranks", "applied_routes", "top_score"}
 OFFICIAL_CASE_FIELDS = {
     "qid",
     "case_type",
@@ -103,6 +128,16 @@ FORMAL_RANKS = [
     1,
     1,
 ]
+STRESS_ROUTES = {
+    "stress-003": ["severance_comparison"],
+    "stress-010": ["wage_arrears_termination"],
+    "stress-037": ["severance_comparison"],
+    "stress-038": ["wage_arrears_termination"],
+}
+FORMAL_ROUTES = {
+    "eval-03": ["severance_comparison"],
+    "eval-10": ["wage_arrears_termination"],
+}
 
 
 @pytest.fixture(scope="module")
@@ -117,18 +152,17 @@ def _source_key(source: dict[str, str]) -> str:
 def _observations(cases):
     observations = []
     for index, case in enumerate(cases):
-        source_ranks = {
-            _source_key(source): rank
-            for rank, source in enumerate(case.sources, start=1)
-        }
         score = 0.015 if index == 0 else 0.5
-        if not case.expect_generation:
+        if case.qid == "severance-policy-023":
             score = 0.0
         observations.append(
             build_case_observation(
                 case,
-                source_ranks=source_ranks,
-                applied_routes=case.required_routes,
+                source_ranks={
+                    _source_key(source): rank
+                    for rank, source in enumerate(case.sources, start=1)
+                },
+                applied_routes=plan_retrieval_query(case.question).routes,
                 top_score=score,
             )
         )
@@ -136,51 +170,53 @@ def _observations(cases):
 
 
 def _stress_rows():
-    answerable = [
-        {
-            "qid": f"stress-{number:03d}",
-            "answerable": True,
-            "rank": 1,
-            "top_score": 0.0175 if number == 1 else 0.5,
-            "applied_routes": ["severance_comparison"] if number == 1 else [],
-        }
-        for number in range(1, 41)
-    ]
-    unanswerable = [
-        {
-            "qid": f"stress-{number:03d}",
-            "answerable": False,
-            "rank": None,
-            "top_score": 0.0 if number <= 57 else 0.5,
-            "applied_routes": [],
-        }
-        for number in range(41, 61)
-    ]
-    return answerable + unanswerable
+    rows = []
+    for number in range(1, 61):
+        qid = f"stress-{number:03d}"
+        answerable = number <= 40
+        if qid == "stress-037":
+            score = 0.0175004
+        elif not answerable and number <= 57:
+            score = 0.0
+        else:
+            score = 0.5
+        rows.append(
+            {
+                "qid": qid,
+                "answerable": answerable,
+                "rank": 1 if answerable else None,
+                "top_score": score,
+                "applied_routes": STRESS_ROUTES.get(qid, []),
+                "score_precision": "raw_unrounded",
+            }
+        )
+    return rows
 
 
 def _formal_rows():
-    answerable = [
+    rows = [
         {
             "qid": f"eval-{number:02d}",
             "answerable": True,
             "rank": rank,
             "top_score": 0.5,
-            "applied_routes": [],
+            "applied_routes": FORMAL_ROUTES.get(f"eval-{number:02d}", []),
+            "score_precision": "raw_unrounded",
         }
         for number, rank in enumerate(FORMAL_RANKS, start=1)
     ]
-    unanswerable = [
+    rows.extend(
         {
             "qid": f"eval-{number:02d}",
             "answerable": False,
             "rank": None,
             "top_score": 0.0 if number <= 39 else 0.5,
             "applied_routes": [],
+            "score_precision": "raw_unrounded",
         }
         for number in range(31, 41)
-    ]
-    return answerable + unanswerable
+    )
+    return rows
 
 
 def _candidate_results(observations):
@@ -192,23 +228,35 @@ def _candidate_results(observations):
             stress_rows=_stress_rows(),
             formal_rows=_formal_rows(),
         )
-        for threshold in CANDIDATE_THRESHOLDS
+        for threshold in EXPECTED_CANDIDATES
     ]
 
 
-def _provenance():
+def _canonical_sha256(value) -> str:
+    payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _provenance(candidate_results):
+    first = candidate_results[0]
     return {
         "dataset_sha256": "a" * 64,
         "corpus_snapshot_sha256": "b" * 64,
         "source_artifact_sha256": {
-            "reliability_results": "c" * 64,
-            "reliability_trace": "d" * 64,
-            "reliability_formal_trace": "e" * 64,
+            "stress_dataset": "c" * 64,
+            "formal_dataset": "d" * 64,
+            "stress_raw_evidence": _canonical_sha256(first["stress_evidence"]),
+            "formal_raw_evidence": _canonical_sha256(first["formal_evidence"]),
         },
         "embedding_model": "BAAI/bge-m3",
-        "embedding_revision": "1" * 40,
+        "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
         "reranker_model": "BAAI/bge-reranker-v2-m3",
-        "reranker_revision": "2" * 40,
+        "reranker_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
         "retrieval_configuration": {
             "chunking": "structure",
             "retrieval": "hybrid",
@@ -227,31 +275,22 @@ def test_reviewed_dataset_has_exact_order_contracts_and_style_coverage(cases):
     assert [case.case_type for case in cases] == ["positive"] * 15 + [
         "collision_negative"
     ] * 15
-    positives = cases[:15]
-    collisions = cases[15:]
-    assert all(case.answerable for case in positives)
-    assert all(case.sources == SEVERANCE_SOURCES for case in positives)
-    assert all(case.required_routes == ("severance_comparison",) for case in positives)
-    assert all(not case.prohibited_routes for case in positives)
-    assert all(case.expect_generation for case in positives)
-    assert POSITIVE_STYLES <= {
-        tag for case in positives for tag in case.style_tags
-    }
-    assert COLLISION_STYLES <= {
-        tag for case in collisions for tag in case.style_tags
-    }
+    assert all(case.sources == SEVERANCE_SOURCES for case in cases[:15])
+    assert all(case.required_routes == ("severance_comparison",) for case in cases[:15])
+    assert POSITIVE_STYLES <= {tag for case in cases[:15] for tag in case.style_tags}
+    assert COLLISION_STYLES <= {tag for case in cases[15:] for tag in case.style_tags}
     assert all(len(case.question) >= 12 and case.question[-1] in "？?" for case in cases)
 
 
 def test_reviewed_questions_match_committed_route_semantics(cases):
-    for case in cases:
-        routes = plan_retrieval_query(case.question).routes
-        if case.case_type == "positive":
-            assert routes == ("severance_comparison",), case.qid
-        else:
-            assert routes != ("severance_comparison",), case.qid
-            assert all(route in routes for route in case.required_routes), case.qid
-            assert all(route not in routes for route in case.prohibited_routes), case.qid
+    expected = [("severance_comparison",)] * 15
+    expected.extend([()] * 4)
+    expected.extend([("wage_arrears_termination",)])
+    expected.extend([()] * 9)
+    expected.extend(
+        [("severance_comparison", "wage_arrears_termination")]
+    )
+    assert [plan_retrieval_query(case.question).routes for case in cases] == expected
 
 
 def _dataset_rows():
@@ -283,6 +322,16 @@ def _dataset_rows():
         (lambda rows: rows[0].update(expect_generation=1), "expect_generation"),
         (lambda rows: rows[0].update(case_type="collision_negative"), "ordering"),
         (lambda rows: rows.pop(), "qids"),
+        (
+            lambda rows: (
+                rows[22].update(
+                    answerable=True,
+                    sources=[{"law": "勞動基準法", "article": "第 17 條"}],
+                ),
+                rows[24].update(answerable=False, sources=[]),
+            ),
+            "canonical contract",
+        ),
     ],
 )
 def test_loader_fails_closed_on_dataset_drift(tmp_path, mutate, message):
@@ -293,12 +342,11 @@ def test_loader_fails_closed_on_dataset_drift(tmp_path, mutate, message):
         "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
         encoding="utf-8",
     )
-
     with pytest.raises(ValueError, match=message):
         load_cases(path)
 
 
-def test_observation_is_content_free_and_scores_real_contracts(cases):
+def test_observation_contains_only_raw_content_free_evidence(cases):
     observation = build_case_observation(
         cases[0],
         source_ranks={
@@ -308,37 +356,20 @@ def test_observation_is_content_free_and_scores_real_contracts(cases):
         applied_routes=("severance_comparison",),
         top_score=0.0150004,
     )
-
     assert set(observation) == OBSERVATION_FIELDS
-    assert observation["source_contract_passed"] is True
-    assert observation["route_contract_passed"] is True
     assert observation["top_score"] == 0.0150004
-    assert "question" not in observation
 
 
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
         ({"source_ranks": {"未知法規|第 1 條": 1}}, "source_ranks"),
-        (
-            {
-                "source_ranks": {
-                    "勞工退休金條例|第 12 條": True,
-                    "勞動基準法|第 17 條": 2,
-                }
-            },
-            "source_ranks",
-        ),
         ({"applied_routes": ["severance_comparison"]}, "applied_routes"),
         (
-            {
-                "applied_routes": (
-                    "severance_comparison",
-                    "severance_comparison",
-                )
-            },
+            {"applied_routes": ("severance_comparison", "severance_comparison")},
             "duplicates",
         ),
+        ({"applied_routes": ("private-route",)}, "allowlist"),
         ({"top_score": math.nan}, "top_score"),
         ({"top_score": math.inf}, "top_score"),
     ],
@@ -353,9 +384,34 @@ def test_observation_rejects_invalid_content_free_inputs(cases, kwargs, message)
         "top_score": 0.1,
     }
     valid.update(kwargs)
-
     with pytest.raises(ValueError, match=message):
         build_case_observation(cases[0], **valid)
+
+
+def test_evaluator_recomputes_canonical_source_and_route_contracts(cases):
+    observations = _observations(cases)
+    observations[0] = {**observations[0], "source_ranks": {}}
+    observations[1] = {**observations[1], "applied_routes": []}
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+    assert result["cases"][0]["source_contract_passed"] is False
+    assert result["cases"][1]["route_contract_passed"] is False
+    assert result["target"]["passed_cases"] == 28
+
+    injected = [{**observations[0], "source_contract_passed": True}, *observations[1:]]
+    with pytest.raises(ValueError, match="observation fields"):
+        evaluate_candidate(
+            injected,
+            candidate_threshold=0.015,
+            global_threshold=0.03,
+            stress_rows=_stress_rows(),
+            formal_rows=_formal_rows(),
+        )
 
 
 def test_candidate_recomputes_target_stress_and_formal_gates(cases):
@@ -366,7 +422,6 @@ def test_candidate_recomputes_target_stress_and_formal_gates(cases):
         stress_rows=_stress_rows(),
         formal_rows=_formal_rows(),
     )
-
     assert result["target"] == {
         "total": 30,
         "passed_cases": 30,
@@ -376,29 +431,24 @@ def test_candidate_recomputes_target_stress_and_formal_gates(cases):
         "collision_contracts": 15,
         "passed": True,
     }
-    assert result["stress"] == {
-        "questions": 60,
-        "answerable": 40,
-        "unanswerable": 20,
-        "direct_false_refusals": 0,
-        "direct_unanswerable_refusals": 17,
-        "direct_unanswerable_coverage": 0.85,
-        "passed": True,
-    }
-    assert result["formal"]["hit_at_5"] == FORMAL_HIT_AT_5_BASELINE
-    assert result["formal"]["mrr_at_10"] == FORMAL_MRR_AT_10_BASELINE
-    assert result["formal"]["direct_false_refusals"] == 0
-    assert result["formal"]["passed"] is True
+    assert result["stress"]["direct_false_refusals"] == 0
+    assert result["stress"]["direct_unanswerable_refusals"] == 17
+    assert result["formal"]["hit_at_5"] == 0.9666666666666667
+    assert result["formal"]["mrr_at_10"] == 0.9055555555555554
     assert result["passed"] is True
+    assert result["stress_evidence"][36] == {
+        "qid": "stress-037",
+        "answerable": True,
+        "rank": 1,
+        "top_score": 0.0175004,
+        "applied_routes": ["severance_comparison"],
+        "score_precision": "raw_unrounded",
+    }
 
 
 def test_candidate_uses_unrounded_score_and_shared_equality_behavior(cases):
     observations = _observations(cases)
-    observations[0] = {
-        **observations[0],
-        "top_score": 0.0149996,
-    }
-
+    observations[0] = {**observations[0], "top_score": 0.0149996}
     result = evaluate_candidate(
         observations,
         candidate_threshold=0.015,
@@ -406,50 +456,189 @@ def test_candidate_uses_unrounded_score_and_shared_equality_behavior(cases):
         stress_rows=_stress_rows(),
         formal_rows=_formal_rows(),
     )
-
     first = result["cases"][0]
     assert round(first["top_score"], 6) == 0.015
     assert first["refused"] is True
-    assert first["refusal_stage"] == "threshold"
     assert result["target"]["passed_cases"] == 29
 
 
 @pytest.mark.parametrize(
-    ("mutation", "message"),
+    ("mutate", "message"),
     [
-        ("candidate_nan", "candidate_threshold"),
-        ("candidate_outside_grid", "candidate_threshold"),
-        ("stress_nonfinite", "top_score"),
-        ("formal_wrong_count", "formal rows"),
+        (lambda stress, formal: stress[0].pop("score_precision"), "fields"),
+        (
+            lambda stress, formal: stress[0].update(score_precision="rounded_4dp"),
+            "raw_unrounded",
+        ),
+        (
+            lambda stress, formal: (
+                stress[0].update(answerable=False, rank=None),
+                stress[40].update(answerable=True, rank=1),
+            ),
+            "answerability",
+        ),
+        (
+            lambda stress, formal: (
+                stress[0].update(applied_routes=["severance_comparison"]),
+                stress[2].update(applied_routes=[]),
+            ),
+            "route identity",
+        ),
+        (
+            lambda stress, formal: formal[0].update(
+                applied_routes=["endpoint.example.com"]
+            ),
+            "allowlist",
+        ),
     ],
 )
-def test_candidate_rejects_bad_grid_and_guard_inputs(cases, mutation, message):
-    threshold = 0.015
+def test_guard_evidence_is_raw_and_bound_to_qid(cases, mutate, message):
     stress = _stress_rows()
     formal = _formal_rows()
-    if mutation == "candidate_nan":
-        threshold = math.nan
-    elif mutation == "candidate_outside_grid":
-        threshold = 0.017
-    elif mutation == "stress_nonfinite":
-        stress[0]["top_score"] = math.inf
-    else:
-        formal.pop()
-
+    mutate(stress, formal)
     with pytest.raises(ValueError, match=message):
         evaluate_candidate(
             _observations(cases),
-            candidate_threshold=threshold,
+            candidate_threshold=0.015,
             global_threshold=0.03,
             stress_rows=stress,
             formal_rows=formal,
         )
 
 
-def test_selector_sorts_grid_and_returns_highest_complete_pass(cases):
-    results = list(reversed(_candidate_results(_observations(cases))))
+@pytest.mark.parametrize("threshold", [math.nan, 0.017])
+def test_candidate_rejects_bad_candidate_grid(cases, threshold):
+    with pytest.raises(ValueError, match="candidate_threshold"):
+        evaluate_candidate(
+            _observations(cases),
+            candidate_threshold=threshold,
+            global_threshold=0.03,
+            stress_rows=_stress_rows(),
+            formal_rows=_formal_rows(),
+        )
 
+
+def test_candidate_rejects_noncanonical_global_threshold(cases):
+    with pytest.raises(ValueError, match="global_threshold"):
+        evaluate_candidate(
+            _observations(cases),
+            candidate_threshold=0.015,
+            global_threshold=0.02,
+            stress_rows=_stress_rows(),
+            formal_rows=_formal_rows(),
+        )
+
+
+def test_evaluator_calls_shared_policy_with_exact_raw_boundary(monkeypatch, cases):
+    calls = []
+    real_policy = policy.decide_retrieval_refusal
+
+    def spy(**kwargs):
+        calls.append(kwargs)
+        return real_policy(**kwargs)
+
+    monkeypatch.setattr(policy, "decide_retrieval_refusal", spy)
+    evaluate_candidate(
+        _observations(cases),
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+    assert len(calls) == 130
+    assert calls[66] == {
+        "has_hits": True,
+        "reranker_enabled": True,
+        "applied_routes": ("severance_comparison",),
+        "top_score": 0.0175004,
+        "global_threshold": 0.03,
+        "severance_comparison_threshold": 0.015,
+    }
+
+
+def test_selector_replays_policy_and_returns_highest_complete_pass(
+    monkeypatch, cases
+):
+    results = list(reversed(_candidate_results(_observations(cases))))
+    calls = []
+    real_policy = policy.decide_retrieval_refusal
+
+    def spy(**kwargs):
+        calls.append(kwargs)
+        return real_policy(**kwargs)
+
+    monkeypatch.setattr(policy, "decide_retrieval_refusal", spy)
     assert select_highest_passing_threshold(results) == 0.015
+    assert len(calls) == 910
+    assert {
+        "has_hits": True,
+        "reranker_enabled": True,
+        "applied_routes": ("severance_comparison",),
+        "top_score": 0.0175004,
+        "global_threshold": 0.03,
+        "severance_comparison_threshold": 0.015,
+    } in calls
+
+
+def _result_for(results, threshold):
+    return next(row for row in results if row["candidate_threshold"] == threshold)
+
+
+def test_selector_rejects_fabricated_passing_point_zero_three(cases):
+    results = _candidate_results(_observations(cases))
+    fabricated = _result_for(results, 0.03)
+    fabricated["target"] = {
+        **fabricated["target"],
+        "passed_cases": 30,
+        "positive_generation_allowed": 15,
+        "passed": True,
+    }
+    fabricated["stress"] = {
+        **fabricated["stress"],
+        "direct_false_refusals": 0,
+        "passed": True,
+    }
+    fabricated["passed"] = True
+    with pytest.raises(ValueError, match="target aggregate"):
+        select_highest_passing_threshold(results)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda result: result["cases"][0].update(effective_threshold=0.03),
+            "case decision",
+        ),
+        (
+            lambda result: result["cases"][0].update(refused=True),
+            "case decision",
+        ),
+        (
+            lambda result: result["cases"][0].update(applied_routes=[]),
+            "case decision",
+        ),
+        (
+            lambda result: result["target"].update(passed_cases=29, passed=False),
+            "target aggregate",
+        ),
+        (
+            lambda result: result["stress_evidence"][40].update(top_score=0.5),
+            "stress aggregate",
+        ),
+        (
+            lambda result: result["formal"].update(hit_at_5=1.0),
+            "formal aggregate",
+        ),
+    ],
+)
+def test_selector_rejects_case_decision_and_guard_mismatches(
+    cases, mutate, message
+):
+    results = _candidate_results(_observations(cases))
+    mutate(_result_for(results, 0.015))
+    with pytest.raises(ValueError, match=message):
+        select_highest_passing_threshold(results)
 
 
 def test_selector_rejects_grid_tampering_and_no_go(cases):
@@ -457,14 +646,9 @@ def test_selector_rejects_grid_tampering_and_no_go(cases):
     with pytest.raises(ValueError, match="candidate grid"):
         select_highest_passing_threshold(results[:-1])
 
-    failing = [
-        {
-            **result,
-            "target": {**result["target"], "passed_cases": 29, "passed": False},
-            "passed": False,
-        }
-        for result in results
-    ]
+    observations = _observations(cases)
+    observations[0] = {**observations[0], "applied_routes": []}
+    failing = _candidate_results(observations)
     with pytest.raises(RuntimeError, match="no candidate"):
         select_highest_passing_threshold(failing)
 
@@ -472,20 +656,19 @@ def test_selector_rejects_grid_tampering_and_no_go(cases):
 def test_selector_rejects_nonfinite_case_decision_inputs(cases):
     results = _candidate_results(_observations(cases))
     results[0]["cases"][0]["top_score"] = math.nan
-
     with pytest.raises(ValueError, match="top_score"):
         select_highest_passing_threshold(results)
 
 
-def test_official_artifact_has_strict_content_free_schema_and_rounding(cases):
+def test_official_artifact_recomputes_and_publishes_only_safe_truth(cases):
     observations = _observations(cases)
     observations[0] = {**observations[0], "top_score": 0.0150004}
+    results = _candidate_results(observations)
     artifact = build_official_artifact(
         observations=observations,
-        candidate_results=_candidate_results(observations),
-        provenance=_provenance(),
+        candidate_results=results,
+        provenance=_provenance(results),
     )
-
     assert tuple(artifact) == (
         "schema_version",
         "provenance",
@@ -494,54 +677,64 @@ def test_official_artifact_has_strict_content_free_schema_and_rounding(cases):
         "candidates",
         "cases",
     )
-    assert artifact["schema_version"] == "1.0"
-    assert artifact["candidate_thresholds"] == list(CANDIDATE_THRESHOLDS)
+    assert artifact["candidate_thresholds"] == list(EXPECTED_CANDIDATES)
     assert artifact["selected_threshold"] == 0.015
-    assert len(artifact["candidates"]) == 7
     assert all("cases" not in result for result in artifact["candidates"])
-    assert len(artifact["cases"]) == 30
+    assert all("stress_evidence" not in result for result in artifact["candidates"])
+    assert all("formal_evidence" not in result for result in artifact["candidates"])
     assert set(artifact["cases"][0]) == OFFICIAL_CASE_FIELDS
     assert artifact["cases"][0]["top_score"] == 0.015
-    assert artifact["cases"][0]["effective_threshold"] == 0.015
     serialized = json.dumps(artifact, ensure_ascii=False, sort_keys=True)
     assert all(case.question not in serialized for case in cases)
-    assert not {
-        "question",
-        "content",
-        "answer",
-        "endpoint",
-        "url",
-        "credential",
-        "response",
-        "local_path",
-        "account",
-    } & {key.casefold() for key in _all_keys(artifact)}
 
 
-def _all_keys(value):
-    if isinstance(value, dict):
-        for key, nested in value.items():
-            yield key
-            yield from _all_keys(nested)
-    elif isinstance(value, list):
-        for nested in value:
-            yield from _all_keys(nested)
-
-
-def test_official_artifact_rejects_content_bearing_rows_and_provenance(cases):
+def test_official_artifact_rejects_raw_evidence_provenance_mismatch(cases):
     observations = _observations(cases)
     results = _candidate_results(observations)
-    content_bearing = [{**observations[0], "question": cases[0].question}]
-    content_bearing.extend(observations[1:])
-    with pytest.raises(ValueError, match="observation fields"):
+    provenance = _provenance(results)
+    provenance["source_artifact_sha256"]["stress_raw_evidence"] = "0" * 64
+    with pytest.raises(ValueError, match="raw evidence hash"):
         build_official_artifact(
-            observations=content_bearing,
+            observations=observations,
             candidate_results=results,
-            provenance=_provenance(),
+            provenance=provenance,
         )
 
-    provenance = {**_provenance(), "endpoint": "https://example.invalid"}
-    with pytest.raises(ValueError, match="provenance fields"):
+
+@pytest.mark.parametrize(
+    ("attack", "message"),
+    [
+        ("nested_source_key", "source_ranks"),
+        ("route_value", "allowlist"),
+        ("relative_path", "embedding_model"),
+        ("schemeless_endpoint", "embedding_model"),
+        ("credential_value", "embedding_revision"),
+        ("account_field", "provenance fields"),
+        ("nested_endpoint_key", "retrieval_configuration fields"),
+    ],
+)
+def test_official_artifact_rejects_nested_privacy_attacks(cases, attack, message):
+    observations = _observations(cases)
+    results = _candidate_results(observations)
+    provenance = _provenance(results)
+    if attack == "nested_source_key":
+        observations[0] = {**observations[0], "source_ranks": {"question": 1}}
+    elif attack == "route_value":
+        observations[0] = {
+            **observations[0],
+            "applied_routes": ["https://endpoint.invalid"],
+        }
+    elif attack == "relative_path":
+        provenance["embedding_model"] = "private/models/bge-m3"
+    elif attack == "schemeless_endpoint":
+        provenance["embedding_model"] = "api.internal.example"
+    elif attack == "credential_value":
+        provenance["embedding_revision"] = "sk-private-credential"
+    elif attack == "account_field":
+        provenance["account"] = "person@example.com"
+    else:
+        provenance["retrieval_configuration"]["endpoint"] = "api.internal.example"
+    with pytest.raises(ValueError, match=message):
         build_official_artifact(
             observations=observations,
             candidate_results=results,

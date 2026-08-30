@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from dataclasses import dataclass
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 from typing import Any, Literal
 
 from rag.retrieval.refusal_policy import decide_retrieval_refusal
@@ -16,8 +17,9 @@ EXPECTED_QIDS = tuple(
 )
 FORMAL_HIT_AT_5_BASELINE = 0.9666666666666667
 FORMAL_MRR_AT_10_BASELINE = 0.9055555555555554
+_GLOBAL_THRESHOLD = 0.03
 
-_FIELDS = {
+_DATASET_FIELDS = {
     "qid",
     "question",
     "case_type",
@@ -28,59 +30,98 @@ _FIELDS = {
     "expect_generation",
     "style_tags",
 }
-_OBSERVATION_FIELDS = {
+_OBSERVATION_FIELDS = {"qid", "source_ranks", "applied_routes", "top_score"}
+_CASE_RESULT_FIELDS = {
     "qid",
     "case_type",
     "answerable",
     "source_ranks",
     "applied_routes",
     "top_score",
-    "source_contract_passed",
-    "route_contract_passed",
-    "generation_expected",
-}
-_CASE_RESULT_FIELDS = _OBSERVATION_FIELDS | {
     "effective_threshold",
     "refused",
     "refusal_stage",
+    "source_contract_passed",
+    "route_contract_passed",
+    "generation_expected",
     "generation_allowed",
     "generation_contract_passed",
     "passed",
 }
-_TARGET_FIELDS = {
-    "total",
-    "passed_cases",
-    "positive_routes",
-    "positive_sources_at_5",
-    "positive_generation_allowed",
-    "collision_contracts",
-    "passed",
-}
-_STRESS_FIELDS = {
-    "questions",
+_GUARD_FIELDS = {
+    "qid",
     "answerable",
-    "unanswerable",
-    "direct_false_refusals",
-    "direct_unanswerable_refusals",
-    "direct_unanswerable_coverage",
-    "passed",
-}
-_FORMAL_FIELDS = {
-    "questions",
-    "answerable",
-    "unanswerable",
-    "hit_at_5",
-    "mrr_at_10",
-    "direct_false_refusals",
-    "passed",
+    "rank",
+    "top_score",
+    "applied_routes",
+    "score_precision",
 }
 _CANDIDATE_FIELDS = {
     "candidate_threshold",
+    "global_threshold",
     "target",
     "stress",
     "formal",
     "cases",
+    "stress_evidence",
+    "formal_evidence",
     "passed",
+}
+_PROVENANCE_FIELDS = {
+    "dataset_sha256",
+    "corpus_snapshot_sha256",
+    "source_artifact_sha256",
+    "embedding_model",
+    "embedding_revision",
+    "reranker_model",
+    "reranker_revision",
+    "retrieval_configuration",
+    "code_revision",
+    "provider_adapters",
+    "provider_requests",
+}
+_SOURCE_ARTIFACT_FIELDS = {
+    "stress_dataset",
+    "formal_dataset",
+    "stress_raw_evidence",
+    "formal_raw_evidence",
+}
+_RETRIEVAL_CONFIGURATION = {
+    "chunking": "structure",
+    "retrieval": "hybrid",
+    "reranker": True,
+    "top_k_retrieve": 20,
+    "top_k_final": 5,
+}
+_EMBEDDING_MODEL = "BAAI/bge-m3"
+_EMBEDDING_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
+_RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
+_RERANKER_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+_KNOWN_ROUTES = {
+    "off_hours_employer_message",
+    "severance_comparison",
+    "wage_arrears_termination",
+}
+_SEVERANCE_ROUTE = ("severance_comparison",)
+_WAGE_ROUTE = ("wage_arrears_termination",)
+_MULTI_ROUTE = ("severance_comparison", "wage_arrears_termination")
+_PENSION_12 = "勞工退休金條例|第 12 條"
+_LABOR_17 = "勞動基準法|第 17 條"
+_LABOR_11 = "勞動基準法|第 11 條"
+_LABOR_16 = "勞動基準法|第 16 條"
+_LABOR_14 = "勞動基準法|第 14 條"
+_PENSION_24 = "勞工退休金條例|第 24 條"
+_LABOR_54 = "勞動基準法|第 54 條"
+_LABOR_30 = "勞動基準法|第 30 條"
+_CANONICAL_SOURCE_KEYS = {
+    _PENSION_12,
+    _LABOR_17,
+    _LABOR_11,
+    _LABOR_16,
+    _LABOR_14,
+    _PENSION_24,
+    _LABOR_54,
+    _LABOR_30,
 }
 _POSITIVE_STYLES = {
     "statutory_chinese",
@@ -102,42 +143,6 @@ _COLLISION_STYLES = {
     "unrelated_old_new",
     "partial_cue_collision",
 }
-_SEVERANCE_ROUTE = ("severance_comparison",)
-_KNOWN_ROUTES = {
-    "off_hours_employer_message",
-    "severance_comparison",
-    "wage_arrears_termination",
-}
-_SEVERANCE_SOURCES = (
-    {"law": "勞工退休金條例", "article": "第 12 條"},
-    {"law": "勞動基準法", "article": "第 17 條"},
-)
-_GUARD_FIELDS = {"qid", "answerable", "rank", "top_score", "applied_routes"}
-_PROVENANCE_FIELDS = {
-    "dataset_sha256",
-    "corpus_snapshot_sha256",
-    "source_artifact_sha256",
-    "embedding_model",
-    "embedding_revision",
-    "reranker_model",
-    "reranker_revision",
-    "retrieval_configuration",
-    "code_revision",
-    "provider_adapters",
-    "provider_requests",
-}
-_SOURCE_ARTIFACT_FIELDS = {
-    "reliability_results",
-    "reliability_trace",
-    "reliability_formal_trace",
-}
-_RETRIEVAL_CONFIGURATION_FIELDS = {
-    "chunking",
-    "retrieval",
-    "reranker",
-    "top_k_retrieve",
-    "top_k_final",
-}
 
 
 @dataclass(frozen=True)
@@ -151,6 +156,82 @@ class SeverancePolicyCase:
     prohibited_routes: tuple[str, ...]
     expect_generation: bool
     style_tags: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _CaseContract:
+    case_type: Literal["positive", "collision_negative"]
+    answerable: bool
+    source_keys: tuple[str, ...]
+    required_routes: tuple[str, ...]
+    prohibited_routes: tuple[str, ...]
+    expect_generation: bool
+
+
+def _collision(
+    source_keys: tuple[str, ...],
+    *,
+    answerable: bool = True,
+    required_routes: tuple[str, ...] = (),
+    prohibited_routes: tuple[str, ...] = _SEVERANCE_ROUTE,
+    expect_generation: bool = True,
+) -> _CaseContract:
+    return _CaseContract(
+        case_type="collision_negative",
+        answerable=answerable,
+        source_keys=source_keys,
+        required_routes=required_routes,
+        prohibited_routes=prohibited_routes,
+        expect_generation=expect_generation,
+    )
+
+
+_POSITIVE_CONTRACT = _CaseContract(
+    case_type="positive",
+    answerable=True,
+    source_keys=(_PENSION_12, _LABOR_17),
+    required_routes=_SEVERANCE_ROUTE,
+    prohibited_routes=(),
+    expect_generation=True,
+)
+_CASE_CONTRACTS = {
+    **{qid: _POSITIVE_CONTRACT for qid in EXPECTED_QIDS[:15]},
+    "severance-policy-016": _collision((_PENSION_12,)),
+    "severance-policy-017": _collision((_LABOR_17,)),
+    "severance-policy-018": _collision((_LABOR_11,)),
+    "severance-policy-019": _collision((_LABOR_16,)),
+    "severance-policy-020": _collision(
+        (_LABOR_14,), required_routes=_WAGE_ROUTE
+    ),
+    "severance-policy-021": _collision((_PENSION_24,)),
+    "severance-policy-022": _collision((_LABOR_54,)),
+    "severance-policy-023": _collision(
+        (), answerable=False, expect_generation=False
+    ),
+    "severance-policy-024": _collision((), answerable=False),
+    "severance-policy-025": _collision((_PENSION_12,)),
+    "severance-policy-026": _collision((_LABOR_17,)),
+    "severance-policy-027": _collision((), answerable=False),
+    "severance-policy-028": _collision((_LABOR_16,)),
+    "severance-policy-029": _collision((_LABOR_30,)),
+    "severance-policy-030": _collision(
+        (_LABOR_14, _PENSION_12, _LABOR_17),
+        required_routes=_MULTI_ROUTE,
+        prohibited_routes=(),
+    ),
+}
+_STRESS_QIDS = tuple(f"stress-{number:03d}" for number in range(1, 61))
+_FORMAL_QIDS = tuple(f"eval-{number:02d}" for number in range(1, 41))
+_STRESS_ROUTES = {
+    "stress-003": _SEVERANCE_ROUTE,
+    "stress-010": _WAGE_ROUTE,
+    "stress-037": _SEVERANCE_ROUTE,
+    "stress-038": _WAGE_ROUTE,
+}
+_FORMAL_ROUTES = {
+    "eval-03": _SEVERANCE_ROUTE,
+    "eval-10": _WAGE_ROUTE,
+}
 
 
 def _invalid(identity: object, message: str) -> ValueError:
@@ -178,6 +259,22 @@ def _boolean(value: object, *, field: str, identity: object) -> bool:
     return value
 
 
+def _unit_interval(value: object, *, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field} must be numeric")
+    normalized = float(value)
+    if not math.isfinite(normalized) or not 0.0 <= normalized <= 1.0:
+        raise ValueError(f"{field} must be finite and between zero and one")
+    return normalized
+
+
+def _validated_global_threshold(value: object) -> float:
+    normalized = _unit_interval(value, field="global_threshold")
+    if normalized != _GLOBAL_THRESHOLD:
+        raise ValueError("global_threshold must equal the committed 0.03")
+    return normalized
+
+
 def _strings(
     value: object,
     *,
@@ -197,22 +294,45 @@ def _strings(
     return normalized
 
 
+def _routes(value: object, *, field: str, require_tuple: bool) -> tuple[str, ...]:
+    expected_type = tuple if require_tuple else list
+    if not isinstance(value, expected_type):
+        raise ValueError(f"{field} must be a {expected_type.__name__}")
+    if not all(isinstance(route, str) and route.strip() for route in value):
+        raise ValueError(f"{field} must contain non-blank strings")
+    normalized = tuple(route.strip() for route in value)
+    if len(normalized) != len(set(normalized)):
+        raise ValueError(f"{field} contains duplicates")
+    if not set(normalized) <= _KNOWN_ROUTES:
+        raise ValueError(f"{field} values must belong to the route allowlist")
+    return normalized
+
+
+def _source_key(source: dict[str, str]) -> str:
+    return f"{source['law']}|{source['article']}"
+
+
 def _sources(value: object, *, identity: object) -> tuple[dict[str, str], ...]:
     if not isinstance(value, list):
         raise _invalid(identity, "sources must be a list")
     normalized: list[dict[str, str]] = []
-    seen: set[tuple[str, str]] = set()
+    seen: set[str] = set()
     for source in value:
         if not isinstance(source, dict) or set(source) != {"law", "article"}:
             raise _invalid(identity, "source fields must equal law and article")
-        source_id = (
-            _non_blank(source["law"], field="source law", identity=identity),
-            _non_blank(source["article"], field="source article", identity=identity),
-        )
-        if source_id in seen:
+        normalized_source = {
+            "law": _non_blank(
+                source["law"], field="source law", identity=identity
+            ),
+            "article": _non_blank(
+                source["article"], field="source article", identity=identity
+            ),
+        }
+        key = _source_key(normalized_source)
+        if key in seen:
             raise _invalid(identity, "sources contain a duplicate source")
-        seen.add(source_id)
-        normalized.append({"law": source_id[0], "article": source_id[1]})
+        seen.add(key)
+        normalized.append(normalized_source)
     return tuple(normalized)
 
 
@@ -221,17 +341,14 @@ def _parse_case(row: object, index: int) -> SeverancePolicyCase:
     if not isinstance(row, dict):
         raise _invalid(identity, "must be an object")
     identity = row.get("qid", identity)
-    if set(row) != _FIELDS:
-        raise _invalid(identity, f"fields must equal {sorted(_FIELDS)}")
+    if set(row) != _DATASET_FIELDS:
+        raise _invalid(identity, f"fields must equal {sorted(_DATASET_FIELDS)}")
     qid = _non_blank(row["qid"], field="qid", identity=identity)
     question = _non_blank(row["question"], field="question", identity=qid)
     case_type = row["case_type"]
-    if case_type not in {"positive", "collision_negative"}:
-        raise _invalid(qid, "case_type is invalid")
     expected_type = "positive" if index <= 15 else "collision_negative"
     if case_type != expected_type:
         raise _invalid(qid, "case_type ordering must be fifteen positives then negatives")
-
     answerable = _boolean(row["answerable"], field="answerable", identity=qid)
     expect_generation = _boolean(
         row["expect_generation"], field="expect_generation", identity=qid
@@ -256,23 +373,25 @@ def _parse_case(row: object, index: int) -> SeverancePolicyCase:
         raise _invalid(qid, "required_routes overlap prohibited_routes")
     if not set(required_routes + prohibited_routes) <= _KNOWN_ROUTES:
         raise _invalid(qid, "route contract contains an unknown route")
-    if answerable and not sources:
-        raise _invalid(qid, "answerable cases require sources")
-    if not answerable and sources:
-        raise _invalid(qid, "unanswerable cases must not have sources")
-
-    if case_type == "positive":
-        if not answerable or sources != _SEVERANCE_SOURCES:
-            raise _invalid(qid, "positive sources must be the reviewed two-law contract")
-        if required_routes != _SEVERANCE_ROUTE or prohibited_routes:
-            raise _invalid(qid, "positive route contract must be severance-only")
-        if not expect_generation:
-            raise _invalid(qid, "positive cases must reach generation")
-    elif required_routes == _SEVERANCE_ROUTE and not prohibited_routes:
-        raise _invalid(qid, "collision case cannot request the severance-only policy")
-    if answerable and not expect_generation:
-        raise _invalid(qid, "answerable cases must reach generation")
-
+    contract = _CASE_CONTRACTS.get(qid)
+    actual_contract = (
+        case_type,
+        answerable,
+        tuple(_source_key(source) for source in sources),
+        required_routes,
+        prohibited_routes,
+        expect_generation,
+    )
+    expected_contract = (
+        contract.case_type,
+        contract.answerable,
+        contract.source_keys,
+        contract.required_routes,
+        contract.prohibited_routes,
+        contract.expect_generation,
+    ) if contract else None
+    if actual_contract != expected_contract:
+        raise _invalid(qid, "does not match its canonical contract")
     return SeverancePolicyCase(
         qid=qid,
         question=question,
@@ -302,41 +421,56 @@ def load_cases(path: Path) -> list[SeverancePolicyCase]:
     if len(qids) != len(set(qids)):
         raise _invalid("dataset", "contains duplicate qids")
     if tuple(qids) != EXPECTED_QIDS:
-        raise _invalid(
-            "dataset", "qids must be severance-policy-001 through -030"
-        )
-    positive_styles = {tag for case in cases[:15] for tag in case.style_tags}
-    if not _POSITIVE_STYLES <= positive_styles:
+        raise _invalid("dataset", "qids must be severance-policy-001 through -030")
+    if not _POSITIVE_STYLES <= {
+        tag for case in cases[:15] for tag in case.style_tags
+    }:
         raise _invalid("dataset", "positive style coverage is incomplete")
-    collision_styles = {tag for case in cases[15:] for tag in case.style_tags}
-    if not _COLLISION_STYLES <= collision_styles:
+    if not _COLLISION_STYLES <= {
+        tag for case in cases[15:] for tag in case.style_tags
+    }:
         raise _invalid("dataset", "collision style coverage is incomplete")
     return cases
 
 
-def _unit_interval(value: object, *, field: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError(f"{field} must be numeric")
-    normalized = float(value)
-    if not math.isfinite(normalized) or not 0.0 <= normalized <= 1.0:
-        raise ValueError(f"{field} must be finite and between zero and one")
-    return normalized
+def _validated_source_ranks(
+    value: object, *, qid: str, allowed: tuple[str, ...]
+) -> dict[str, int]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{qid}: source_ranks must be a dict")
+    if not set(value) <= set(allowed):
+        raise ValueError(f"{qid}: source_ranks keys are not canonical")
+    normalized: dict[str, int] = {}
+    for source, rank in value.items():
+        if type(rank) is not int or rank < 1:
+            raise ValueError(f"{qid}: source_ranks require positive integer ranks")
+        normalized[source] = rank
+    return dict(sorted(normalized.items()))
 
 
-def _source_key(source: dict[str, str]) -> str:
-    return f"{source['law']}|{source['article']}"
-
-
-def _routes(value: object, *, field: str, require_tuple: bool) -> tuple[str, ...]:
-    expected_type = tuple if require_tuple else list
-    if not isinstance(value, expected_type):
-        raise ValueError(f"{field} must be a {expected_type.__name__}")
-    if not all(isinstance(route, str) and route.strip() for route in value):
-        raise ValueError(f"{field} must contain non-blank strings")
-    normalized = tuple(route.strip() for route in value)
-    if len(normalized) != len(set(normalized)):
-        raise ValueError(f"{field} contains duplicates")
-    return normalized
+def _case_matches_contract(case: SeverancePolicyCase) -> _CaseContract:
+    contract = _CASE_CONTRACTS.get(case.qid)
+    if contract is None:
+        raise ValueError("case qid is not canonical")
+    actual = (
+        case.case_type,
+        case.answerable,
+        tuple(_source_key(source) for source in case.sources),
+        case.required_routes,
+        case.prohibited_routes,
+        case.expect_generation,
+    )
+    expected = (
+        contract.case_type,
+        contract.answerable,
+        contract.source_keys,
+        contract.required_routes,
+        contract.prohibited_routes,
+        contract.expect_generation,
+    )
+    if actual != expected:
+        raise ValueError(f"{case.qid}: case does not match canonical contract")
+    return contract
 
 
 def build_case_observation(
@@ -350,126 +484,70 @@ def build_case_observation(
 
     if not isinstance(case, SeverancePolicyCase):
         raise ValueError("case must be a SeverancePolicyCase")
-    if not isinstance(source_ranks, dict):
-        raise ValueError("source_ranks must be a dict")
-    expected_sources = {_source_key(source) for source in case.sources}
-    if not set(source_ranks) <= expected_sources:
-        raise ValueError("source_ranks may contain only reviewed source identities")
-    normalized_ranks: dict[str, int] = {}
-    for source, rank in source_ranks.items():
-        if (
-            not isinstance(source, str)
-            or not source.strip()
-            or type(rank) is not int
-            or rank < 1
-        ):
-            raise ValueError("source_ranks require non-blank keys and positive integers")
-        normalized_ranks[source.strip()] = rank
-    routes = _routes(applied_routes, field="applied_routes", require_tuple=True)
-    score = _unit_interval(top_score, field="top_score")
-    source_contract_passed = case.case_type != "positive" or all(
-        normalized_ranks.get(source, 6) <= 5 for source in expected_sources
+    contract = _case_matches_contract(case)
+    ranks = _validated_source_ranks(
+        source_ranks, qid=case.qid, allowed=contract.source_keys
     )
-    if case.case_type == "positive":
-        route_contract_passed = routes == _SEVERANCE_ROUTE
-    else:
-        route_contract_passed = (
-            routes != _SEVERANCE_ROUTE
-            and all(route in routes for route in case.required_routes)
-            and all(route not in routes for route in case.prohibited_routes)
-        )
+    routes = _routes(applied_routes, field="applied_routes", require_tuple=True)
     return {
         "qid": case.qid,
-        "case_type": case.case_type,
-        "answerable": case.answerable,
-        "source_ranks": dict(sorted(normalized_ranks.items())),
+        "source_ranks": ranks,
         "applied_routes": list(routes),
-        "top_score": score,
-        "source_contract_passed": source_contract_passed,
-        "route_contract_passed": route_contract_passed,
-        "generation_expected": case.expect_generation,
+        "top_score": _unit_interval(top_score, field="top_score"),
     }
 
 
 def _validated_observations(observations: object) -> list[dict[str, Any]]:
     if not isinstance(observations, list):
         raise ValueError("observations must be a list")
-    normalized: list[dict[str, Any]] = []
-    for index, row in enumerate(observations, start=1):
+    if len(observations) != 30:
+        raise ValueError("observations must contain thirty rows")
+    normalized = []
+    for index, row in enumerate(observations):
         if not isinstance(row, dict) or set(row) != _OBSERVATION_FIELDS:
-            raise ValueError(f"observation fields are invalid at row {index}")
-        qid = _non_blank(row["qid"], field="qid", identity=f"observation {index}")
-        case_type = row["case_type"]
-        if case_type not in {"positive", "collision_negative"}:
-            raise ValueError(f"observation {qid}: invalid case_type")
-        answerable = _boolean(row["answerable"], field="answerable", identity=qid)
-        generation_expected = _boolean(
-            row["generation_expected"], field="generation_expected", identity=qid
-        )
-        source_contract = _boolean(
-            row["source_contract_passed"],
-            field="source_contract_passed",
-            identity=qid,
-        )
-        route_contract = _boolean(
-            row["route_contract_passed"],
-            field="route_contract_passed",
-            identity=qid,
-        )
-        if not isinstance(row["source_ranks"], dict):
-            raise ValueError(f"observation {qid}: source_ranks must be a dict")
-        ranks: dict[str, int] = {}
-        for source, rank in row["source_ranks"].items():
-            if (
-                not isinstance(source, str)
-                or not source.strip()
-                or type(rank) is not int
-                or rank < 1
-            ):
-                raise ValueError(f"observation {qid}: invalid source_ranks")
-            ranks[source.strip()] = rank
-        routes = _routes(
-            row["applied_routes"], field="applied_routes", require_tuple=False
-        )
+            raise ValueError(f"observation fields are invalid at row {index + 1}")
+        qid = row["qid"]
+        if qid != EXPECTED_QIDS[index]:
+            raise ValueError("observations must contain the exact thirty qids in order")
+        contract = _CASE_CONTRACTS[qid]
         normalized.append(
             {
                 "qid": qid,
-                "case_type": case_type,
-                "answerable": answerable,
-                "source_ranks": dict(sorted(ranks.items())),
-                "applied_routes": list(routes),
+                "source_ranks": _validated_source_ranks(
+                    row["source_ranks"], qid=qid, allowed=contract.source_keys
+                ),
+                "applied_routes": list(
+                    _routes(
+                        row["applied_routes"],
+                        field="applied_routes",
+                        require_tuple=False,
+                    )
+                ),
                 "top_score": _unit_interval(row["top_score"], field="top_score"),
-                "source_contract_passed": source_contract,
-                "route_contract_passed": route_contract,
-                "generation_expected": generation_expected,
             }
         )
-    qids = [row["qid"] for row in normalized]
-    if len(qids) != len(set(qids)):
-        raise ValueError("observations contain duplicate qids")
-    if tuple(qids) != EXPECTED_QIDS:
-        raise ValueError("observations must contain the exact thirty qids in order")
-    expected_types = ["positive"] * 15 + ["collision_negative"] * 15
-    if [row["case_type"] for row in normalized] != expected_types:
-        raise ValueError("observation case types must preserve reviewed ordering")
     return normalized
 
 
-def _validated_guard_rows(
-    rows: object,
-    *,
-    label: str,
-    expected_qids: tuple[str, ...],
-    answerable_count: int,
-) -> list[dict[str, Any]]:
-    if not isinstance(rows, list):
-        raise ValueError(f"{label} rows must be a list")
-    normalized: list[dict[str, Any]] = []
-    for index, row in enumerate(rows, start=1):
+def _expected_guard_answerability(label: str, index: int) -> bool:
+    return index < (40 if label == "stress" else 30)
+
+
+def _validated_guard_rows(rows: object, *, label: str) -> list[dict[str, Any]]:
+    expected_qids = _STRESS_QIDS if label == "stress" else _FORMAL_QIDS
+    expected_routes = _STRESS_ROUTES if label == "stress" else _FORMAL_ROUTES
+    if not isinstance(rows, list) or len(rows) != len(expected_qids):
+        raise ValueError(f"{label} rows must contain the exact committed qids")
+    normalized = []
+    for index, row in enumerate(rows):
         if not isinstance(row, dict) or set(row) != _GUARD_FIELDS:
-            raise ValueError(f"{label} rows have invalid fields at row {index}")
-        qid = _non_blank(row["qid"], field="qid", identity=f"{label} row {index}")
+            raise ValueError(f"{label} rows have invalid fields at row {index + 1}")
+        qid = row["qid"]
+        if qid != expected_qids[index]:
+            raise ValueError(f"{label} rows must contain the exact committed qids")
         answerable = _boolean(row["answerable"], field="answerable", identity=qid)
+        if answerable is not _expected_guard_answerability(label, index):
+            raise ValueError(f"{label} answerability is not canonical for {qid}")
         rank = row["rank"]
         if rank is not None and (type(rank) is not int or rank < 1):
             raise ValueError(f"{label} row {qid}: rank must be null or positive")
@@ -478,6 +556,10 @@ def _validated_guard_rows(
         routes = _routes(
             row["applied_routes"], field="applied_routes", require_tuple=False
         )
+        if routes != expected_routes.get(qid, ()):
+            raise ValueError(f"{label} route identity is not canonical for {qid}")
+        if row["score_precision"] != "raw_unrounded":
+            raise ValueError(f"{label} score_precision must be raw_unrounded")
         normalized.append(
             {
                 "qid": qid,
@@ -485,91 +567,73 @@ def _validated_guard_rows(
                 "rank": rank,
                 "top_score": _unit_interval(row["top_score"], field="top_score"),
                 "applied_routes": list(routes),
+                "score_precision": "raw_unrounded",
             }
         )
-    if tuple(row["qid"] for row in normalized) != expected_qids:
-        raise ValueError(f"{label} rows must contain the exact committed qids")
-    if sum(row["answerable"] for row in normalized) != answerable_count:
-        raise ValueError(f"{label} rows have the wrong answerable split")
     return normalized
 
 
-def _guard_refused(
-    row: dict[str, Any], *, candidate_threshold: float, global_threshold: float
-) -> bool:
-    decision = decide_retrieval_refusal(
+def _decision(
+    *, routes: list[str], score: float, candidate: float, global_threshold: float
+):
+    return decide_retrieval_refusal(
         has_hits=True,
         reranker_enabled=True,
-        applied_routes=tuple(row["applied_routes"]),
-        top_score=row["top_score"],
+        applied_routes=tuple(routes),
+        top_score=score,
         global_threshold=global_threshold,
-        severance_comparison_threshold=candidate_threshold,
+        severance_comparison_threshold=candidate,
     )
-    return decision.refused
 
 
-def evaluate_candidate(
+def _evaluate_target(
     observations: list[dict[str, Any]],
     *,
-    candidate_threshold: float,
+    candidate: float,
     global_threshold: float,
-    stress_rows: list[dict[str, Any]],
-    formal_rows: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Recompute target and guard gates through the shared policy."""
-
-    candidate = _unit_interval(
-        candidate_threshold, field="candidate_threshold"
-    )
-    if candidate not in CANDIDATE_THRESHOLDS:
-        raise ValueError("candidate_threshold must belong to the committed grid")
-    global_value = _unit_interval(global_threshold, field="global_threshold")
-    target_rows = _validated_observations(observations)
-    stress = _validated_guard_rows(
-        stress_rows,
-        label="stress",
-        expected_qids=tuple(f"stress-{number:03d}" for number in range(1, 61)),
-        answerable_count=40,
-    )
-    formal = _validated_guard_rows(
-        formal_rows,
-        label="formal",
-        expected_qids=tuple(f"eval-{number:02d}" for number in range(1, 41)),
-        answerable_count=30,
-    )
-
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     case_results = []
-    for row in target_rows:
-        decision = decide_retrieval_refusal(
-            has_hits=True,
-            reranker_enabled=True,
-            applied_routes=tuple(row["applied_routes"]),
-            top_score=row["top_score"],
-            global_threshold=global_value,
-            severance_comparison_threshold=candidate,
+    for row in observations:
+        contract = _CASE_CONTRACTS[row["qid"]]
+        source_contract = all(
+            row["source_ranks"].get(source, 6) <= 5
+            for source in contract.source_keys
+        )
+        route_contract = tuple(row["applied_routes"]) == contract.required_routes
+        decision = _decision(
+            routes=row["applied_routes"],
+            score=row["top_score"],
+            candidate=candidate,
+            global_threshold=global_threshold,
         )
         generation_allowed = not decision.refused
-        generation_contract = generation_allowed is row["generation_expected"]
-        required_contracts = row["route_contract_passed"] and generation_contract
-        passed = required_contracts and (
-            row["source_contract_passed"] or row["case_type"] == "collision_negative"
+        generation_contract = generation_allowed is contract.expect_generation
+        passed = route_contract and generation_contract and (
+            source_contract or contract.case_type == "collision_negative"
         )
         case_results.append(
             {
-                **row,
+                "qid": row["qid"],
+                "case_type": contract.case_type,
+                "answerable": contract.answerable,
+                "source_ranks": dict(row["source_ranks"]),
+                "applied_routes": list(row["applied_routes"]),
+                "top_score": row["top_score"],
                 "effective_threshold": decision.effective_threshold,
                 "refused": decision.refused,
                 "refusal_stage": decision.refusal_stage,
+                "source_contract_passed": source_contract,
+                "route_contract_passed": route_contract,
+                "generation_expected": contract.expect_generation,
                 "generation_allowed": generation_allowed,
                 "generation_contract_passed": generation_contract,
                 "passed": passed,
             }
         )
-
     positives = case_results[:15]
     collisions = case_results[15:]
     passed_cases = sum(row["passed"] for row in case_results)
-    target_summary = {
+    summary = {
         "total": 30,
         "passed_cases": passed_cases,
         "positive_routes": sum(row["route_contract_passed"] for row in positives),
@@ -586,87 +650,193 @@ def evaluate_candidate(
         ),
         "passed": passed_cases == 30,
     }
+    return case_results, summary
 
-    stress_decisions = [
-        _guard_refused(
-            row,
-            candidate_threshold=candidate,
-            global_threshold=global_value,
-        )
-        for row in stress
+
+def _stress_summary(
+    rows: list[dict[str, Any]], *, candidate: float, global_threshold: float
+) -> dict[str, Any]:
+    decisions = [
+        _decision(
+            routes=row["applied_routes"],
+            score=row["top_score"],
+            candidate=candidate,
+            global_threshold=global_threshold,
+        ).refused
+        for row in rows
     ]
-    stress_false_refusals = sum(
+    false_refusals = sum(
         refused and row["answerable"]
-        for row, refused in zip(stress, stress_decisions, strict=True)
+        for row, refused in zip(rows, decisions, strict=True)
     )
-    stress_unanswerable_refusals = sum(
+    unanswerable_refusals = sum(
         refused and not row["answerable"]
-        for row, refused in zip(stress, stress_decisions, strict=True)
+        for row, refused in zip(rows, decisions, strict=True)
     )
-    stress_summary = {
+    return {
         "questions": 60,
         "answerable": 40,
         "unanswerable": 20,
-        "direct_false_refusals": stress_false_refusals,
-        "direct_unanswerable_refusals": stress_unanswerable_refusals,
-        "direct_unanswerable_coverage": stress_unanswerable_refusals / 20,
-        "passed": stress_false_refusals == 0
-        and stress_unanswerable_refusals >= 17,
+        "direct_false_refusals": false_refusals,
+        "direct_unanswerable_refusals": unanswerable_refusals,
+        "direct_unanswerable_coverage": unanswerable_refusals / 20,
+        "passed": false_refusals == 0 and unanswerable_refusals >= 17,
     }
 
-    formal_answerable = [row for row in formal if row["answerable"]]
-    formal_decisions = [
-        _guard_refused(
-            row,
-            candidate_threshold=candidate,
-            global_threshold=global_value,
-        )
-        for row in formal
+
+def _formal_summary(
+    rows: list[dict[str, Any]], *, candidate: float, global_threshold: float
+) -> dict[str, Any]:
+    answerable = [row for row in rows if row["answerable"]]
+    decisions = [
+        _decision(
+            routes=row["applied_routes"],
+            score=row["top_score"],
+            candidate=candidate,
+            global_threshold=global_threshold,
+        ).refused
+        for row in rows
     ]
-    formal_false_refusals = sum(
+    false_refusals = sum(
         refused and row["answerable"]
-        for row, refused in zip(formal, formal_decisions, strict=True)
+        for row, refused in zip(rows, decisions, strict=True)
     )
     hit_at_5 = sum(
-        row["rank"] is not None and row["rank"] <= 5 for row in formal_answerable
+        row["rank"] is not None and row["rank"] <= 5 for row in answerable
     ) / 30
     mrr_at_10 = sum(
         1 / row["rank"]
-        for row in formal_answerable
+        for row in answerable
         if row["rank"] is not None and row["rank"] <= 10
     ) / 30
-    formal_summary = {
+    return {
         "questions": 40,
         "answerable": 30,
         "unanswerable": 10,
         "hit_at_5": hit_at_5,
         "mrr_at_10": mrr_at_10,
-        "direct_false_refusals": formal_false_refusals,
+        "direct_false_refusals": false_refusals,
         "passed": hit_at_5 >= FORMAL_HIT_AT_5_BASELINE
         and mrr_at_10 >= FORMAL_MRR_AT_10_BASELINE
-        and formal_false_refusals == 0,
+        and false_refusals == 0,
     }
-    passed = target_summary["passed"] and stress_summary["passed"] and formal_summary[
-        "passed"
-    ]
+
+
+def evaluate_candidate(
+    observations: list[dict[str, Any]],
+    *,
+    candidate_threshold: float,
+    global_threshold: float,
+    stress_rows: list[dict[str, Any]],
+    formal_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Recompute target and guard gates through the shared policy."""
+
+    candidate = _unit_interval(candidate_threshold, field="candidate_threshold")
+    if candidate not in CANDIDATE_THRESHOLDS:
+        raise ValueError("candidate_threshold must belong to the committed grid")
+    global_value = _validated_global_threshold(global_threshold)
+    target_evidence = _validated_observations(observations)
+    stress_evidence = _validated_guard_rows(stress_rows, label="stress")
+    formal_evidence = _validated_guard_rows(formal_rows, label="formal")
+    cases, target = _evaluate_target(
+        target_evidence,
+        candidate=candidate,
+        global_threshold=global_value,
+    )
+    stress = _stress_summary(
+        stress_evidence,
+        candidate=candidate,
+        global_threshold=global_value,
+    )
+    formal = _formal_summary(
+        formal_evidence,
+        candidate=candidate,
+        global_threshold=global_value,
+    )
+    passed = target["passed"] and stress["passed"] and formal["passed"]
     return {
         "candidate_threshold": candidate,
-        "target": target_summary,
-        "stress": stress_summary,
-        "formal": formal_summary,
-        "cases": case_results,
+        "global_threshold": global_value,
+        "target": target,
+        "stress": stress,
+        "formal": formal,
+        "cases": cases,
+        "stress_evidence": stress_evidence,
+        "formal_evidence": formal_evidence,
         "passed": passed,
     }
 
 
-def _count(value: object, *, field: str, maximum: int) -> int:
-    if type(value) is not int or not 0 <= value <= maximum:
-        raise ValueError(f"{field} must be an integer from zero through {maximum}")
-    return value
+def _observations_from_case_results(cases: object) -> list[dict[str, Any]]:
+    if not isinstance(cases, list) or len(cases) != 30:
+        raise ValueError("candidate cases must contain thirty rows")
+    observations = []
+    for index, row in enumerate(cases):
+        if not isinstance(row, dict) or set(row) != _CASE_RESULT_FIELDS:
+            raise ValueError(f"candidate case fields are invalid at row {index + 1}")
+        observations.append(
+            {
+                "qid": row["qid"],
+                "source_ranks": row["source_ranks"],
+                "applied_routes": row["applied_routes"],
+                "top_score": row["top_score"],
+            }
+        )
+    return _validated_observations(observations)
 
 
-def _metric(value: object, *, field: str) -> float:
-    return _unit_interval(value, field=field)
+def _recompute_candidate(result: object) -> dict[str, Any]:
+    if not isinstance(result, dict) or set(result) != _CANDIDATE_FIELDS:
+        raise ValueError("candidate result fields are invalid")
+    candidate = _unit_interval(
+        result["candidate_threshold"], field="candidate_threshold"
+    )
+    global_threshold = _validated_global_threshold(result["global_threshold"])
+    observations = _observations_from_case_results(result["cases"])
+    stress_evidence = _validated_guard_rows(
+        result["stress_evidence"], label="stress"
+    )
+    formal_evidence = _validated_guard_rows(
+        result["formal_evidence"], label="formal"
+    )
+    cases, target = _evaluate_target(
+        observations,
+        candidate=candidate,
+        global_threshold=global_threshold,
+    )
+    stress = _stress_summary(
+        stress_evidence,
+        candidate=candidate,
+        global_threshold=global_threshold,
+    )
+    formal = _formal_summary(
+        formal_evidence,
+        candidate=candidate,
+        global_threshold=global_threshold,
+    )
+    passed = target["passed"] and stress["passed"] and formal["passed"]
+    if result["cases"] != cases:
+        raise ValueError(f"candidate {candidate}: case decision mismatch")
+    if result["target"] != target:
+        raise ValueError(f"candidate {candidate}: target aggregate mismatch")
+    if result["stress"] != stress:
+        raise ValueError(f"candidate {candidate}: stress aggregate mismatch")
+    if result["formal"] != formal:
+        raise ValueError(f"candidate {candidate}: formal aggregate mismatch")
+    if type(result["passed"]) is not bool or result["passed"] is not passed:
+        raise ValueError(f"candidate {candidate}: complete gate mismatch")
+    return {
+        "candidate_threshold": candidate,
+        "global_threshold": global_threshold,
+        "target": target,
+        "stress": stress,
+        "formal": formal,
+        "cases": cases,
+        "stress_evidence": stress_evidence,
+        "formal_evidence": formal_evidence,
+        "passed": passed,
+    }
 
 
 def _validated_candidate_results(
@@ -674,164 +844,31 @@ def _validated_candidate_results(
 ) -> list[dict[str, Any]]:
     if not isinstance(candidate_results, list):
         raise ValueError("candidate_results must be a list")
-    normalized: list[dict[str, Any]] = []
-    for result in candidate_results:
-        if not isinstance(result, dict) or set(result) != _CANDIDATE_FIELDS:
-            raise ValueError("candidate result fields are invalid")
-        threshold = _unit_interval(
-            result["candidate_threshold"], field="candidate_threshold"
-        )
-        target = result["target"]
-        stress = result["stress"]
-        formal = result["formal"]
-        if not isinstance(target, dict) or set(target) != _TARGET_FIELDS:
-            raise ValueError("candidate target fields are invalid")
-        if not isinstance(stress, dict) or set(stress) != _STRESS_FIELDS:
-            raise ValueError("candidate stress fields are invalid")
-        if not isinstance(formal, dict) or set(formal) != _FORMAL_FIELDS:
-            raise ValueError("candidate formal fields are invalid")
-        cases = result["cases"]
-        if not isinstance(cases, list) or len(cases) != 30:
-            raise ValueError("candidate cases must contain thirty rows")
-        if any(not isinstance(row, dict) or set(row) != _CASE_RESULT_FIELDS for row in cases):
-            raise ValueError("candidate case fields are invalid")
-        if tuple(row["qid"] for row in cases) != EXPECTED_QIDS:
-            raise ValueError("candidate cases have invalid qids")
-        for index, row in enumerate(cases, start=1):
-            expected_type = "positive" if index <= 15 else "collision_negative"
-            if row["case_type"] != expected_type:
-                raise ValueError("candidate cases have invalid case types")
-            _boolean(row["answerable"], field="answerable", identity=row["qid"])
-            if not isinstance(row["source_ranks"], dict) or any(
-                not isinstance(source, str)
-                or not source.strip()
-                or type(rank) is not int
-                or rank < 1
-                for source, rank in row["source_ranks"].items()
-            ):
-                raise ValueError("candidate case source_ranks are invalid")
-            _routes(
-                row["applied_routes"],
-                field="applied_routes",
-                require_tuple=False,
-            )
-            _unit_interval(row["top_score"], field="top_score")
-            _unit_interval(
-                row["effective_threshold"], field="effective_threshold"
-            )
-            for field in (
-                "source_contract_passed",
-                "route_contract_passed",
-                "generation_expected",
-                "refused",
-                "generation_allowed",
-                "generation_contract_passed",
-                "passed",
-            ):
-                _boolean(row[field], field=field, identity=row["qid"])
-            if row["refusal_stage"] not in {None, "threshold"}:
-                raise ValueError("candidate case refusal_stage is invalid")
-            if row["refused"] is not (row["refusal_stage"] is not None):
-                raise ValueError("candidate case refusal decision is inconsistent")
-            if row["generation_allowed"] is row["refused"]:
-                raise ValueError("candidate case generation decision is inconsistent")
-            expected_generation_contract = (
-                row["generation_allowed"] is row["generation_expected"]
-            )
-            if row["generation_contract_passed"] is not expected_generation_contract:
-                raise ValueError("candidate generation contract is inconsistent")
-
-        target_total = _count(target["total"], field="target total", maximum=30)
-        target_passed_cases = _count(
-            target["passed_cases"], field="target passed_cases", maximum=30
-        )
-        if target_total != 30:
-            raise ValueError("target total must equal thirty")
-        for field in (
-            "positive_routes",
-            "positive_sources_at_5",
-            "positive_generation_allowed",
-            "collision_contracts",
-        ):
-            _count(target[field], field=f"target {field}", maximum=15)
-        target_passed = _boolean(
-            target["passed"], field="target passed", identity=threshold
-        )
-        if target_passed is not (target_passed_cases == 30):
-            raise ValueError("candidate target passed flag is inconsistent")
-
-        if (
-            stress["questions"],
-            stress["answerable"],
-            stress["unanswerable"],
-        ) != (60, 40, 20):
-            raise ValueError("candidate stress counts are invalid")
-        stress_false = _count(
-            stress["direct_false_refusals"],
-            field="stress direct_false_refusals",
-            maximum=40,
-        )
-        stress_refusals = _count(
-            stress["direct_unanswerable_refusals"],
-            field="stress direct_unanswerable_refusals",
-            maximum=20,
-        )
-        coverage = _metric(
-            stress["direct_unanswerable_coverage"], field="stress coverage"
-        )
-        if coverage != stress_refusals / 20:
-            raise ValueError("candidate stress coverage is inconsistent")
-        stress_passed = _boolean(
-            stress["passed"], field="stress passed", identity=threshold
-        )
-        if stress_passed is not (stress_false == 0 and stress_refusals >= 17):
-            raise ValueError("candidate stress passed flag is inconsistent")
-
-        if (
-            formal["questions"],
-            formal["answerable"],
-            formal["unanswerable"],
-        ) != (40, 30, 10):
-            raise ValueError("candidate formal counts are invalid")
-        formal_hit = _metric(formal["hit_at_5"], field="formal hit_at_5")
-        formal_mrr = _metric(formal["mrr_at_10"], field="formal mrr_at_10")
-        formal_false = _count(
-            formal["direct_false_refusals"],
-            field="formal direct_false_refusals",
-            maximum=30,
-        )
-        formal_passed = _boolean(
-            formal["passed"], field="formal passed", identity=threshold
-        )
-        formal_gate = (
-            formal_hit >= FORMAL_HIT_AT_5_BASELINE
-            and formal_mrr >= FORMAL_MRR_AT_10_BASELINE
-            and formal_false == 0
-        )
-        if formal_passed is not formal_gate:
-            raise ValueError("candidate formal passed flag is inconsistent")
-        passed = _boolean(result["passed"], field="candidate passed", identity=threshold)
-        if passed is not (target_passed and stress_passed and formal_passed):
-            raise ValueError("candidate passed flag is inconsistent")
-        normalized.append(result)
-
-    thresholds = [result["candidate_threshold"] for result in normalized]
+    results = [_recompute_candidate(result) for result in candidate_results]
+    thresholds = [result["candidate_threshold"] for result in results]
     if len(thresholds) != len(set(thresholds)) or set(thresholds) != set(
         CANDIDATE_THRESHOLDS
     ):
         raise ValueError("candidate grid must equal the committed seven thresholds")
-    return sorted(normalized, key=lambda result: result["candidate_threshold"])
+    first = results[0]
+    first_observations = _observations_from_case_results(first["cases"])
+    for result in results[1:]:
+        if result["global_threshold"] != first["global_threshold"]:
+            raise ValueError("candidate global threshold must be identical across grid")
+        if _observations_from_case_results(result["cases"]) != first_observations:
+            raise ValueError("candidate target evidence must be identical across grid")
+        if result["stress_evidence"] != first["stress_evidence"]:
+            raise ValueError("candidate stress evidence must be identical across grid")
+        if result["formal_evidence"] != first["formal_evidence"]:
+            raise ValueError("candidate formal evidence must be identical across grid")
+    return sorted(results, key=lambda result: result["candidate_threshold"])
 
 
-def _complete_gate_set(result: dict[str, Any]) -> bool:
-    return (
-        result["target"]["passed_cases"] == 30
-        and result["stress"]["direct_false_refusals"] == 0
-        and result["stress"]["direct_unanswerable_refusals"] >= 17
-        and result["formal"]["hit_at_5"] >= FORMAL_HIT_AT_5_BASELINE
-        and result["formal"]["mrr_at_10"] >= FORMAL_MRR_AT_10_BASELINE
-        and result["formal"]["direct_false_refusals"] == 0
-    )
+def _selected_threshold(results: list[dict[str, Any]]) -> float:
+    passing = [result["candidate_threshold"] for result in results if result["passed"]]
+    if not passing:
+        raise RuntimeError("no candidate threshold satisfies the complete gate set")
+    return max(passing)
 
 
 def select_highest_passing_threshold(
@@ -839,15 +876,7 @@ def select_highest_passing_threshold(
 ) -> float:
     """Return the greatest candidate whose complete gate set passes."""
 
-    validated = _validated_candidate_results(candidate_results)
-    passing = [
-        result["candidate_threshold"]
-        for result in validated
-        if _complete_gate_set(result)
-    ]
-    if not passing:
-        raise RuntimeError("no candidate threshold satisfies the complete gate set")
-    return max(passing)
+    return _selected_threshold(_validated_candidate_results(candidate_results))
 
 
 def _hex(value: object, *, field: str, length: int) -> str:
@@ -860,38 +889,58 @@ def _hex(value: object, *, field: str, length: int) -> str:
     return value
 
 
-def _public_identifier(value: object, *, field: str) -> str:
-    normalized = _non_blank(value, field=field, identity="provenance")
-    if "://" in normalized or Path(normalized).is_absolute() or PureWindowsPath(
-        normalized
-    ).is_absolute():
-        raise ValueError(f"{field} must not contain a URL or local absolute path")
-    return normalized
+def _canonical_sha256(value: object) -> str:
+    encoded = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
-def _validated_provenance(provenance: object) -> dict[str, Any]:
+def _validated_provenance(
+    provenance: object,
+    *,
+    stress_evidence: list[dict[str, Any]],
+    formal_evidence: list[dict[str, Any]],
+) -> dict[str, Any]:
     if not isinstance(provenance, dict) or set(provenance) != _PROVENANCE_FIELDS:
         raise ValueError(f"provenance fields must equal {sorted(_PROVENANCE_FIELDS)}")
     source_hashes = provenance["source_artifact_sha256"]
     if not isinstance(source_hashes, dict) or set(source_hashes) != _SOURCE_ARTIFACT_FIELDS:
         raise ValueError("source_artifact_sha256 fields are invalid")
+    normalized_hashes = {
+        field: _hex(source_hashes[field], field=field, length=64)
+        for field in sorted(_SOURCE_ARTIFACT_FIELDS)
+    }
+    expected_raw_hashes = {
+        "stress_raw_evidence": _canonical_sha256(stress_evidence),
+        "formal_raw_evidence": _canonical_sha256(formal_evidence),
+    }
+    for field, expected in expected_raw_hashes.items():
+        if normalized_hashes[field] != expected:
+            raise ValueError(f"{field} raw evidence hash mismatch")
+    exact_strings = {
+        "embedding_model": _EMBEDDING_MODEL,
+        "embedding_revision": _EMBEDDING_REVISION,
+        "reranker_model": _RERANKER_MODEL,
+        "reranker_revision": _RERANKER_REVISION,
+    }
+    for field, expected in exact_strings.items():
+        if provenance[field] != expected:
+            raise ValueError(f"{field} must equal the approved pinned value")
     configuration = provenance["retrieval_configuration"]
-    if (
-        not isinstance(configuration, dict)
-        or set(configuration) != _RETRIEVAL_CONFIGURATION_FIELDS
+    if not isinstance(configuration, dict) or set(configuration) != set(
+        _RETRIEVAL_CONFIGURATION
     ):
         raise ValueError("retrieval_configuration fields are invalid")
-    for field in ("chunking", "retrieval"):
-        _public_identifier(configuration[field], field=field)
-    if type(configuration["reranker"]) is not bool or not configuration["reranker"]:
-        raise ValueError("retrieval_configuration reranker must be true")
-    for field in ("top_k_retrieve", "top_k_final"):
-        if type(configuration[field]) is not int or configuration[field] < 1:
-            raise ValueError(f"retrieval_configuration {field} must be positive")
+    if configuration != _RETRIEVAL_CONFIGURATION:
+        raise ValueError("retrieval_configuration must equal the approved primitives")
     for field in ("provider_adapters", "provider_requests"):
         if type(provenance[field]) is not int or provenance[field] != 0:
             raise ValueError(f"{field} must be zero")
-    normalized = {
+    return {
         "dataset_sha256": _hex(
             provenance["dataset_sha256"], field="dataset_sha256", length=64
         ),
@@ -900,30 +949,96 @@ def _validated_provenance(provenance: object) -> dict[str, Any]:
             field="corpus_snapshot_sha256",
             length=64,
         ),
-        "source_artifact_sha256": {
-            field: _hex(source_hashes[field], field=field, length=64)
-            for field in sorted(_SOURCE_ARTIFACT_FIELDS)
-        },
-        "embedding_model": _public_identifier(
-            provenance["embedding_model"], field="embedding_model"
-        ),
-        "embedding_revision": _hex(
-            provenance["embedding_revision"], field="embedding_revision", length=40
-        ),
-        "reranker_model": _public_identifier(
-            provenance["reranker_model"], field="reranker_model"
-        ),
-        "reranker_revision": _hex(
-            provenance["reranker_revision"], field="reranker_revision", length=40
-        ),
-        "retrieval_configuration": dict(configuration),
+        "source_artifact_sha256": normalized_hashes,
+        **exact_strings,
+        "retrieval_configuration": dict(_RETRIEVAL_CONFIGURATION),
         "code_revision": _hex(
             provenance["code_revision"], field="code_revision", length=40
         ),
         "provider_adapters": 0,
         "provider_requests": 0,
     }
-    return normalized
+
+
+_PUBLIC_KEYS = {
+    "schema_version",
+    "provenance",
+    "candidate_thresholds",
+    "selected_threshold",
+    "candidates",
+    "cases",
+    "candidate_threshold",
+    "target",
+    "stress",
+    "formal",
+    "passed",
+    "total",
+    "passed_cases",
+    "positive_routes",
+    "positive_sources_at_5",
+    "positive_generation_allowed",
+    "collision_contracts",
+    "questions",
+    "answerable",
+    "unanswerable",
+    "direct_false_refusals",
+    "direct_unanswerable_refusals",
+    "direct_unanswerable_coverage",
+    "hit_at_5",
+    "mrr_at_10",
+    "qid",
+    "case_type",
+    "source_ranks",
+    "applied_routes",
+    "top_score",
+    "effective_threshold",
+    "refused",
+    "refusal_stage",
+    "source_contract_passed",
+    "route_contract_passed",
+    "generation_expected",
+    "generation_allowed",
+    "generation_contract_passed",
+    *_PROVENANCE_FIELDS,
+    *_SOURCE_ARTIFACT_FIELDS,
+    *_RETRIEVAL_CONFIGURATION,
+    *_CANONICAL_SOURCE_KEYS,
+}
+_PUBLIC_STRINGS = {
+    "1.0",
+    "positive",
+    "collision_negative",
+    "threshold",
+    "structure",
+    "hybrid",
+    _EMBEDDING_MODEL,
+    _EMBEDDING_REVISION,
+    _RERANKER_MODEL,
+    _RERANKER_REVISION,
+    *EXPECTED_QIDS,
+    *_KNOWN_ROUTES,
+}
+
+
+def _validate_public_tree(value: object) -> None:
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if not isinstance(key, str) or key not in _PUBLIC_KEYS:
+                raise ValueError("public artifact contains a non-allowlisted key")
+            _validate_public_tree(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            _validate_public_tree(nested)
+    elif isinstance(value, str):
+        is_hash = len(value) in {40, 64} and all(
+            character in "0123456789abcdef" for character in value
+        )
+        if value not in _PUBLIC_STRINGS and not is_hash:
+            raise ValueError("public artifact contains a non-allowlisted string value")
+    elif isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("public artifact contains a non-finite number")
+    elif value is not None and type(value) not in {bool, int, float}:
+        raise ValueError("public artifact contains an unsupported value")
 
 
 def build_official_artifact(
@@ -934,44 +1049,31 @@ def build_official_artifact(
 ) -> dict[str, Any]:
     """Build the strict content-free official schema."""
 
-    target_observations = _validated_observations(observations)
+    target_evidence = _validated_observations(observations)
     candidates = _validated_candidate_results(candidate_results)
-    selected_threshold = select_highest_passing_threshold(candidates)
+    selected_threshold = _selected_threshold(candidates)
     selected = next(
         result
         for result in candidates
         if result["candidate_threshold"] == selected_threshold
     )
-    for observation, result in zip(
-        target_observations, selected["cases"], strict=True
-    ):
-        for field in _OBSERVATION_FIELDS:
-            if result[field] != observation[field]:
-                raise ValueError(f"selected case {result['qid']} does not match observation")
-
-    public_cases = []
-    for result in selected["cases"]:
-        public_cases.append(
-            {
-                "qid": result["qid"],
-                "case_type": result["case_type"],
-                "answerable": result["answerable"],
-                "source_ranks": dict(result["source_ranks"]),
-                "applied_routes": list(result["applied_routes"]),
-                "top_score": round(result["top_score"], 6),
-                "effective_threshold": round(result["effective_threshold"], 6),
-                "refused": result["refused"],
-                "refusal_stage": result["refusal_stage"],
-                "source_contract_passed": result["source_contract_passed"],
-                "route_contract_passed": result["route_contract_passed"],
-                "generation_expected": result["generation_expected"],
-                "generation_allowed": result["generation_allowed"],
-                "generation_contract_passed": result[
-                    "generation_contract_passed"
-                ],
-                "passed": result["passed"],
-            }
-        )
+    if _observations_from_case_results(selected["cases"]) != target_evidence:
+        raise ValueError("selected candidate cases do not match target observations")
+    normalized_provenance = _validated_provenance(
+        provenance,
+        stress_evidence=selected["stress_evidence"],
+        formal_evidence=selected["formal_evidence"],
+    )
+    public_cases = [
+        {
+            **row,
+            "source_ranks": dict(row["source_ranks"]),
+            "applied_routes": list(row["applied_routes"]),
+            "top_score": round(row["top_score"], 6),
+            "effective_threshold": round(row["effective_threshold"], 6),
+        }
+        for row in selected["cases"]
+    ]
     public_candidates = [
         {
             "candidate_threshold": result["candidate_threshold"],
@@ -982,11 +1084,13 @@ def build_official_artifact(
         }
         for result in candidates
     ]
-    return {
+    artifact = {
         "schema_version": "1.0",
-        "provenance": _validated_provenance(provenance),
+        "provenance": normalized_provenance,
         "candidate_thresholds": list(CANDIDATE_THRESHOLDS),
         "selected_threshold": selected_threshold,
         "candidates": public_candidates,
         "cases": public_cases,
     }
+    _validate_public_tree(artifact)
+    return artifact
