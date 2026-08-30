@@ -64,6 +64,10 @@ EXPECTED_QIDS = (
     "severance-policy-030",
 )
 EXPECTED_CANDIDATES = (0.0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03)
+WINDOWS_PYWIN32_RUNTIME_LAYOUT = [
+    "Lib/site-packages/win32",
+    "Lib/site-packages/win32/lib",
+]
 POSITIVE_STYLES = {
     "statutory_chinese",
     "colloquial_chinese",
@@ -1536,6 +1540,7 @@ def _environment_binding() -> dict:
         },
         "pyvenv": {"include_system_site_packages": False},
         "site_layout": ["Lib/site-packages"],
+        "runtime_import_layout": list(WINDOWS_PYWIN32_RUNTIME_LAYOUT),
         "lock_selection": {
             "lock_sha256": "e" * 64,
             "offline": True,
@@ -1556,13 +1561,9 @@ def _environment_binding() -> dict:
             "active_resolution_markers": [
                 "python_full_version < '3.12' and sys_platform == 'win32'"
             ],
-            "selected_packages": [
-                {"name": "example-package", "version": "1.0"}
-            ],
+            "selected_packages": [{"name": "pywin32", "version": "306"}],
         },
-        "installed_distributions": [
-            {"name": "example-package", "version": "1.0"}
-        ],
+        "installed_distributions": [{"name": "pywin32", "version": "306"}],
     }
 
 
@@ -1624,6 +1625,179 @@ def _provenance():
         "provider_adapters": 0,
         "provider_requests": 0,
     }
+
+
+def _runner_provenance_from_trusted_runtime(tmp_path: Path) -> dict:
+    target = tmp_path / "target.jsonl"
+    stress = tmp_path / "stress.jsonl"
+    formal = tmp_path / "formal.jsonl"
+    snapshot = tmp_path / "snapshot.json"
+    for path in (target, stress, formal):
+        path.write_text("{}\n", encoding="utf-8")
+    snapshot.write_text("{}\n", encoding="utf-8")
+    args = SimpleNamespace(
+        dataset=target,
+        stress_dataset=stress,
+        formal_dataset=formal,
+        snapshot=snapshot,
+    )
+    settings = SimpleNamespace(
+        embedding_model="BAAI/bge-m3",
+        embedding_model_revision="5617a9f61b028005a4858fdac845db406aefb181",
+        reranker_model="BAAI/bge-reranker-v2-m3",
+        reranker_model_revision="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        top_k_retrieve=20,
+        top_k_final=5,
+        rrf_k=60,
+        device="cpu",
+    )
+    revision = "f" * 40
+    trusted_runtime = _trusted_runtime_for_inputs(
+        target=target,
+        stress=stress,
+        formal=formal,
+        snapshot=snapshot,
+        revision=revision,
+    )
+    return runner._build_provenance(
+        args,
+        settings,
+        revision,
+        trusted_runtime=trusted_runtime,
+    )
+
+
+def test_bootstrap_shaped_runtime_binding_survives_accepted_artifact_construction(
+    cases,
+    tmp_path: Path,
+) -> None:
+    artifact = runner._build_accepted_artifact(
+        observations=_observations(cases),
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+        provenance=_runner_provenance_from_trusted_runtime(tmp_path),
+    )
+
+    assert artifact["provenance"]["environment_binding"][
+        "runtime_import_layout"
+    ] == WINDOWS_PYWIN32_RUNTIME_LAYOUT
+
+
+def test_bootstrap_shaped_runtime_binding_survives_no_go_artifact_construction(
+    cases,
+    tmp_path: Path,
+) -> None:
+    observations = _observations(cases)
+    observations[0] = {
+        **observations[0],
+        "source_ranks": {},
+        "top_score": 0.0150004,
+    }
+
+    artifact = policy.build_no_go_evidence(
+        observations=observations,
+        candidate_results=_candidate_results(observations),
+        provenance=_runner_provenance_from_trusted_runtime(tmp_path),
+    )
+
+    assert artifact["provenance"]["environment_binding"][
+        "runtime_import_layout"
+    ] == WINDOWS_PYWIN32_RUNTIME_LAYOUT
+
+
+@pytest.mark.parametrize(
+    "layout",
+    [
+        pytest.param(
+            [WINDOWS_PYWIN32_RUNTIME_LAYOUT[0]],
+            id="missing-root",
+        ),
+        pytest.param(
+            [*WINDOWS_PYWIN32_RUNTIME_LAYOUT, "Lib/site-packages/pythonwin"],
+            id="extra-root",
+        ),
+        pytest.param(
+            list(reversed(WINDOWS_PYWIN32_RUNTIME_LAYOUT)),
+            id="wrong-order",
+        ),
+        pytest.param(
+            [WINDOWS_PYWIN32_RUNTIME_LAYOUT[0]] * 2,
+            id="duplicate-root",
+        ),
+        pytest.param(
+            ["Lib/site-packages/Win32", WINDOWS_PYWIN32_RUNTIME_LAYOUT[1]],
+            id="wrong-spelling",
+        ),
+        pytest.param(
+            ["Lib/site-packages/win32/.", WINDOWS_PYWIN32_RUNTIME_LAYOUT[1]],
+            id="noncanonical-dot-segment",
+        ),
+        pytest.param(
+            [r"Lib\site-packages\win32", WINDOWS_PYWIN32_RUNTIME_LAYOUT[1]],
+            id="noncanonical-separator",
+        ),
+        pytest.param(
+            ["C:/private-environment/win32", WINDOWS_PYWIN32_RUNTIME_LAYOUT[1]],
+            id="absolute-root",
+        ),
+        pytest.param(
+            [WINDOWS_PYWIN32_RUNTIME_LAYOUT[0], 7],
+            id="non-string-root",
+        ),
+        pytest.param(
+            tuple(WINDOWS_PYWIN32_RUNTIME_LAYOUT),
+            id="non-list-layout",
+        ),
+    ],
+)
+def test_environment_binding_rejects_runtime_import_layout_drift(
+    layout: object,
+) -> None:
+    binding = _environment_binding()
+    binding["runtime_import_layout"] = layout
+
+    with pytest.raises(ValueError, match="runtime import layout"):
+        policy._validated_environment_binding(binding)
+
+
+@pytest.mark.parametrize("mismatch", ["missing-pywin32", "non-windows-markers"])
+def test_environment_binding_rejects_conditioned_runtime_layout_mismatch(
+    mismatch: str,
+) -> None:
+    binding = _environment_binding()
+    if mismatch == "missing-pywin32":
+        binding["lock_selection"]["selected_packages"] = []
+        binding["installed_distributions"] = []
+    else:
+        binding["lock_selection"]["markers"].update(
+            os_name="posix",
+            platform_system="Linux",
+            sys_platform="linux",
+        )
+
+    with pytest.raises(ValueError, match="runtime import layout"):
+        policy._validated_environment_binding(binding)
+
+
+@pytest.mark.parametrize("condition", ["missing-pywin32", "non-windows-markers"])
+def test_environment_binding_preserves_empty_unconditioned_runtime_layout(
+    condition: str,
+) -> None:
+    binding = _environment_binding()
+    binding["runtime_import_layout"] = []
+    if condition == "missing-pywin32":
+        binding["lock_selection"]["selected_packages"] = []
+        binding["installed_distributions"] = []
+    else:
+        binding["lock_selection"]["markers"].update(
+            os_name="posix",
+            platform_system="Linux",
+            sys_platform="linux",
+        )
+
+    normalized = policy._validated_environment_binding(binding)
+
+    assert normalized["runtime_import_layout"] == []
 
 
 def test_reviewed_dataset_has_exact_order_contracts_and_style_coverage(cases):

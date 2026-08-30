@@ -6,7 +6,7 @@
 
 **Architecture:** Derive an exact environment-relative runtime layout from the already verified platform markers and locked inventory, bind it into the privacy-safe receipt, validate it before any third-party import, and revalidate it immediately before direct `sys.path` activation. The only non-empty layout is `Lib/site-packages/win32` plus `Lib/site-packages/win32/lib` on Windows when PyWin32 is selected and installed.
 
-**Tech Stack:** Python 3.12, pytest, Ruff, isolated Python `-B -I -S`, uv frozen synchronization, portalocker, local Qdrant.
+**Tech Stack:** Python 3.11, pytest, Ruff, isolated Python `-B -I -S`, uv frozen synchronization, portalocker, local Qdrant.
 
 ## Global constraints
 

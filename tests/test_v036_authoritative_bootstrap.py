@@ -654,6 +654,21 @@ print(
 )
 """
 
+_PRIVATE_SMOKE_WINDOWS_PROCESS_VARIABLES = (
+    "PROCESSOR_ARCHITECTURE",
+    "SYSTEMROOT",
+    "WINDIR",
+)
+_PRIVATE_SMOKE_OFFLINE_CONTROLS = {
+    "HF_HUB_OFFLINE": "1",
+    "PIP_NO_INDEX": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "UV_FROZEN": "1",
+    "UV_NO_DEV": "1",
+    "UV_OFFLINE": "1",
+    "UV_PYTHON_DOWNLOADS": "never",
+}
+
 
 def _run_private_lock_smoke(
     repository: Path,
@@ -662,9 +677,12 @@ def _run_private_lock_smoke(
     pth_marker: Path,
     qdrant_root: Path | None = None,
 ) -> subprocess.CompletedProcess:
-    process_environment = os.environ.copy()
-    for name in ("PYTHONHOME", "PYTHONPATH", "PYTHONUSERBASE"):
-        process_environment.pop(name, None)
+    process_environment = {
+        name: os.environ[name]
+        for name in _PRIVATE_SMOKE_WINDOWS_PROCESS_VARIABLES
+        if name in os.environ
+    }
+    process_environment.update(_PRIVATE_SMOKE_OFFLINE_CONTROLS)
     return subprocess.run(
         [
             str(_environment_python(environment_root)),
@@ -688,6 +706,90 @@ def _run_private_lock_smoke(
         encoding="utf-8",
         errors="replace",
     )
+
+
+def test_private_lock_smoke_child_receives_only_minimum_offline_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    safe_windows_names = ("PROCESSOR_ARCHITECTURE", "SYSTEMROOT", "WINDIR")
+    offline_controls = {
+        "HF_HUB_OFFLINE": "1",
+        "PIP_NO_INDEX": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "UV_FROZEN": "1",
+        "UV_NO_DEV": "1",
+        "UV_OFFLINE": "1",
+        "UV_PYTHON_DOWNLOADS": "never",
+    }
+    sentinels = (
+        "HF_TOKEN",
+        "OPENAI_API_KEY",
+        "QDRANT_API_KEY",
+        "V036_UNRELATED_AMBIENT_SENTINEL",
+    )
+    for name in sentinels:
+        monkeypatch.setenv(name, "must-not-reach-child")
+    expected_safe_names = sorted(
+        name for name in safe_windows_names if name in os.environ
+    )
+    child_probe = r"""
+import json
+import os
+
+safe_windows_names = {"PROCESSOR_ARCHITECTURE", "SYSTEMROOT", "WINDIR"}
+offline_names = {
+    "HF_HUB_OFFLINE",
+    "PIP_NO_INDEX",
+    "TRANSFORMERS_OFFLINE",
+    "UV_FROZEN",
+    "UV_NO_DEV",
+    "UV_OFFLINE",
+    "UV_PYTHON_DOWNLOADS",
+}
+sentinels = {
+    "HF_TOKEN",
+    "OPENAI_API_KEY",
+    "QDRANT_API_KEY",
+    "V036_UNRELATED_AMBIENT_SENTINEL",
+}
+allowed_names = safe_windows_names | offline_names
+print(
+    json.dumps(
+        {
+            "offline_controls": {
+                name: os.environ.get(name) for name in sorted(offline_names)
+            },
+            "safe_windows_names": sorted(safe_windows_names & set(os.environ)),
+            "sentinel_present": bool(sentinels & set(os.environ)),
+            "unexpected_name_count": len(set(os.environ) - allowed_names),
+        },
+        sort_keys=True,
+    )
+)
+"""
+    test_module = sys.modules[__name__]
+    monkeypatch.setattr(test_module, "_PRIVATE_LOCK_SMOKE", child_probe)
+    monkeypatch.setattr(
+        test_module,
+        "_environment_python",
+        lambda _environment_root: Path(sys.executable),
+    )
+
+    completed = _run_private_lock_smoke(
+        tmp_path,
+        tmp_path / "environment",
+        tmp_path / "binding.json",
+        tmp_path / "pth.marker",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "offline_controls": offline_controls,
+        "safe_windows_names": expected_safe_names,
+        "sentinel_present": False,
+        "unexpected_name_count": 0,
+    }
 
 
 def _replace_lock(repository: Path, payload: str) -> None:
@@ -851,6 +953,35 @@ def test_runtime_import_root_validator_returns_empty_for_unconditioned_layouts(
         )
         == []
     )
+
+
+@pytest.mark.parametrize(
+    ("selected", "markers"),
+    [
+        pytest.param([], WINDOWS_MARKERS, id="windows-without-pywin32"),
+        pytest.param(
+            PYWIN32_SELECTED,
+            NON_WINDOWS_MARKERS,
+            id="non-windows-with-pywin32",
+        ),
+    ],
+)
+def test_runtime_import_root_validator_rejects_non_empty_unconditioned_layout(
+    bootstrap_module,
+    tmp_path: Path,
+    selected: list[dict[str, str]],
+    markers: dict[str, str],
+) -> None:
+    environment_root = tmp_path / "authority-env"
+    _create_windows_pywin32_runtime_layout(environment_root)
+
+    with pytest.raises(ValueError, match="runtime import layout"):
+        bootstrap_module._validated_runtime_import_roots(
+            environment_root,
+            WINDOWS_PYWIN32_RUNTIME_LAYOUT,
+            selected,
+            markers,
+        )
 
 
 def test_import_activation_rejects_runtime_layout_replay_without_partial_path_change(

@@ -43,6 +43,10 @@ _PRECISION_MODE = "fp32"
 _SEMANTIC_VIEW_SHA256 = SEVERANCE_SEMANTIC_VIEW_SHA256
 _MERGE_POLICY_VERSION = MULTI_VIEW_MERGE_POLICY_VERSION
 _PRIMARY_SCORE_SEMANTICS = "full_precision_primary_query_top_score"
+_WINDOWS_PYWIN32_RUNTIME_LAYOUT = (
+    "Lib/site-packages/win32",
+    "Lib/site-packages/win32/lib",
+)
 
 _DATASET_FIELDS = {
     "qid",
@@ -1296,12 +1300,44 @@ def _validated_package_inventory(value: object, *, field: str) -> list[dict[str,
     return normalized
 
 
+def _validated_runtime_import_layout(
+    value: object,
+    *,
+    selected_packages: list[dict[str, str]],
+    installed_distributions: list[dict[str, str]],
+    markers: dict[str, str],
+) -> list[str]:
+    if type(value) is not list or any(type(item) is not str for item in value):
+        raise ValueError("environment_binding runtime import layout must be a list of strings")
+    is_windows = (
+        markers["os_name"] == "nt"
+        and markers["sys_platform"] == "win32"
+        and markers["platform_system"] == "Windows"
+    )
+    selected_names = {entry["name"] for entry in selected_packages}
+    installed_names = {entry["name"] for entry in installed_distributions}
+    expected = (
+        list(_WINDOWS_PYWIN32_RUNTIME_LAYOUT)
+        if is_windows
+        and "pywin32" in selected_names
+        and "pywin32" in installed_names
+        else []
+    )
+    if value != expected:
+        raise ValueError(
+            "environment_binding runtime import layout does not match "
+            "the selected inventory and platform markers"
+        )
+    return expected
+
+
 def _validated_environment_binding(value: object) -> dict[str, Any]:
     fields = {
         "format_version",
         "interpreter",
         "pyvenv",
         "site_layout",
+        "runtime_import_layout",
         "lock_selection",
         "installed_distributions",
     }
@@ -1409,11 +1445,18 @@ def _validated_environment_binding(value: object) -> dict[str, Any]:
     )
     if installed != selected_packages:
         raise ValueError("environment_binding installed inventory must equal selected lock")
+    runtime_import_layout = _validated_runtime_import_layout(
+        value["runtime_import_layout"],
+        selected_packages=selected_packages,
+        installed_distributions=installed,
+        markers=normalized_markers,
+    )
     return {
         "format_version": "1",
         "interpreter": normalized_interpreter,
         "pyvenv": {"include_system_site_packages": False},
         "site_layout": list(expected_sites),
+        "runtime_import_layout": runtime_import_layout,
         "lock_selection": {
             "lock_sha256": _hex(
                 lock["lock_sha256"], field="environment_binding.lock_sha256", length=64
