@@ -9,6 +9,12 @@ app_port: 7860
 
 [![CI](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml)
 
+> **3 分鐘看懂專案：** [技術審閱導覽](docs/release/V035_REVIEWER_TOUR.md) ｜ [面試展示腳本](docs/release/V035_INTERVIEW_DEMO.md) ｜ [架構](DESIGN.md) ｜ [證據重算](docs/release/REVIEWER_GUIDE.md) ｜ [限制](#scope)
+
+| 稽核快照 | 知識庫 | 正式集 Hit@5 | 正式集 MRR@10 |
+|---|---:|---:|---:|
+| **2026-08-29** | **15 部／884 條** | **0.967** | **0.906** |
+
 以台灣 15 部勞動法規（13 部法律、2 部命令）為目標知識庫的檢索增強生成(RAG)問答系統:BM25 + BGE-M3 向量檢索以 RRF 融合,經 bge-reranker-v2-m3 重排序後生成附條文引用的答案,回答附上法規、條號、法規來源連結與修正／生效日期,查無依據時誠實拒答而非瞎掰。設計決策由 40 題正式評估、8 組消融實驗與 60 題可靠性壓力集檢驗——見 [EVAL_REPORT.md](EVAL_REPORT.md)。
 
 ## 正式評估摘要
@@ -47,13 +53,13 @@ Streamlit 側邊欄的「回答模型」只顯示 API `/models` 回傳的已設�
 
 `v0.1.0` 的正式模型品質指標仍是歷史結果，由 `release/manifest.json` 所列 generator 與 judge 模型產生；本版沒有取代或重新審計這些數值。本版已在不呼叫 provider 的情況下，以 60 題壓力集與既有 40 題正式集 guard 重跑 retrieval 與 threshold 行為。
 
-### 公開 BYOK Docker Space（已上線）
+### 私有 BYOK Docker Space（邀請制）
 
-**Live Demo：** [steven0226-tw-labor-law-rag-demo.hf.space](https://steven0226-tw-labor-law-rag-demo.hf.space)
+**Demo 狀態：** private Space 正常運行；僅限擁有者與受邀審閱者，不公開列出入口。
 
-公開作品集模式採 BYOK（Bring Your Own Key）：訪客選擇 Gemini `gemini-3.5-flash-lite` 或 OpenAI `gpt-5.6-luna`，並在遮罩欄位輸入自己的專用 API Key。Key 只存在目前 Streamlit 工作階段、送往同容器 loopback FastAPI 的單次內部 header，以及該次請求建立的 provider client；不寫入檔案、聊天紀錄、共用設定或跨請求快取。公開 Space 不設定站長的 `GEMINI_API_KEY`／`OPENAI_API_KEY`，也不做跨 provider fallback，因此訪客不會消耗站長的模型 token 額度。
+私有展示模式採 BYOK（Bring Your Own Key）：受邀者選擇 Gemini `gemini-3.5-flash-lite` 或 OpenAI `gpt-5.6-luna`，並在遮罩欄位輸入自己的專用 API Key。Key 只存在目前 Streamlit 工作階段、送往同容器 loopback FastAPI 的單次內部 header，以及該次請求建立的 provider client；不寫入檔案、聊天紀錄、共用設定或跨請求快取。Space 不設定站長的 `GEMINI_API_KEY`／`OPENAI_API_KEY`，也不做跨 provider fallback，因此受邀者不會消耗站長的模型 token 額度。
 
-Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.json` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，最多保留 1,000 個未過期的匿名工作階段。公開前已完成 Key 隔離、唯讀權限與免費 `cpu-basic` 驗收；完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
+Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.json` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，最多保留 1,000 個未過期的匿名工作階段。Key 隔離、唯讀權限與免費 `cpu-basic` 已完成驗收；完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
 
 ### 人工更新 Qdrant 法規索引
 

@@ -9,6 +9,12 @@ app_port: 7860
 
 [![CI](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml)
 
+> **Three-minute review:** [technical tour](docs/release/V035_REVIEWER_TOUR.md) | [interview demo](docs/release/V035_INTERVIEW_DEMO.md) | [architecture](DESIGN.md) | [evidence reproduction](docs/release/REVIEWER_GUIDE.md) | [limitations](#scope)
+
+| Audited snapshot | Knowledge base | Formal Hit@5 | Formal MRR@10 |
+|---|---:|---:|---:|
+| **2026-08-29** | **15 instruments / 884 articles** | **0.967** | **0.906** |
+
 An evidence-oriented retrieval-augmented generation system targeting 15 Taiwan labor-law instruments (13 acts and 2 regulations). It combines BM25 and BGE-M3 dense retrieval with Reciprocal Rank Fusion, reranks candidates with `bge-reranker-v2-m3`, and generates answers with article-level citations. A two-stage refusal policy rejects low-scoring retrievals before generation and asks the generator to refuse when the retrieved law is insufficient.
 
 ## Verified portfolio results
@@ -45,13 +51,13 @@ This is the `v0.3.3` source-only runtime and deployment release. When a question
 
 All four cue groups are required, so ordinary severance, retirement, or single-regime questions are not broadly rewritten. The `v0.1.0` formal model-quality baseline, `v0.3.1` reliability evidence, and `v0.3.2` provider safety cross-check retain their original evidence versions; this release did not use new provider calls to rewrite historical metrics.
 
-## Public BYOK Docker Space (live)
+## Private BYOK Docker Space (invitation only)
 
-**Live demo:** [steven0226-tw-labor-law-rag-demo.hf.space](https://steven0226-tw-labor-law-rag-demo.hf.space)
+**Demo status:** the private Space is running for the owner and invited reviewers; its entry point is not listed publicly.
 
-The portfolio deployment uses BYOK (Bring Your Own Key). A visitor selects Gemini `gemini-3.5-flash-lite` or OpenAI `gpt-5.6-luna` and enters a dedicated key in a masked field. The key exists only in the current Streamlit session, one loopback request header, and one request-scoped provider client. It is never written to files, chat history, shared settings, or cross-request caches. The public Space has no owner `GEMINI_API_KEY` or `OPENAI_API_KEY` and performs no cross-provider fallback, so visitors cannot spend the owner's model-token balance.
+The private Space uses BYOK (Bring Your Own Key). An invited reviewer selects Gemini `gemini-3.5-flash-lite` or OpenAI `gpt-5.6-luna` and enters a dedicated key in a masked field. The key exists only in the current Streamlit session, one loopback request header, and one request-scoped provider client. It is never written to files, chat history, shared settings, or cross-request caches. The Space has no owner `GEMINI_API_KEY` or `OPENAI_API_KEY` and performs no cross-provider fallback, so invited users cannot spend the owner's model-token balance.
 
-The Space receives a collection-scoped read-only Qdrant key. A temporary write/manage key is revoked immediately after the two collections are built locally. Startup scrolls payloads read-only and rebuilds the structure/fixed BM25 indexes in memory; private `data/raw/` and `storage/bm25_*.json` artifacts are not shipped. Defaults are 20 queries per demo session, two concurrent queries globally, a 60-second provider timeout, and at most 1,000 unexpired anonymous sessions. Key isolation, read-only access, and free `cpu-basic` acceptance passed before the Space was made public. See the [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md).
+The Space receives a collection-scoped read-only Qdrant key. A temporary write/manage key is revoked immediately after the two collections are built locally. Startup scrolls payloads read-only and rebuilds the structure/fixed BM25 indexes in memory; private `data/raw/` and `storage/bm25_*.json` artifacts are not shipped. Defaults are 20 queries per demo session, two concurrent queries globally, a 60-second provider timeout, and at most 1,000 unexpired anonymous sessions. Key isolation, read-only access, and free `cpu-basic` acceptance have passed. See the [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md).
 
 ## v0.3.2 provider safety cross-check: reliability, provenance, and dual-model runtime
 
