@@ -305,3 +305,114 @@ def test_provider_runner_rejects_when_shared_decision_refuses(monkeypatch):
             qid="stress-001",
             reranker_enabled=True,
         )
+
+
+def test_provider_main_uses_shared_policy_before_provider_construction(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(
+        '{"snapshot_date":"2026-01-01","law_count":15,"article_count":100}',
+        encoding="utf-8",
+    )
+    row = {
+        "qid": "stress-001",
+        "question": "private question",
+        "answerable": True,
+        "answer": "private answer",
+        "sources": [],
+    }
+    credentials = SimpleNamespace(gemini_api_key="test", openai_api_key="test")
+    settings = SimpleNamespace(
+        rerank_score_threshold=0.03,
+        severance_comparison_score_threshold=0.015,
+        reranker_model="reranker-test",
+        reranker_model_revision="reranker-revision",
+        device="cpu",
+    )
+    retrieval = SimpleNamespace(
+        hits=[object()],
+        top_score=0.9,
+        applied_routes=(),
+    )
+    pipeline = SimpleNamespace(reranker=object(), run=lambda _question: retrieval)
+    store = SimpleNamespace(close=lambda: None)
+    policy_calls = []
+
+    def decide(**kwargs):
+        policy_calls.append(kwargs)
+        return SimpleNamespace(refusal_stage="threshold")
+
+    monkeypatch.setattr(
+        run_provider_crosscheck,
+        "_credential_settings",
+        lambda _env_file: credentials,
+    )
+    monkeypatch.setattr(
+        run_provider_crosscheck,
+        "Settings",
+        lambda **_kwargs: settings,
+    )
+    monkeypatch.setattr(run_provider_crosscheck.lib, "load_dataset", lambda _path: [row])
+    monkeypatch.setattr(run_provider_crosscheck, "_load_jsonl", lambda _path: [])
+    monkeypatch.setattr(
+        run_provider_crosscheck,
+        "select_crosscheck_rows",
+        lambda *_args, **_kwargs: ([row], []),
+    )
+    monkeypatch.setattr(
+        run_provider_crosscheck,
+        "resolve_private_run_dir",
+        lambda *_args: tmp_path / "run",
+    )
+    monkeypatch.setattr(
+        run_provider_crosscheck,
+        "_materialize_audited_corpus",
+        lambda *_args: tmp_path,
+    )
+    monkeypatch.setattr(
+        run_provider_crosscheck,
+        "_build_indexes",
+        lambda *_args: (object(), store),
+    )
+    monkeypatch.setattr(run_provider_crosscheck, "Reranker", lambda **_kwargs: object())
+    monkeypatch.setattr(
+        run_provider_crosscheck,
+        "build_retrieval_pipeline",
+        lambda *_args, **_kwargs: pipeline,
+    )
+    monkeypatch.setattr(run_provider_crosscheck, "decide_retrieval_refusal", decide)
+    monkeypatch.setattr(
+        run_provider_crosscheck,
+        "build_llm",
+        lambda *_args, **_kwargs: pytest.fail("provider construction was reached"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_provider_crosscheck.py",
+            "--snapshot",
+            str(snapshot),
+            "--work-dir",
+            str(tmp_path / "run"),
+            "--gemini-cap-usd",
+            "0.01",
+            "--openai-cap-usd",
+            "0.01",
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="stress-001"):
+        run_provider_crosscheck.main()
+
+    assert len(policy_calls) == 1
+    assert policy_calls[0] == {
+        "has_hits": True,
+        "reranker_enabled": True,
+        "applied_routes": (),
+        "top_score": 0.9,
+        "global_threshold": 0.03,
+        "severance_comparison_threshold": 0.015,
+    }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,12 +11,17 @@ import pytest
 
 from eval import run_portfolio_demo_regression
 from eval.run_portfolio_demo_regression import run_cases, write_public_json
+from rag import factory
 from rag.portfolio_demo_regression import (
     build_artifact,
     build_result,
     load_cases,
     summarize_results,
 )
+from rag.retrieval import reranker as reranker_module
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
+import run_reliability_eval  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).parents[1]
 DATASET = PROJECT_ROOT / "eval/dataset/portfolio_demo_v0.3.5.jsonl"
@@ -278,3 +284,85 @@ def test_portfolio_runner_uses_retrieval_routes_and_shared_decision(
             "severance_comparison_threshold": 0.015,
         }
     ]
+
+
+def test_portfolio_local_index_wiring_uses_shared_policy_observation(
+    monkeypatch,
+    tmp_path: Path,
+    cases,
+) -> None:
+    case = cases[0]
+    expected_source = case.sources[0]
+    hit = SimpleNamespace(
+        payload={
+            "doc_title": expected_source["law"],
+            "articles": [expected_source["article"]],
+        }
+    )
+    retrieval = SimpleNamespace(
+        hits=[hit],
+        top_score=0.01,
+        applied_routes=("route_from_retrieval",),
+    )
+    pipeline = SimpleNamespace(reranker=object(), run=lambda _question: retrieval)
+    settings = SimpleNamespace(
+        rerank_score_threshold=0.03,
+        severance_comparison_score_threshold=0.015,
+        top_k_retrieve=20,
+        top_k_final=5,
+        rrf_k=60,
+        embedding_model="embedding-test",
+        embedding_model_revision="embedding-revision",
+        reranker_model="reranker-test",
+        reranker_model_revision="reranker-revision",
+        device="cpu",
+    )
+    store = SimpleNamespace(close=lambda: None)
+    embedder = SimpleNamespace(close=lambda: None)
+    policy_calls = []
+
+    def decide(**kwargs):
+        policy_calls.append(kwargs)
+        return SimpleNamespace(refusal_stage=None)
+
+    monkeypatch.setattr(
+        run_portfolio_demo_regression,
+        "Settings",
+        lambda **_kwargs: settings,
+    )
+    monkeypatch.setattr(
+        run_portfolio_demo_regression,
+        "require_cached_models",
+        lambda _settings: None,
+    )
+    monkeypatch.setattr(run_portfolio_demo_regression, "load_cases", lambda _path: [case])
+    monkeypatch.setattr(
+        run_portfolio_demo_regression,
+        "decide_retrieval_refusal",
+        decide,
+    )
+    monkeypatch.setattr(
+        run_reliability_eval,
+        "_build_indexes",
+        lambda *_args: (embedder, store),
+    )
+    monkeypatch.setattr(
+        factory,
+        "build_retrieval_pipeline",
+        lambda *_args, **_kwargs: pipeline,
+    )
+    monkeypatch.setattr(reranker_module, "Reranker", lambda **_kwargs: object())
+    args = SimpleNamespace(
+        offline=False,
+        device="cpu",
+        dataset=DATASET,
+        data_dir=tmp_path,
+        snapshot=tmp_path / "unused-snapshot.json",
+    )
+
+    results, _configuration = run_portfolio_demo_regression._run_with_local_index(args)
+
+    assert len(policy_calls) == 1
+    assert policy_calls[0]["top_score"] == 0.01
+    assert results[0]["applied_routes"] == ["route_from_retrieval"]
+    assert results[0]["threshold_refused"] is False
