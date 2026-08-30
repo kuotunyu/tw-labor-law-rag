@@ -323,8 +323,8 @@ def test_official_provider_trace_documentation_has_token_usage_carve_out():
 def write_version_contract_fixture(
     root: Path,
     *,
-    package_version: str = "0.3.4",
-    release_version: str = "v0.3.4",
+    package_version: str = "0.3.5",
+    release_version: str = "v0.3.5",
     evidence_version: str = "v0.1.0",
 ) -> dict:
     (root / "pyproject.toml").write_text(
@@ -350,8 +350,8 @@ def test_release_version_contract_is_explicit_and_consistent(tmp_path):
     manifest = write_version_contract_fixture(tmp_path)
 
     assert module._verify_release_version_contract(tmp_path, manifest) == {
-        "version": "v0.3.4",
-        "package_version": "0.3.4",
+        "version": "v0.3.5",
+        "package_version": "0.3.5",
         "formal_evidence_version": "v0.1.0",
     }
 
@@ -369,6 +369,25 @@ def test_release_version_contract_rejects_changed_formal_evidence_baseline(tmp_p
 
     with pytest.raises(module.ReleaseVerificationError, match="formal evidence version"):
         module._verify_release_version_contract(tmp_path, manifest)
+
+
+def test_v035_version_and_release_documents_are_aligned():
+    manifest = json.loads(
+        (PROJECT_ROOT / "release/manifest.json").read_text(encoding="utf-8")
+    )
+    pyproject = tomllib.loads(
+        (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    public_paths = set(
+        (PROJECT_ROOT / "release/public-files.txt")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
+
+    assert pyproject["project"]["version"] == "0.3.5"
+    assert manifest["release_version"] == "v0.3.5"
+    assert "docs/release/V035_RELEASE_NOTES.md" in public_paths
+    assert (PROJECT_ROOT / "docs/release/V035_RELEASE_NOTES.md").is_file()
 
 
 def write_wage_arrears_regression_fixture(root: Path) -> dict:
@@ -918,8 +937,8 @@ def test_release_verifier_recomputes_committed_evidence():
 
     assert report["status"] == "pass"
     assert report["release"] == {
-        "version": "v0.3.4",
-        "package_version": "0.3.4",
+        "version": "v0.3.5",
+        "package_version": "0.3.5",
         "formal_evidence_version": "v0.1.0",
     }
     assert report["dataset"] == {
@@ -1002,7 +1021,7 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
-    assert report["publication"]["files"] == 164
+    assert report["publication"]["files"] == 165
     expected_history = len(
         {
             line
