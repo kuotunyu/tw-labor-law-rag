@@ -56,6 +56,9 @@ DIAGNOSTIC_RESULT = (
     PROJECT_ROOT
     / "eval/diagnostics/severance_retrieval_pivot_v0.3.6_no_go.json"
 )
+HISTORICAL_DIAGNOSTIC = (
+    PROJECT_ROOT / "eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json"
+)
 RUNS_DIR = PROJECT_ROOT / "eval/runs"
 
 
@@ -75,6 +78,44 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--device", choices=["cpu"], default="cpu")
     parser.add_argument("--export-official", action="store_true")
     return parser
+
+
+def _resolved_project_path(path: Path) -> Path:
+    candidate = path if path.is_absolute() else PROJECT_ROOT / path
+    return candidate.resolve()
+
+
+def _validated_diagnostics_output(args: argparse.Namespace) -> Path:
+    approved = DIAGNOSTIC_RESULT.resolve()
+    output = _resolved_project_path(args.diagnostics_output)
+    if output != approved:
+        raise ValueError(
+            "--diagnostics-output must resolve to the approved pivot diagnostic path"
+        )
+    source_paths = {
+        _resolved_project_path(path)
+        for path in (
+            args.dataset,
+            args.stress_dataset,
+            args.formal_dataset,
+            args.snapshot,
+        )
+    }
+    protected_paths = {
+        *source_paths,
+        OFFICIAL_RESULT.resolve(),
+        HISTORICAL_DIAGNOSTIC.resolve(),
+    }
+    aliases_protected_file = output.exists() and any(
+        protected.exists() and output.samefile(protected)
+        for protected in protected_paths
+    )
+    if output in protected_paths or aliases_protected_file:
+        raise ValueError(
+            "diagnostics output must not collide with historical, source, or "
+            "official artifacts"
+        )
+    return approved
 
 
 def _offline_preflight(args: argparse.Namespace) -> Settings:
@@ -395,6 +436,10 @@ def _build_local_pipeline(
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
+    try:
+        args.diagnostics_output = _validated_diagnostics_output(args)
+    except ValueError as exc:
+        parser.error(str(exc))
     if not args.offline:
         parser.error("--offline is required for calibration")
     _offline_preflight(args)

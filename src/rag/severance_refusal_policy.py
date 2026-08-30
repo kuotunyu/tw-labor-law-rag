@@ -17,12 +17,47 @@ from rag.retrieval.refusal_policy import decide_retrieval_refusal
 
 CANDIDATE_THRESHOLDS = (0.0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03)
 DECISION_CODE_PATHS = {
-    "policy": "src/rag/severance_refusal_policy.py",
-    "runner": "eval/run_severance_refusal_policy.py",
-    "pipeline": "src/rag/retrieval/pipeline.py",
-    "reranker": "src/rag/retrieval/reranker.py",
-    "refusal_policy": "src/rag/retrieval/refusal_policy.py",
+    # Runtime configuration, data contracts, and construction wiring.
+    "config": "src/rag/config.py",
+    "corpus_audit": "src/rag/corpus_audit.py",
+    "evaluation": "src/rag/evaluation.py",
+    "factory": "src/rag/factory.py",
+    "models": "src/rag/models.py",
+    "reliability": "src/rag/reliability.py",
+    "wage_arrears_regression": "src/rag/wage_arrears_regression.py",
+    # Factory imports whose import-time behavior is part of provider isolation.
+    "generation_answerer": "src/rag/generation/answerer.py",
+    "generation_llm": "src/rag/generation/llm.py",
+    "generation_prompts": "src/rag/generation/prompts.py",
+    "generation_router": "src/rag/generation/router.py",
+    # Complete local indexing and retrieval implementation used by acceptance.
+    "index_bm25": "src/rag/indexing/bm25_index.py",
+    "index_embedder": "src/rag/indexing/embedder.py",
+    "index_legal_terms": "src/rag/indexing/dict/legal_terms.txt",
+    "index_tokenizer": "src/rag/indexing/tokenizer.py",
+    "index_vector_store": "src/rag/indexing/vector_store.py",
+    "ingestion_chunkers": "src/rag/ingestion/chunkers.py",
+    "ingestion_cleaner": "src/rag/ingestion/cleaner.py",
+    "ingestion_loader": "src/rag/ingestion/loader.py",
+    "retrieval_fusion": "src/rag/retrieval/fusion.py",
+    "retrieval_pipeline": "src/rag/retrieval/pipeline.py",
+    "retrieval_refusal_policy": "src/rag/retrieval/refusal_policy.py",
+    "retrieval_reranker": "src/rag/retrieval/reranker.py",
+    "retrieval_retriever": "src/rag/retrieval/retriever.py",
+    # Evidence construction, replay, and release verification entry points.
+    "severance_policy": "src/rag/severance_refusal_policy.py",
+    "runner_bootstrap": "eval/_bootstrap.py",
+    "runner_lib": "eval/lib.py",
+    "runner_reliability": "eval/run_reliability_eval.py",
+    "runner_severance": "eval/run_severance_refusal_policy.py",
+    "script_audit_corpus": "scripts/audit_corpus.py",
+    "script_bootstrap": "scripts/_bootstrap.py",
+    "script_download_corpus": "scripts/download_corpus.py",
     "release_verifier": "src/rag/release_verification.py",
+    "release_verifier_wrapper": "scripts/verify_release.py",
+    # Python dependency resolution can alter CPU/FP32/model execution semantics.
+    "project_configuration": "pyproject.toml",
+    "runtime_lock": "uv.lock",
 }
 EXPECTED_QIDS = tuple(
     f"severance-policy-{number:03d}" for number in range(1, 31)

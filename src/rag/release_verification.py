@@ -2293,6 +2293,52 @@ def _provider_metrics(provider: str, rows: Sequence[Mapping[str, Any]]) -> dict[
     }
 
 
+def _require_bound_file(root: Path, relative_path: str, *, label: str) -> Path:
+    path = root / relative_path
+    if not path.is_file():
+        raise ReleaseVerificationError(
+            f"severance refusal policy missing bound file {label}"
+        )
+    return path
+
+
+def _require_clean_committed_path(
+    root: Path, revision: str, relative_path: str, *, label: str
+) -> None:
+    tracked = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "--error-unmatch", "--", relative_path],
+        check=False,
+        capture_output=True,
+    )
+    status = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            "--",
+            relative_path,
+        ],
+        check=False,
+        capture_output=True,
+    )
+    comparison = subprocess.run(
+        ["git", "-C", str(root), "diff", "--quiet", revision, "--", relative_path],
+        check=False,
+    )
+    if (
+        tracked.returncode != 0
+        or status.returncode != 0
+        or status.stdout
+        or comparison.returncode != 0
+    ):
+        raise ReleaseVerificationError(
+            "severance refusal policy committed revision mismatch for " + label
+        )
+
+
 def _verify_severance_refusal_policy_artifact(
     project_root: Path, artifact_path: Path
 ) -> dict[str, Any]:
@@ -2318,6 +2364,10 @@ def _verify_severance_refusal_policy_artifact(
         "corpus_snapshot_sha256": root / "release/corpus_snapshot.json",
     }
     for field, path in source_paths.items():
+        if not path.is_file():
+            raise ReleaseVerificationError(
+                f"severance refusal policy missing bound source {field}"
+            )
         _assert_equal(
             f"severance refusal policy {field}",
             hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -2328,6 +2378,10 @@ def _verify_severance_refusal_policy_artifact(
         "formal_dataset": root / "eval/dataset/eval_set.jsonl",
     }
     for field, path in source_artifact_paths.items():
+        if not path.is_file():
+            raise ReleaseVerificationError(
+                f"severance refusal policy missing bound source {field}"
+            )
         _assert_equal(
             f"severance refusal policy {field} SHA-256",
             hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -2352,9 +2406,10 @@ def _verify_severance_refusal_policy_artifact(
                 plan_retrieval_query(row["question"]).routes,
             )
     for field, relative_path in DECISION_CODE_PATHS.items():
+        decision_path = _require_bound_file(root, relative_path, label=field)
         _assert_equal(
             f"severance refusal policy decision code {field} SHA-256",
-            hashlib.sha256((root / relative_path).read_bytes()).hexdigest(),
+            hashlib.sha256(decision_path.read_bytes()).hexdigest(),
             provenance["decision_code_sha256"][field],
         )
 
@@ -2370,24 +2425,12 @@ def _verify_severance_refusal_policy_artifact(
             "severance refusal policy code_revision is not a committed revision"
         ) from exc
     for field, relative_path in DECISION_CODE_PATHS.items():
-        comparison = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(root),
-                "diff",
-                "--quiet",
-                revision,
-                "--",
-                relative_path,
-            ],
-            check=False,
+        _require_clean_committed_path(
+            root,
+            revision,
+            relative_path,
+            label=f"decision code {field}",
         )
-        if comparison.returncode != 0:
-            raise ReleaseVerificationError(
-                "severance refusal policy committed revision mismatch for "
-                f"decision code {field}"
-            )
     committed_sources = {
         "dataset_sha256": "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
         "corpus_snapshot_sha256": "release/corpus_snapshot.json",
@@ -2395,24 +2438,12 @@ def _verify_severance_refusal_policy_artifact(
         "formal_dataset": "eval/dataset/eval_set.jsonl",
     }
     for field, relative_path in committed_sources.items():
-        comparison = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(root),
-                "diff",
-                "--quiet",
-                revision,
-                "--",
-                relative_path,
-            ],
-            check=False,
+        _require_clean_committed_path(
+            root,
+            revision,
+            relative_path,
+            label=f"source {field}",
         )
-        if comparison.returncode != 0:
-            raise ReleaseVerificationError(
-                "severance refusal policy committed revision mismatch for "
-                f"source {field}"
-            )
 
     return {
         "schema_version": replayed["schema_version"],

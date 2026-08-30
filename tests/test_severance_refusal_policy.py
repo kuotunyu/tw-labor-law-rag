@@ -31,6 +31,44 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATASET = PROJECT_ROOT / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl"
 RUNNER = PROJECT_ROOT / "eval/run_severance_refusal_policy.py"
 STRESS_DATASET = PROJECT_ROOT / "eval/dataset/reliability_stress_v0.3.1.jsonl"
+DECISION_RELEVANT_PATHS = {
+    "config": "src/rag/config.py",
+    "corpus_audit": "src/rag/corpus_audit.py",
+    "evaluation": "src/rag/evaluation.py",
+    "factory": "src/rag/factory.py",
+    "generation_answerer": "src/rag/generation/answerer.py",
+    "generation_llm": "src/rag/generation/llm.py",
+    "generation_prompts": "src/rag/generation/prompts.py",
+    "generation_router": "src/rag/generation/router.py",
+    "index_bm25": "src/rag/indexing/bm25_index.py",
+    "index_embedder": "src/rag/indexing/embedder.py",
+    "index_legal_terms": "src/rag/indexing/dict/legal_terms.txt",
+    "index_tokenizer": "src/rag/indexing/tokenizer.py",
+    "index_vector_store": "src/rag/indexing/vector_store.py",
+    "ingestion_chunkers": "src/rag/ingestion/chunkers.py",
+    "ingestion_cleaner": "src/rag/ingestion/cleaner.py",
+    "ingestion_loader": "src/rag/ingestion/loader.py",
+    "models": "src/rag/models.py",
+    "reliability": "src/rag/reliability.py",
+    "retrieval_fusion": "src/rag/retrieval/fusion.py",
+    "retrieval_pipeline": "src/rag/retrieval/pipeline.py",
+    "retrieval_refusal_policy": "src/rag/retrieval/refusal_policy.py",
+    "retrieval_reranker": "src/rag/retrieval/reranker.py",
+    "retrieval_retriever": "src/rag/retrieval/retriever.py",
+    "severance_policy": "src/rag/severance_refusal_policy.py",
+    "wage_arrears_regression": "src/rag/wage_arrears_regression.py",
+    "runner_bootstrap": "eval/_bootstrap.py",
+    "runner_lib": "eval/lib.py",
+    "runner_reliability": "eval/run_reliability_eval.py",
+    "runner_severance": "eval/run_severance_refusal_policy.py",
+    "script_audit_corpus": "scripts/audit_corpus.py",
+    "script_bootstrap": "scripts/_bootstrap.py",
+    "script_download_corpus": "scripts/download_corpus.py",
+    "release_verifier": "src/rag/release_verification.py",
+    "release_verifier_wrapper": "scripts/verify_release.py",
+    "project_configuration": "pyproject.toml",
+    "runtime_lock": "uv.lock",
+}
 EXPECTED_QIDS = (
     "severance-policy-001",
     "severance-policy-002",
@@ -271,6 +309,112 @@ def test_runner_rejects_non_cpu_device_before_model_preflight(monkeypatch) -> No
 
     with pytest.raises(SystemExit):
         runner.main(["--offline", "--device", "cuda"])
+
+
+@pytest.mark.parametrize(
+    "unsafe_output",
+    [
+        "historical",
+        "official",
+        "source",
+        "relative_arbitrary",
+        "traversal_collision",
+        "absolute_arbitrary",
+    ],
+)
+def test_runner_rejects_nonapproved_diagnostics_output_before_models_or_writes(
+    monkeypatch, tmp_path, unsafe_output
+) -> None:
+    outputs = {
+        "historical": PROJECT_ROOT
+        / "eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json",
+        "official": runner.OFFICIAL_RESULT,
+        "source": runner.DEFAULT_DATASET,
+        "relative_arbitrary": Path("eval/diagnostics/arbitrary.json"),
+        "traversal_collision": Path(
+            "eval/diagnostics/../official/severance_refusal_policy_v0.3.6.json"
+        ),
+        "absolute_arbitrary": tmp_path / "arbitrary.json",
+    }
+    protected = outputs[unsafe_output]
+    before = protected.read_bytes() if protected.is_file() else None
+    monkeypatch.setattr(
+        runner,
+        "_offline_preflight",
+        lambda _args: pytest.fail("unsafe output must fail before model preflight"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_write_public_json",
+        lambda *_args: pytest.fail("unsafe output must fail before artifact writes"),
+    )
+
+    with pytest.raises(SystemExit):
+        runner.main(
+            [
+                "--offline",
+                "--diagnostics-output",
+                str(protected),
+            ]
+        )
+
+    if before is None:
+        assert not protected.exists()
+    else:
+        assert protected.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "source_option",
+    ["--dataset", "--stress-dataset", "--formal-dataset", "--snapshot"],
+)
+def test_runner_rejects_approved_output_aliased_as_a_source_before_models(
+    monkeypatch, source_option
+) -> None:
+    monkeypatch.setattr(
+        runner,
+        "_offline_preflight",
+        lambda _args: pytest.fail("output/source collision must fail before models"),
+    )
+
+    with pytest.raises(SystemExit):
+        runner.main(
+            [
+                "--offline",
+                "--diagnostics-output",
+                str(runner.DIAGNOSTIC_RESULT),
+                source_option,
+                str(runner.DIAGNOSTIC_RESULT),
+            ]
+        )
+
+
+def test_runner_rejects_hardlink_alias_collision_before_models(
+    monkeypatch, tmp_path
+) -> None:
+    source = tmp_path / "source.jsonl"
+    approved = tmp_path / "pivot-no-go.json"
+    source.write_text("source evidence\n", encoding="utf-8")
+    os.link(source, approved)
+    monkeypatch.setattr(runner, "DIAGNOSTIC_RESULT", approved)
+    monkeypatch.setattr(
+        runner,
+        "_offline_preflight",
+        lambda _args: pytest.fail("hardlink collision must fail before models"),
+    )
+
+    with pytest.raises(SystemExit):
+        runner.main(
+            [
+                "--offline",
+                "--dataset",
+                str(source),
+                "--diagnostics-output",
+                str(approved),
+            ]
+        )
+
+    assert source.read_text(encoding="utf-8") == "source evidence\n"
 
 
 def test_local_pipeline_forces_both_model_loaders_local_only_without_llm(
@@ -682,14 +826,7 @@ def test_runner_binds_exact_input_hashes_models_settings_and_zero_providers(
         },
         "decision_code_sha256": {
             name: hashlib.sha256((PROJECT_ROOT / path).read_bytes()).hexdigest()
-            for name, path in {
-                "policy": "src/rag/severance_refusal_policy.py",
-                "runner": "eval/run_severance_refusal_policy.py",
-                "pipeline": "src/rag/retrieval/pipeline.py",
-                "reranker": "src/rag/retrieval/reranker.py",
-                "refusal_policy": "src/rag/retrieval/refusal_policy.py",
-                "release_verifier": "src/rag/release_verification.py",
-            }.items()
+            for name, path in DECISION_RELEVANT_PATHS.items()
         },
         "embedding_model": "BAAI/bge-m3",
         "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
@@ -902,6 +1039,7 @@ def test_runner_main_persists_replayable_no_go_without_official_export(
     embedder = SimpleNamespace(close=lambda: None)
 
     monkeypatch.setattr(runner, "OFFICIAL_RESULT", official)
+    monkeypatch.setattr(runner, "DIAGNOSTIC_RESULT", diagnostic)
     monkeypatch.setattr(runner, "_offline_preflight", lambda _args: settings)
     monkeypatch.setattr(runner, "_clean_git_revision", lambda: "a" * 40)
     monkeypatch.setattr(
@@ -1006,6 +1144,7 @@ def test_runner_main_no_go_keeps_real_retrieval_factory_provider_free(
     monkeypatch.setattr(factory, "build_answerer", forbidden_provider_construction)
     monkeypatch.setattr(factory, "RoutedLLM", forbidden_provider_construction)
     monkeypatch.setattr(runner, "OFFICIAL_RESULT", official)
+    monkeypatch.setattr(runner, "DIAGNOSTIC_RESULT", diagnostic)
     monkeypatch.setattr(runner, "require_cached_models", lambda _settings: None)
     monkeypatch.setattr(runner, "_clean_git_revision", lambda: "a" * 40)
     monkeypatch.setattr(
@@ -1239,12 +1378,8 @@ def _provenance():
             "formal_dataset": "d" * 64,
         },
         "decision_code_sha256": {
-            "policy": "0" * 64,
-            "runner": "1" * 64,
-            "pipeline": "2" * 64,
-            "reranker": "3" * 64,
-            "refusal_policy": "4" * 64,
-            "release_verifier": "5" * 64,
+            name: f"{index % 16:x}" * 64
+            for index, name in enumerate(DECISION_RELEVANT_PATHS)
         },
         "embedding_model": "BAAI/bge-m3",
         "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
@@ -2240,9 +2375,9 @@ def test_official_artifact_replays_without_retrieval_or_model_execution(
         ),
         (
             lambda artifact: artifact["provenance"]["decision_code_sha256"].update(
-                policy="z" * 64
+                severance_policy="z" * 64
             ),
-            "policy must be a lowercase",
+            "severance_policy must be a lowercase",
         ),
         (
             lambda artifact: artifact["provenance"].update(provider_requests=1),
@@ -2296,8 +2431,18 @@ def test_official_replay_rejects_schema_provenance_gate_and_evidence_tampering(
         policy.replay_official_artifact(artifact)
 
 
-def test_release_verifier_replays_artifact_and_binds_current_source_bytes(
-    tmp_path, cases
+@pytest.mark.parametrize(
+    "changed_dependency",
+    [
+        "retrieval_refusal_policy",
+        "retrieval_fusion",
+        "index_embedder",
+        "runner_severance",
+        "release_verifier_wrapper",
+    ],
+)
+def test_release_verifier_invalidates_representative_dependency_changes(
+    tmp_path, cases, changed_dependency
 ):
     repository = tmp_path / "repository"
     repository.mkdir()
@@ -2306,7 +2451,7 @@ def test_release_verifier_replays_artifact_and_binds_current_source_bytes(
         "eval/dataset/reliability_stress_v0.3.1.jsonl",
         "eval/dataset/eval_set.jsonl",
         "release/corpus_snapshot.json",
-        *policy.DECISION_CODE_PATHS.values(),
+        *DECISION_RELEVANT_PATHS.values(),
     )
     for relative_path in source_paths:
         destination = repository / relative_path
@@ -2349,7 +2494,7 @@ def test_release_verifier_replays_artifact_and_binds_current_source_bytes(
         },
         decision_code_sha256={
             name: hashlib.sha256((repository / path).read_bytes()).hexdigest()
-            for name, path in policy.DECISION_CODE_PATHS.items()
+            for name, path in DECISION_RELEVANT_PATHS.items()
         },
         code_revision=subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -2385,13 +2530,10 @@ def test_release_verifier_replays_artifact_and_binds_current_source_bytes(
         "provider_requests": 0,
     }
 
-    changed_pipeline = repository / policy.DECISION_CODE_PATHS["pipeline"]
-    changed_pipeline.write_text(
-        changed_pipeline.read_text(encoding="utf-8") + "\n",
-        encoding="utf-8",
-    )
-    provenance["decision_code_sha256"]["pipeline"] = hashlib.sha256(
-        changed_pipeline.read_bytes()
+    changed_path = repository / DECISION_RELEVANT_PATHS[changed_dependency]
+    changed_path.write_bytes(changed_path.read_bytes() + b"\n")
+    provenance["decision_code_sha256"][changed_dependency] = hashlib.sha256(
+        changed_path.read_bytes()
     ).hexdigest()
     mismatched = build_official_artifact(
         observations=observations,
@@ -2401,10 +2543,103 @@ def test_release_verifier_replays_artifact_and_binds_current_source_bytes(
     runner._write_public_json(path, mismatched)
     with pytest.raises(
         release_verification.ReleaseVerificationError,
-        match="committed revision.*pipeline",
+        match=f"committed revision.*{changed_dependency}",
     ):
         release_verification._verify_severance_refusal_policy_artifact(
             repository, path
+        )
+
+
+def test_release_verifier_rejects_missing_or_untracked_relevant_files(
+    tmp_path, cases
+):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    source_paths = (
+        "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
+        "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "eval/dataset/eval_set.jsonl",
+        "release/corpus_snapshot.json",
+        *DECISION_RELEVANT_PATHS.values(),
+    )
+    for relative_path in source_paths:
+        destination = repository / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(PROJECT_ROOT / relative_path, destination)
+    subprocess.run(["git", "init"], cwd=repository, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repository, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.invalid"],
+        cwd=repository,
+        check=True,
+    )
+    subprocess.run(["git", "add", "."], cwd=repository, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "fixture"],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+    )
+    observations = _observations(cases)
+    provenance = _provenance()
+    provenance.update(
+        dataset_sha256=hashlib.sha256(
+            (repository / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl").read_bytes()
+        ).hexdigest(),
+        corpus_snapshot_sha256=hashlib.sha256(
+            (repository / "release/corpus_snapshot.json").read_bytes()
+        ).hexdigest(),
+        source_artifact_sha256={
+            "stress_dataset": hashlib.sha256(
+                (repository / "eval/dataset/reliability_stress_v0.3.1.jsonl").read_bytes()
+            ).hexdigest(),
+            "formal_dataset": hashlib.sha256(
+                (repository / "eval/dataset/eval_set.jsonl").read_bytes()
+            ).hexdigest(),
+        },
+        decision_code_sha256={
+            name: hashlib.sha256((repository / relative).read_bytes()).hexdigest()
+            for name, relative in DECISION_RELEVANT_PATHS.items()
+        },
+        code_revision=subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repository,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        ).stdout.strip(),
+    )
+    artifact = build_official_artifact(
+        observations=observations,
+        candidate_results=_candidate_results(observations),
+        provenance=provenance,
+    )
+    artifact_path = repository / "severance-policy.json"
+    runner._write_public_json(artifact_path, artifact)
+    relevant = repository / DECISION_RELEVANT_PATHS["release_verifier_wrapper"]
+    subprocess.run(
+        ["git", "rm", "--cached", DECISION_RELEVANT_PATHS["release_verifier_wrapper"]],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+    )
+
+    with pytest.raises(
+        release_verification.ReleaseVerificationError,
+        match="committed revision.*release_verifier_wrapper",
+    ):
+        release_verification._verify_severance_refusal_policy_artifact(
+            repository, artifact_path
+        )
+
+    relevant.unlink()
+    with pytest.raises(
+        release_verification.ReleaseVerificationError,
+        match="missing.*release_verifier_wrapper",
+    ):
+        release_verification._verify_severance_refusal_policy_artifact(
+            repository, artifact_path
         )
 
 
