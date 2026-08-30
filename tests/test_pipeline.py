@@ -276,6 +276,9 @@ def test_pipeline_exact_severance_route_reranks_full_pool_twice_then_merges_top_
     ]
     assert result.top_score == 0.021
     assert len(result.candidates) == 6
+    assert result.first_stage_retrieval_calls == 1
+    assert result.reranker_calls == 2
+    assert result.reranker_scored_pairs == (6, 6)
 
 
 def test_pipeline_non_exact_route_retains_single_reranker_call():
@@ -314,6 +317,9 @@ def test_pipeline_non_exact_route_retains_single_reranker_call():
         "severance_comparison",
         "wage_arrears_termination",
     )
+    assert result.first_stage_retrieval_calls == 1
+    assert result.reranker_calls == 1
+    assert result.reranker_scored_pairs == (3,)
 
 
 def test_pipeline_empty_candidates_makes_no_reranker_call():
@@ -342,6 +348,9 @@ def test_pipeline_empty_candidates_makes_no_reranker_call():
 
     assert result.hits == []
     assert result.top_score == 0.0
+    assert result.first_stage_retrieval_calls == 1
+    assert result.reranker_calls == 0
+    assert result.reranker_scored_pairs == ()
     assert [call[0] for call in calls] == ["retrieve"]
 
 

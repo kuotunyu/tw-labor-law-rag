@@ -5,17 +5,21 @@ did not satisfy their release gates. These files are diagnostics, not official
 release artifacts, and are intentionally excluded from
 `release/public-files.txt`.
 
-`severance_refusal_policy_v0.3.6_no_go.json` is written only when the Task 6
-candidate sweep has no passing threshold or selects a value other than the
-approved `0.015`. Its strict allowlist excludes question/answer text, retrieved
-content, endpoints, credentials, private paths, and account data. It retains
-the raw unrounded content-free target observations, fresh stress/formal guard
-rows, all seven candidate aggregates, failed gates, hashes, retrieval
-configuration, exact execution device, clean candidate revision, and zero
-provider counters.
+`severance_refusal_policy_v0.3.6_no_go.json` is the immutable audit record for
+the superseded route-threshold design. The pivot runner never overwrites it;
+its original bytes remain bound to commit `9890c78538176c5338f6a31232a615f8d970fdd2`.
 
-The diagnostic schema is `1.0` and is distinct from accepted official schema
-`1.2`. It can be replayed with
+A failed retrieval-coverage pivot is written instead to
+`severance_retrieval_pivot_v0.3.6_no_go.json`. Its schema is `1.3`, records the
+fixed production threshold `0.03` separately from the evaluation-only
+`route_ablation`, and is a NO-GO unless that ablation's highest passing
+candidate is also `0.03`. It retains raw unrounded content-free target,
+stress, and formal evidence; exact route checks; first-stage and reranker call
+counts; CPU/FP32 and local-only model provenance; `rrf_k`; semantic-view and
+merge-policy bindings; clean committed source hashes; and zero-provider
+counters.
+
+The pivot diagnostic can be replayed with
 `rag.severance_refusal_policy.replay_no_go_evidence` without loading retrieval
-models or rerunning the 130 queries. A NO-GO diagnostic never authorizes a
-production threshold or official artifact.
+models or rerunning the 130 queries. A NO-GO diagnostic never authorizes an
+official artifact or any production-threshold change.

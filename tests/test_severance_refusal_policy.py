@@ -2,6 +2,7 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import rag.release_verification as release_verification
 import rag.severance_refusal_policy as policy
 from eval import run_severance_refusal_policy as runner
 from rag import factory
@@ -96,6 +98,11 @@ OBSERVATION_FIELDS = {
     "applied_routes",
     "hit_count",
     "top_score",
+    "candidate_count",
+    "route_plan_matched",
+    "first_stage_retrieval_calls",
+    "reranker_calls",
+    "reranker_scored_pairs",
 }
 OFFICIAL_CASE_FIELDS = {
     "qid",
@@ -105,6 +112,11 @@ OFFICIAL_CASE_FIELDS = {
     "applied_routes",
     "hit_count",
     "top_score",
+    "candidate_count",
+    "route_plan_matched",
+    "first_stage_retrieval_calls",
+    "reranker_calls",
+    "reranker_scored_pairs",
     "effective_threshold",
     "refused",
     "refusal_stage",
@@ -250,6 +262,17 @@ def test_runner_forces_offline_mode_before_cached_model_preflight(
     assert calls == [settings]
 
 
+def test_runner_rejects_non_cpu_device_before_model_preflight(monkeypatch) -> None:
+    monkeypatch.setattr(
+        runner,
+        "_offline_preflight",
+        lambda _args: pytest.fail("non-CPU input must fail before model preflight"),
+    )
+
+    with pytest.raises(SystemExit):
+        runner.main(["--offline", "--device", "cuda"])
+
+
 def test_local_pipeline_forces_both_model_loaders_local_only_without_llm(
     monkeypatch,
     tmp_path,
@@ -343,10 +366,16 @@ def test_runner_retrieves_each_target_once_and_records_unrounded_observation(
             )
             for source in case.sources
         ] or [SimpleNamespace(payload={"doc_title": "irrelevant", "articles": []})]
+        routes = plan_retrieval_query(question).routes
+        reranker_calls = 2 if routes == ("severance_comparison",) else 1
         return SimpleNamespace(
             hits=hits,
-            applied_routes=plan_retrieval_query(question).routes,
+            candidates=hits,
+            applied_routes=routes,
             top_score=0.0150004,
+            first_stage_retrieval_calls=1,
+            reranker_calls=reranker_calls,
+            reranker_scored_pairs=(len(hits),) * reranker_calls,
         )
 
     observations = runner._run_target_cases(
@@ -364,6 +393,11 @@ def test_runner_retrieves_each_target_once_and_records_unrounded_observation(
         "applied_routes": ["severance_comparison"],
         "hit_count": 2,
         "top_score": 0.0150004,
+        "candidate_count": 2,
+        "route_plan_matched": True,
+        "first_stage_retrieval_calls": 1,
+        "reranker_calls": 2,
+        "reranker_scored_pairs": [2, 2],
     }
 
 
@@ -400,6 +434,10 @@ def test_runner_builds_guard_rows_from_fresh_scores_and_authoritative_routes() -
         ],
         applied_routes=("severance_comparison",),
         top_score=0.0175004,
+        candidates=[object(), object()],
+        first_stage_retrieval_calls=1,
+        reranker_calls=2,
+        reranker_scored_pairs=(2, 2),
     )
 
     evidence = runner._run_guard_cases(
@@ -414,6 +452,11 @@ def test_runner_builds_guard_rows_from_fresh_scores_and_authoritative_routes() -
             "hit_count": 2,
             "top_score": 0.0175004,
             "applied_routes": ["severance_comparison"],
+            "candidate_count": 2,
+            "route_plan_matched": True,
+            "first_stage_retrieval_calls": 1,
+            "reranker_calls": 2,
+            "reranker_scored_pairs": [2, 2],
         }
     ]
 
@@ -432,7 +475,7 @@ def test_runner_rejects_guard_route_disagreement_instead_of_replacing_it() -> No
         )
 
 
-def test_runner_sweeps_every_candidate_over_the_same_retrieval_evidence(
+def test_runner_route_ablation_sweeps_same_retrieval_evidence(
     monkeypatch,
 ) -> None:
     observations = [{"retrieval": "target"}]
@@ -444,9 +487,9 @@ def test_runner_sweeps_every_candidate_over_the_same_retrieval_evidence(
         calls.append((actual_observations, kwargs))
         return {"candidate_threshold": kwargs["candidate_threshold"]}
 
-    monkeypatch.setattr(runner, "evaluate_candidate", evaluate)
+    monkeypatch.setattr(runner, "evaluate_route_ablation_candidate", evaluate)
 
-    results = runner._evaluate_candidates(observations, stress, formal)
+    results = runner._evaluate_route_ablation(observations, stress, formal)
 
     assert [result["candidate_threshold"] for result in results] == list(
         EXPECTED_CANDIDATES
@@ -470,8 +513,11 @@ def test_runner_rebuilds_identical_content_free_accepted_artifact(cases) -> None
     second = runner._build_accepted_artifact(**kwargs)
 
     assert first == second
-    assert first["schema_version"] == "1.2"
-    assert first["selected_threshold"] == 0.015
+    assert first["schema_version"] == "1.3"
+    assert first["production_threshold"] == 0.03
+    assert first["route_ablation"]["highest_passing_candidate"] == 0.03
+    assert "selected_threshold" not in first
+    assert "global_threshold" not in first
     serialized = json.dumps(first, ensure_ascii=False, sort_keys=True)
     for forbidden_key in (
         '"question"',
@@ -518,27 +564,27 @@ def test_no_go_envelope_is_content_free_unrounded_and_replayable(cases) -> None:
         observations=observations,
         candidate_results=candidates,
         provenance=_provenance(),
-        expected_threshold=0.015,
     )
 
-    assert envelope["schema_version"] == "1.0"
-    assert envelope["evidence_class"] == "non_release_no_go"
+    assert envelope["schema_version"] == "1.3"
+    assert envelope["evidence_class"] == "non_release_pivot_no_go"
     assert envelope["outcome"] == "no_go"
     assert envelope["official_export_allowed"] is False
-    assert envelope["selected_threshold"] is None
+    assert envelope["production_threshold"] == 0.03
+    assert envelope["route_ablation"]["highest_passing_candidate"] is None
     assert envelope["target_observations"] == observations
     assert envelope["target_observations"][0]["top_score"] == 0.0150004
     assert len(envelope["guard_evidence"]["stress"]) == 60
     assert len(envelope["guard_evidence"]["formal"]) == 40
-    assert len(envelope["candidates"]) == 7
+    assert len(envelope["route_ablation"]["candidates"]) == 7
     assert envelope["failed_gates"] == [
         {"candidate_threshold": 0.0, "gates": ["target"]},
         {"candidate_threshold": 0.005, "gates": ["target"]},
         {"candidate_threshold": 0.01, "gates": ["target"]},
         {"candidate_threshold": 0.015, "gates": ["target"]},
-        {"candidate_threshold": 0.02, "gates": ["target", "stress"]},
-        {"candidate_threshold": 0.025, "gates": ["target", "stress"]},
-        {"candidate_threshold": 0.03, "gates": ["target", "stress"]},
+        {"candidate_threshold": 0.02, "gates": ["target"]},
+        {"candidate_threshold": 0.025, "gates": ["target"]},
+        {"candidate_threshold": 0.03, "gates": ["target", "route_ablation"]},
     ]
     assert policy.replay_no_go_evidence(envelope) == envelope
     serialized = json.dumps(envelope, ensure_ascii=False, sort_keys=True)
@@ -566,10 +612,9 @@ def test_no_go_replay_rejects_mutated_candidate_aggregate(cases) -> None:
         observations=observations,
         candidate_results=_candidate_results(observations),
         provenance=_provenance(),
-        expected_threshold=0.015,
     )
     mutated = json.loads(json.dumps(envelope))
-    mutated["candidates"][0]["target"]["passed_cases"] = 28
+    mutated["route_ablation"]["candidates"][0]["target"]["passed_cases"] = 28
 
     with pytest.raises(ValueError, match="replay mismatch"):
         policy.replay_no_go_evidence(mutated)
@@ -635,6 +680,17 @@ def test_runner_binds_exact_input_hashes_models_settings_and_zero_providers(
             "stress_dataset": hashlib.sha256(b"stress\n").hexdigest(),
             "formal_dataset": hashlib.sha256(b"formal\n").hexdigest(),
         },
+        "decision_code_sha256": {
+            name: hashlib.sha256((PROJECT_ROOT / path).read_bytes()).hexdigest()
+            for name, path in {
+                "policy": "src/rag/severance_refusal_policy.py",
+                "runner": "eval/run_severance_refusal_policy.py",
+                "pipeline": "src/rag/retrieval/pipeline.py",
+                "reranker": "src/rag/retrieval/reranker.py",
+                "refusal_policy": "src/rag/retrieval/refusal_policy.py",
+                "release_verifier": "src/rag/release_verification.py",
+            }.items()
+        },
         "embedding_model": "BAAI/bge-m3",
         "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
         "reranker_model": "BAAI/bge-reranker-v2-m3",
@@ -648,6 +704,14 @@ def test_runner_binds_exact_input_hashes_models_settings_and_zero_providers(
             "rrf_k": 60,
         },
         "execution_device": "cpu",
+        "precision_mode": "fp32",
+        "local_files_only": True,
+        "semantic_view_sha256": (
+            "3faf051810ad233ee2da982155c4c4d8127f00d2aea56351fa19f87bee0d49a6"
+        ),
+        "merge_policy_version": "primary_first_deduplicating_interleave_v1",
+        "primary_score_semantics": "full_precision_primary_query_top_score",
+        "source_tree_clean": True,
         "code_revision": "a" * 40,
         "run_origin": "fresh_offline_retrieval",
         "provider_adapters": 0,
@@ -703,7 +767,10 @@ def test_runner_main_uses_one_retrieval_only_pipeline_and_exports_after_acceptan
     observations = [{"qid": "target"}]
     stress_evidence = [{"qid": "stress-evidence"}]
     formal_evidence = [{"qid": "formal-evidence"}]
-    artifact = {"selected_threshold": 0.015}
+    artifact = {
+        "production_threshold": 0.03,
+        "route_ablation": {"highest_passing_candidate": 0.03},
+    }
     calls = []
 
     monkeypatch.setattr(runner, "OFFICIAL_RESULT", official, raising=False)
@@ -754,7 +821,7 @@ def test_runner_main_uses_one_retrieval_only_pipeline_and_exports_after_acceptan
     )
     monkeypatch.setattr(
         runner,
-        "_evaluate_candidates",
+        "_evaluate_route_ablation",
         lambda actual_observations, actual_stress, actual_formal: (
             calls.append(
                 (
@@ -1020,7 +1087,7 @@ def _source_key(source: dict[str, str]) -> str:
 def _observations(cases):
     observations = []
     for index, case in enumerate(cases):
-        score = 0.015 if index == 0 else 0.5
+        score = 0.0300004 if index == 0 else 0.5
         if case.qid == "severance-policy-023":
             score = 0.0
         elif case.qid == "severance-policy-027":
@@ -1035,6 +1102,25 @@ def _observations(cases):
                 applied_routes=plan_retrieval_query(case.question).routes,
                 top_score=score,
                 hit_count=0 if case.qid == "severance-policy-023" else 5,
+                candidate_count=0 if case.qid == "severance-policy-023" else 20,
+                route_plan_matched=True,
+                first_stage_retrieval_calls=1,
+                reranker_calls=(
+                    0
+                    if case.qid == "severance-policy-023"
+                    else 2
+                    if plan_retrieval_query(case.question).routes
+                    == ("severance_comparison",)
+                    else 1
+                ),
+                reranker_scored_pairs=(
+                    ()
+                    if case.qid == "severance-policy-023"
+                    else (20, 20)
+                    if plan_retrieval_query(case.question).routes
+                    == ("severance_comparison",)
+                    else (20,)
+                ),
             )
         )
     return observations
@@ -1046,7 +1132,7 @@ def _stress_rows():
         qid = f"stress-{number:03d}"
         answerable = number <= 40
         if qid == "stress-037":
-            score = 0.0175004
+            score = 0.3114268601959007
         elif qid == "stress-041":
             score = 0.0
         elif not answerable and number <= 57:
@@ -1061,6 +1147,19 @@ def _stress_rows():
                 "hit_count": 0 if qid == "stress-041" else 5,
                 "top_score": score,
                 "applied_routes": STRESS_ROUTES.get(qid, []),
+                "candidate_count": 0 if qid == "stress-041" else 20,
+                "route_plan_matched": True,
+                "first_stage_retrieval_calls": 1,
+                "reranker_calls": (
+                    0 if qid == "stress-041" else 2 if qid in {"stress-003", "stress-037"} else 1
+                ),
+                "reranker_scored_pairs": (
+                    []
+                    if qid == "stress-041"
+                    else [20, 20]
+                    if qid in {"stress-003", "stress-037"}
+                    else [20]
+                ),
             }
         )
     return rows
@@ -1075,6 +1174,11 @@ def _formal_rows():
             "hit_count": 5,
             "top_score": 0.5000004 if number == 3 else 0.5,
             "applied_routes": FORMAL_ROUTES.get(f"eval-{number:02d}", []),
+            "candidate_count": 20,
+            "route_plan_matched": True,
+            "first_stage_retrieval_calls": 1,
+            "reranker_calls": 2 if number == 3 else 1,
+            "reranker_scored_pairs": [20, 20] if number == 3 else [20],
         }
         for number, rank in enumerate(FORMAL_RANKS, start=1)
     ]
@@ -1090,6 +1194,11 @@ def _formal_rows():
                 else 0.0000004 if number <= 39 else 0.5
             ),
             "applied_routes": [],
+            "candidate_count": 0 if number == 31 else 20,
+            "route_plan_matched": True,
+            "first_stage_retrieval_calls": 1,
+            "reranker_calls": 0 if number == 31 else 1,
+            "reranker_scored_pairs": [] if number == 31 else [20],
         }
         for number in range(31, 41)
     )
@@ -1129,6 +1238,14 @@ def _provenance():
             "stress_dataset": "c" * 64,
             "formal_dataset": "d" * 64,
         },
+        "decision_code_sha256": {
+            "policy": "0" * 64,
+            "runner": "1" * 64,
+            "pipeline": "2" * 64,
+            "reranker": "3" * 64,
+            "refusal_policy": "4" * 64,
+            "release_verifier": "5" * 64,
+        },
         "embedding_model": "BAAI/bge-m3",
         "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
         "reranker_model": "BAAI/bge-reranker-v2-m3",
@@ -1142,6 +1259,14 @@ def _provenance():
             "rrf_k": 60,
         },
         "execution_device": "cpu",
+        "precision_mode": "fp32",
+        "local_files_only": True,
+        "semantic_view_sha256": (
+            "3faf051810ad233ee2da982155c4c4d8127f00d2aea56351fa19f87bee0d49a6"
+        ),
+        "merge_policy_version": "primary_first_deduplicating_interleave_v1",
+        "primary_score_semantics": "full_precision_primary_query_top_score",
+        "source_tree_clean": True,
         "code_revision": "f" * 40,
         "run_origin": "fresh_offline_retrieval",
         "provider_adapters": 0,
@@ -1249,6 +1374,11 @@ def test_observation_contains_only_raw_content_free_evidence(cases):
         applied_routes=("severance_comparison",),
         top_score=0.0150004,
         hit_count=5,
+        candidate_count=20,
+        route_plan_matched=True,
+        first_stage_retrieval_calls=1,
+        reranker_calls=2,
+        reranker_scored_pairs=(20, 20),
     )
     assert set(observation) == OBSERVATION_FIELDS
     assert observation["top_score"] == 0.0150004
@@ -1262,6 +1392,11 @@ def test_target_no_hit_observation_uses_no_hits_policy_semantics(cases):
         applied_routes=("severance_comparison",),
         top_score=0.0,
         hit_count=0,
+        candidate_count=0,
+        route_plan_matched=True,
+        first_stage_retrieval_calls=1,
+        reranker_calls=0,
+        reranker_scored_pairs=(),
     )
 
     result = evaluate_candidate(
@@ -1302,6 +1437,11 @@ def test_observation_rejects_invalid_content_free_inputs(cases, kwargs, message)
         "applied_routes": ("severance_comparison",),
         "top_score": 0.1,
         "hit_count": 5,
+        "candidate_count": 20,
+        "route_plan_matched": True,
+        "first_stage_retrieval_calls": 1,
+        "reranker_calls": 2,
+        "reranker_scored_pairs": (20, 20),
     }
     valid.update(kwargs)
     with pytest.raises(ValueError, match=message):
@@ -1311,7 +1451,12 @@ def test_observation_rejects_invalid_content_free_inputs(cases, kwargs, message)
 def test_evaluator_recomputes_canonical_source_and_route_contracts(cases):
     observations = _observations(cases)
     observations[0] = {**observations[0], "source_ranks": {}}
-    observations[1] = {**observations[1], "applied_routes": []}
+    observations[1] = {
+        **observations[1],
+        "applied_routes": [],
+        "reranker_calls": 1,
+        "reranker_scored_pairs": [20],
+    }
     result = evaluate_candidate(
         observations,
         candidate_threshold=0.015,
@@ -1342,6 +1487,8 @@ def test_positive_route_contract_requires_the_exact_singleton_route(cases):
             "severance_comparison",
             "off_hours_employer_message",
         ],
+        "reranker_calls": 1,
+        "reranker_scored_pairs": [20],
     }
 
     result = evaluate_candidate(
@@ -1411,6 +1558,11 @@ def test_027_requires_a_positive_hit_threshold_refusal_without_generation(cases)
         applied_routes=(),
         top_score=0.029,
         hit_count=5,
+        candidate_count=20,
+        route_plan_matched=True,
+        first_stage_retrieval_calls=1,
+        reranker_calls=1,
+        reranker_scored_pairs=(20,),
     )
 
     result = evaluate_candidate(
@@ -1430,6 +1582,38 @@ def test_027_requires_a_positive_hit_threshold_refusal_without_generation(cases)
     assert collision["passed"] is True
 
 
+def test_027_uses_the_strict_production_threshold_boundary(cases):
+    observations = _observations(cases)
+    observations[26] = build_case_observation(
+        cases[26],
+        source_ranks={},
+        applied_routes=(),
+        top_score=0.03,
+        hit_count=5,
+        candidate_count=20,
+        route_plan_matched=True,
+        first_stage_retrieval_calls=1,
+        reranker_calls=1,
+        reranker_scored_pairs=(20,),
+    )
+
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    collision = result["cases"][26]
+    assert collision["effective_threshold"] == 0.03
+    assert collision["refused"] is False
+    assert collision["refusal_stage"] is None
+    assert collision["generation_allowed"] is True
+    assert collision["outcome_contract_passed"] is False
+    assert collision["passed"] is False
+
+
 def test_027_rejects_a_nonempty_route_tuple(cases):
     observations = _observations(cases)
     observations[26] = build_case_observation(
@@ -1438,6 +1622,11 @@ def test_027_rejects_a_nonempty_route_tuple(cases):
         applied_routes=("off_hours_employer_message",),
         top_score=0.029,
         hit_count=5,
+        candidate_count=20,
+        route_plan_matched=True,
+        first_stage_retrieval_calls=1,
+        reranker_calls=1,
+        reranker_scored_pairs=(20,),
     )
 
     result = evaluate_candidate(
@@ -1461,6 +1650,11 @@ def test_027_rejects_no_hits_instead_of_its_required_threshold_refusal(cases):
         applied_routes=(),
         top_score=0.0,
         hit_count=0,
+        candidate_count=0,
+        route_plan_matched=True,
+        first_stage_retrieval_calls=1,
+        reranker_calls=0,
+        reranker_scored_pairs=(),
     )
 
     result = evaluate_candidate(
@@ -1506,8 +1700,13 @@ def test_candidate_recomputes_target_stress_and_formal_gates(cases):
         "hit_count": 5,
         "has_hits": True,
         "reranker_enabled": True,
-        "top_score": 0.0175004,
+        "top_score": 0.3114268601959007,
         "applied_routes": ["severance_comparison"],
+        "candidate_count": 20,
+        "route_plan_matched": True,
+        "first_stage_retrieval_calls": 1,
+        "reranker_calls": 2,
+        "reranker_scored_pairs": [20, 20],
     }
     assert result["stress_evidence"][40] == {
         "qid": "stress-041",
@@ -1518,6 +1717,11 @@ def test_candidate_recomputes_target_stress_and_formal_gates(cases):
         "reranker_enabled": True,
         "top_score": 0.0,
         "applied_routes": [],
+        "candidate_count": 0,
+        "route_plan_matched": True,
+        "first_stage_retrieval_calls": 1,
+        "reranker_calls": 0,
+        "reranker_scored_pairs": [],
     }
 
 
@@ -1723,9 +1927,8 @@ def test_evaluator_calls_shared_policy_with_exact_raw_boundary(monkeypatch, case
         "has_hits": True,
         "reranker_enabled": True,
         "applied_routes": ("severance_comparison",),
-        "top_score": 0.0175004,
-        "global_threshold": 0.03,
-        "severance_comparison_threshold": 0.015,
+        "top_score": 0.3114268601959007,
+        "global_threshold": 0.015,
     }
     assert calls[70] == {
         "has_hits": False,
@@ -1733,7 +1936,6 @@ def test_evaluator_calls_shared_policy_with_exact_raw_boundary(monkeypatch, case
         "applied_routes": (),
         "top_score": 0.0,
         "global_threshold": 0.03,
-        "severance_comparison_threshold": 0.015,
     }
 
 
@@ -1749,15 +1951,14 @@ def test_selector_replays_policy_and_returns_highest_complete_pass(
         return real_policy(**kwargs)
 
     monkeypatch.setattr(policy, "decide_retrieval_refusal", spy)
-    assert select_highest_passing_threshold(results) == 0.015
+    assert select_highest_passing_threshold(results) == 0.03
     assert len(calls) == 910
     assert {
         "has_hits": True,
         "reranker_enabled": True,
         "applied_routes": ("severance_comparison",),
-        "top_score": 0.0175004,
-        "global_threshold": 0.03,
-        "severance_comparison_threshold": 0.015,
+        "top_score": 0.3114268601959007,
+        "global_threshold": 0.015,
     } in calls
     assert {
         "has_hits": False,
@@ -1765,7 +1966,6 @@ def test_selector_replays_policy_and_returns_highest_complete_pass(
         "applied_routes": (),
         "top_score": 0.0,
         "global_threshold": 0.03,
-        "severance_comparison_threshold": 0.015,
     } in calls
 
 
@@ -1773,21 +1973,21 @@ def _result_for(results, threshold):
     return next(row for row in results if row["candidate_threshold"] == threshold)
 
 
-def test_selector_rejects_fabricated_passing_point_zero_three(cases):
+def test_selector_rejects_fabricated_failing_point_zero_three(cases):
     results = _candidate_results(_observations(cases))
     fabricated = _result_for(results, 0.03)
     fabricated["target"] = {
         **fabricated["target"],
-        "passed_cases": 30,
-        "positive_generation_allowed": 15,
-        "passed": True,
+        "passed_cases": 29,
+        "positive_generation_allowed": 14,
+        "passed": False,
     }
     fabricated["stress"] = {
         **fabricated["stress"],
-        "direct_false_refusals": 0,
-        "passed": True,
+        "direct_false_refusals": 1,
+        "passed": False,
     }
-    fabricated["passed"] = True
+    fabricated["passed"] = False
     with pytest.raises(ValueError, match="target aggregate"):
         select_highest_passing_threshold(results)
 
@@ -1804,7 +2004,11 @@ def test_selector_rejects_fabricated_passing_point_zero_three(cases):
             "case decision",
         ),
         (
-            lambda result: result["cases"][0].update(applied_routes=[]),
+            lambda result: result["cases"][0].update(
+                applied_routes=[],
+                reranker_calls=1,
+                reranker_scored_pairs=[20],
+            ),
             "case decision",
         ),
         (
@@ -1846,7 +2050,12 @@ def test_selector_rejects_grid_tampering_and_no_go(cases):
         select_highest_passing_threshold(results[:-1])
 
     observations = _observations(cases)
-    observations[0] = {**observations[0], "applied_routes": []}
+    observations[0] = {
+        **observations[0],
+        "applied_routes": [],
+        "reranker_calls": 1,
+        "reranker_scored_pairs": [20],
+    }
     failing = _candidate_results(observations)
     with pytest.raises(RuntimeError, match="no candidate"):
         select_highest_passing_threshold(failing)
@@ -1861,7 +2070,7 @@ def test_selector_rejects_nonfinite_case_decision_inputs(cases):
 
 def test_official_artifact_recomputes_and_publishes_only_safe_truth(cases):
     observations = _observations(cases)
-    observations[0] = {**observations[0], "top_score": 0.0150004}
+    observations[0] = {**observations[0], "top_score": 0.0300004}
     results = _candidate_results(observations)
     artifact = build_official_artifact(
         observations=observations,
@@ -1871,26 +2080,38 @@ def test_official_artifact_recomputes_and_publishes_only_safe_truth(cases):
     assert tuple(artifact) == (
         "schema_version",
         "provenance",
-        "candidate_thresholds",
-        "global_threshold",
-        "selected_threshold",
+        "production_threshold",
+        "route_ablation",
         "guard_evidence",
         "guard_evidence_binding_sha256",
-        "candidates",
+        "target_evidence_binding_sha256",
         "cases",
     )
-    assert artifact["schema_version"] == "1.2"
-    assert artifact["candidate_thresholds"] == list(EXPECTED_CANDIDATES)
-    assert artifact["global_threshold"] == 0.03
-    assert artifact["selected_threshold"] == 0.015
-    assert all("cases" not in result for result in artifact["candidates"])
-    assert all("stress_evidence" not in result for result in artifact["candidates"])
-    assert all("formal_evidence" not in result for result in artifact["candidates"])
+    assert artifact["schema_version"] == "1.3"
+    assert artifact["production_threshold"] == 0.03
+    assert artifact["route_ablation"]["candidate_thresholds"] == list(
+        EXPECTED_CANDIDATES
+    )
+    assert artifact["route_ablation"]["highest_passing_candidate"] == 0.03
+    assert all(
+        "cases" not in result
+        for result in artifact["route_ablation"]["candidates"]
+    )
+    assert all(
+        "stress_evidence" not in result
+        for result in artifact["route_ablation"]["candidates"]
+    )
+    assert all(
+        "formal_evidence" not in result
+        for result in artifact["route_ablation"]["candidates"]
+    )
     assert artifact["guard_evidence"] == {
         "stress": results[0]["stress_evidence"],
         "formal": results[0]["formal_evidence"],
     }
-    assert artifact["guard_evidence"]["stress"][36]["top_score"] == 0.0175004
+    assert artifact["guard_evidence"]["stress"][36]["top_score"] == (
+        0.3114268601959007
+    )
     assert artifact["guard_evidence"]["formal"][2]["top_score"] == 0.5000004
     assert artifact["guard_evidence_binding_sha256"] == _canonical_sha256(
         {
@@ -1898,13 +2119,17 @@ def test_official_artifact_recomputes_and_publishes_only_safe_truth(cases):
             "provenance": artifact["provenance"],
         }
     )
+    assert artifact["target_evidence_binding_sha256"] == _canonical_sha256(
+        {"cases": artifact["cases"], "provenance": artifact["provenance"]}
+    )
     assert set(artifact["cases"][0]) == OFFICIAL_CASE_FIELDS
-    assert artifact["cases"][0]["top_score"] == 0.015
+    assert artifact["cases"][0]["top_score"] == 0.0300004
 
     selected = next(
         candidate
-        for candidate in artifact["candidates"]
-        if candidate["candidate_threshold"] == artifact["selected_threshold"]
+        for candidate in artifact["route_ablation"]["candidates"]
+        if candidate["candidate_threshold"]
+        == artifact["route_ablation"]["highest_passing_candidate"]
     )
     stress_decisions = [
         policy.decide_retrieval_refusal(
@@ -1912,8 +2137,7 @@ def test_official_artifact_recomputes_and_publishes_only_safe_truth(cases):
             reranker_enabled=row["reranker_enabled"],
             applied_routes=tuple(row["applied_routes"]),
             top_score=row["top_score"],
-            global_threshold=artifact["global_threshold"],
-            severance_comparison_threshold=artifact["selected_threshold"],
+            global_threshold=artifact["production_threshold"],
         ).refused
         for row in artifact["guard_evidence"]["stress"]
     ]
@@ -1931,6 +2155,257 @@ def test_official_artifact_recomputes_and_publishes_only_safe_truth(cases):
     ) == selected["stress"]["direct_unanswerable_refusals"]
     serialized = json.dumps(artifact, ensure_ascii=False, sort_keys=True)
     assert all(case.question not in serialized for case in cases)
+
+
+def test_official_artifact_replays_without_retrieval_or_model_execution(
+    monkeypatch, cases
+):
+    observations = _observations(cases)
+    artifact = build_official_artifact(
+        observations=observations,
+        candidate_results=_candidate_results(observations),
+        provenance=_provenance(),
+    )
+
+    monkeypatch.setattr(
+        runner,
+        "_build_local_pipeline",
+        lambda *_args, **_kwargs: pytest.fail("replay must not construct models"),
+    )
+
+    assert policy.replay_official_artifact(artifact) == artifact
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda artifact: artifact.update(schema_version="1.2"), "schema_version"),
+        (
+            lambda artifact: artifact.update(production_threshold=0.02),
+            "production_threshold",
+        ),
+        (
+            lambda artifact: artifact["route_ablation"].update(
+                highest_passing_candidate=0.025
+            ),
+            "route ablation",
+        ),
+        (
+            lambda artifact: artifact["provenance"].update(
+                execution_device="cuda"
+            ),
+            "execution_device",
+        ),
+        (
+            lambda artifact: artifact["provenance"].update(
+                precision_mode="fp16"
+            ),
+            "precision_mode",
+        ),
+        (
+            lambda artifact: artifact["provenance"].update(
+                local_files_only=False
+            ),
+            "local_files_only",
+        ),
+        (
+            lambda artifact: artifact["provenance"].update(
+                semantic_view_sha256="0" * 64
+            ),
+            "semantic_view_sha256",
+        ),
+        (
+            lambda artifact: artifact["provenance"].update(
+                merge_policy_version="primary_first_v0"
+            ),
+            "merge_policy_version",
+        ),
+        (
+            lambda artifact: artifact["provenance"].update(
+                primary_score_semantics="rounded_top_score"
+            ),
+            "primary_score_semantics",
+        ),
+        (
+            lambda artifact: artifact["provenance"].update(
+                source_tree_clean=False
+            ),
+            "source_tree_clean",
+        ),
+        (
+            lambda artifact: artifact["provenance"][
+                "retrieval_configuration"
+            ].update(rrf_k=61),
+            "retrieval_configuration",
+        ),
+        (
+            lambda artifact: artifact["provenance"]["decision_code_sha256"].update(
+                policy="z" * 64
+            ),
+            "policy must be a lowercase",
+        ),
+        (
+            lambda artifact: artifact["provenance"].update(provider_requests=1),
+            "provider_requests",
+        ),
+        (
+            lambda artifact: artifact["cases"][0].update(
+                route_plan_matched=False
+            ),
+            "route_plan_matched",
+        ),
+        (
+            lambda artifact: artifact["cases"][0].update(
+                first_stage_retrieval_calls=2
+            ),
+            "first_stage_retrieval_calls",
+        ),
+        (
+            lambda artifact: artifact["cases"][0].update(reranker_calls=1),
+            "reranker_calls",
+        ),
+        (
+            lambda artifact: artifact["cases"][0].update(
+                reranker_scored_pairs=[21, 21]
+            ),
+            "reranker_scored_pairs",
+        ),
+        (
+            lambda artifact: artifact["cases"][0].update(top_score=0.03),
+            "replay mismatch",
+        ),
+    ],
+)
+def test_official_replay_rejects_schema_provenance_gate_and_evidence_tampering(
+    monkeypatch, cases, mutate, message
+):
+    observations = _observations(cases)
+    artifact = build_official_artifact(
+        observations=observations,
+        candidate_results=_candidate_results(observations),
+        provenance=_provenance(),
+    )
+    mutate(artifact)
+    monkeypatch.setattr(
+        runner,
+        "_build_local_pipeline",
+        lambda *_args, **_kwargs: pytest.fail("tamper checks must not construct models"),
+    )
+
+    with pytest.raises(ValueError, match=message):
+        policy.replay_official_artifact(artifact)
+
+
+def test_release_verifier_replays_artifact_and_binds_current_source_bytes(
+    tmp_path, cases
+):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    source_paths = (
+        "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
+        "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "eval/dataset/eval_set.jsonl",
+        "release/corpus_snapshot.json",
+        *policy.DECISION_CODE_PATHS.values(),
+    )
+    for relative_path in source_paths:
+        destination = repository / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(PROJECT_ROOT / relative_path, destination)
+    subprocess.run(["git", "init"], cwd=repository, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=repository,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.invalid"],
+        cwd=repository,
+        check=True,
+    )
+    subprocess.run(["git", "add", "."], cwd=repository, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "fixture"],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+    )
+    observations = _observations(cases)
+    provenance = _provenance()
+    provenance.update(
+        dataset_sha256=hashlib.sha256(
+            (repository / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl").read_bytes()
+        ).hexdigest(),
+        corpus_snapshot_sha256=hashlib.sha256(
+            (repository / "release/corpus_snapshot.json").read_bytes()
+        ).hexdigest(),
+        source_artifact_sha256={
+            "stress_dataset": hashlib.sha256(
+                (repository / "eval/dataset/reliability_stress_v0.3.1.jsonl").read_bytes()
+            ).hexdigest(),
+            "formal_dataset": hashlib.sha256(
+                (repository / "eval/dataset/eval_set.jsonl").read_bytes()
+            ).hexdigest(),
+        },
+        decision_code_sha256={
+            name: hashlib.sha256((repository / path).read_bytes()).hexdigest()
+            for name, path in policy.DECISION_CODE_PATHS.items()
+        },
+        code_revision=subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repository,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        ).stdout.strip(),
+    )
+    artifact = build_official_artifact(
+        observations=observations,
+        candidate_results=_candidate_results(observations),
+        provenance=provenance,
+    )
+    path = repository / "severance-policy.json"
+    runner._write_public_json(path, artifact)
+
+    summary = release_verification._verify_severance_refusal_policy_artifact(
+        repository, path
+    )
+
+    assert summary == {
+        "schema_version": "1.3",
+        "production_threshold": 0.03,
+        "highest_passing_candidate": 0.03,
+        "target_cases": 30,
+        "stress_cases": 60,
+        "formal_cases": 40,
+        "execution_device": "cpu",
+        "precision_mode": "fp32",
+        "provider_adapters": 0,
+        "provider_requests": 0,
+    }
+
+    changed_pipeline = repository / policy.DECISION_CODE_PATHS["pipeline"]
+    changed_pipeline.write_text(
+        changed_pipeline.read_text(encoding="utf-8") + "\n",
+        encoding="utf-8",
+    )
+    provenance["decision_code_sha256"]["pipeline"] = hashlib.sha256(
+        changed_pipeline.read_bytes()
+    ).hexdigest()
+    mismatched = build_official_artifact(
+        observations=observations,
+        candidate_results=_candidate_results(observations),
+        provenance=provenance,
+    )
+    runner._write_public_json(path, mismatched)
+    with pytest.raises(
+        release_verification.ReleaseVerificationError,
+        match="committed revision.*pipeline",
+    ):
+        release_verification._verify_severance_refusal_policy_artifact(
+            repository, path
+        )
 
 
 def test_official_artifact_rejects_hidden_self_hashed_guard_evidence(cases):

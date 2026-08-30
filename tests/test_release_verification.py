@@ -1790,6 +1790,21 @@ def test_threshold_contract_rejects_score_stage_disagreement(row):
         release_module()._verify_e2e_threshold_contract([row], threshold=0.03)
 
 
+def test_severance_policy_verifier_rejects_schema_before_model_execution(
+    tmp_path,
+):
+    artifact = tmp_path / "severance-policy.json"
+    artifact.write_text('{"schema_version":"1.2"}\n', encoding="utf-8")
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="severance refusal policy.*schema_version",
+    ):
+        release_module()._verify_severance_refusal_policy_artifact(
+            tmp_path, artifact
+        )
+
+
 def test_public_entry_scan_reports_secret_without_leaking_value():
     module = release_module()
     secret = "sk-" + "A" * 32

@@ -7,6 +7,7 @@ chunking strategies — is just a different ``RetrievalPipeline`` wiring.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
@@ -26,6 +27,10 @@ _SEVERANCE_LEGAL_TERMS = "資遣費 勞工退休金條例 勞動基準法 工作
 _OLD_REGIME_SEVERANCE_RERANK_VIEW = (
     "勞基法舊制 資遣費 每滿一年 一個月平均工資 未滿一年 比例計給"
 )
+SEVERANCE_SEMANTIC_VIEW_SHA256 = hashlib.sha256(
+    _OLD_REGIME_SEVERANCE_RERANK_VIEW.encode("utf-8")
+).hexdigest()
+MULTI_VIEW_MERGE_POLICY_VERSION = "primary_first_deduplicating_interleave_v1"
 _MAX_CANDIDATE_POOL = 20
 _WAGE_NONPAYMENT_CUES = (
     "欠薪",
@@ -128,6 +133,9 @@ class RetrievalResult:
     candidates: list[RetrievedChunk] = field(default_factory=list)  # pre-rerank top_k_retrieve
     top_score: float = 0.0
     applied_routes: tuple[str, ...] = ()
+    first_stage_retrieval_calls: int = 1
+    reranker_calls: int = 0
+    reranker_scored_pairs: tuple[int, ...] = ()
 
 
 class RetrievalPipeline:
@@ -166,20 +174,26 @@ class RetrievalPipeline:
                 hits = interleave_reranker_rankings(
                     candidates, primary_ranking, secondary_ranking
                 )[: self.top_k_final]
+                reranker_scored_pairs = (len(candidates), len(candidates))
             else:
                 hits = self.reranker.rerank(
                     plan.search_query, candidates, top_k=self.top_k_final
                 )
                 top_score = hits[0].score if hits else 0.0
+                reranker_scored_pairs = (len(candidates),)
         elif candidates:
             hits = candidates[: self.top_k_final]
             top_score = hits[0].score if hits else 0.0
+            reranker_scored_pairs = ()
         else:
             hits = []
             top_score = 0.0
+            reranker_scored_pairs = ()
         return RetrievalResult(
             hits=hits,
             candidates=candidates,
             top_score=top_score,
             applied_routes=plan.routes,
+            reranker_calls=len(reranker_scored_pairs),
+            reranker_scored_pairs=reranker_scored_pairs,
         )

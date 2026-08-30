@@ -30,6 +30,12 @@ from rag.reliability import (
     compute_reliability_metrics,
     pareto_better_thresholds,
 )
+from rag.retrieval.pipeline import plan_retrieval_query
+from rag.severance_refusal_policy import (
+    DECISION_CODE_PATHS,
+    replay_official_artifact,
+)
+from rag.severance_refusal_policy import load_cases as load_severance_policy_cases
 
 ABLATION_FIELDS = frozenset(
     {
@@ -2287,6 +2293,143 @@ def _provider_metrics(provider: str, rows: Sequence[Mapping[str, Any]]) -> dict[
     }
 
 
+def _verify_severance_refusal_policy_artifact(
+    project_root: Path, artifact_path: Path
+) -> dict[str, Any]:
+    """Replay and bind v0.3.6 policy evidence without model construction."""
+
+    root = project_root.resolve()
+    artifact = _read_json(artifact_path)
+    if artifact.get("schema_version") != "1.3":
+        raise ReleaseVerificationError(
+            "severance refusal policy schema_version must equal 1.3"
+        )
+    try:
+        replayed = replay_official_artifact(artifact)
+    except (RuntimeError, ValueError) as exc:
+        raise ReleaseVerificationError(
+            f"severance refusal policy replay failed: {exc}"
+        ) from exc
+
+    provenance = replayed["provenance"]
+    source_paths = {
+        "dataset_sha256": root
+        / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
+        "corpus_snapshot_sha256": root / "release/corpus_snapshot.json",
+    }
+    for field, path in source_paths.items():
+        _assert_equal(
+            f"severance refusal policy {field}",
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+            provenance[field],
+        )
+    source_artifact_paths = {
+        "stress_dataset": root / "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "formal_dataset": root / "eval/dataset/eval_set.jsonl",
+    }
+    for field, path in source_artifact_paths.items():
+        _assert_equal(
+            f"severance refusal policy {field} SHA-256",
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+            provenance["source_artifact_sha256"][field],
+        )
+    target_cases = load_severance_policy_cases(source_paths["dataset_sha256"])
+    for case, evidence in zip(target_cases, replayed["cases"], strict=True):
+        _assert_equal(
+            f"severance refusal policy target route plan {case.qid}",
+            tuple(evidence["applied_routes"]),
+            plan_retrieval_query(case.question).routes,
+        )
+    for label, path in source_artifact_paths.items():
+        rows = _read_jsonl(path)
+        evidence_rows = replayed["guard_evidence"][
+            "stress" if label == "stress_dataset" else "formal"
+        ]
+        for row, evidence in zip(rows, evidence_rows, strict=True):
+            _assert_equal(
+                f"severance refusal policy {label} route plan {row['qid']}",
+                tuple(evidence["applied_routes"]),
+                plan_retrieval_query(row["question"]).routes,
+            )
+    for field, relative_path in DECISION_CODE_PATHS.items():
+        _assert_equal(
+            f"severance refusal policy decision code {field} SHA-256",
+            hashlib.sha256((root / relative_path).read_bytes()).hexdigest(),
+            provenance["decision_code_sha256"][field],
+        )
+
+    revision = provenance["code_revision"]
+    try:
+        subprocess.run(
+            ["git", "-C", str(root), "cat-file", "-e", f"{revision}^{{commit}}"],
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise ReleaseVerificationError(
+            "severance refusal policy code_revision is not a committed revision"
+        ) from exc
+    for field, relative_path in DECISION_CODE_PATHS.items():
+        comparison = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "diff",
+                "--quiet",
+                revision,
+                "--",
+                relative_path,
+            ],
+            check=False,
+        )
+        if comparison.returncode != 0:
+            raise ReleaseVerificationError(
+                "severance refusal policy committed revision mismatch for "
+                f"decision code {field}"
+            )
+    committed_sources = {
+        "dataset_sha256": "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
+        "corpus_snapshot_sha256": "release/corpus_snapshot.json",
+        "stress_dataset": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+        "formal_dataset": "eval/dataset/eval_set.jsonl",
+    }
+    for field, relative_path in committed_sources.items():
+        comparison = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "diff",
+                "--quiet",
+                revision,
+                "--",
+                relative_path,
+            ],
+            check=False,
+        )
+        if comparison.returncode != 0:
+            raise ReleaseVerificationError(
+                "severance refusal policy committed revision mismatch for "
+                f"source {field}"
+            )
+
+    return {
+        "schema_version": replayed["schema_version"],
+        "production_threshold": replayed["production_threshold"],
+        "highest_passing_candidate": replayed["route_ablation"][
+            "highest_passing_candidate"
+        ],
+        "target_cases": len(replayed["cases"]),
+        "stress_cases": len(replayed["guard_evidence"]["stress"]),
+        "formal_cases": len(replayed["guard_evidence"]["formal"]),
+        "execution_device": provenance["execution_device"],
+        "precision_mode": provenance["precision_mode"],
+        "provider_adapters": provenance["provider_adapters"],
+        "provider_requests": provenance["provider_requests"],
+    }
+
+
 def verify_release(project_root: Path) -> dict[str, Any]:
     """Verify all committed release evidence and return a deterministic summary."""
 
@@ -2438,6 +2581,14 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         root,
         manifest["deployment"]["receipt"],
     )
+    severance_policy_path = (
+        root / "eval/official/severance_refusal_policy_v0.3.6.json"
+    )
+    severance_policy_summary = (
+        _verify_severance_refusal_policy_artifact(root, severance_policy_path)
+        if severance_policy_path.is_file()
+        else None
+    )
 
     public_paths = _load_public_file_list(root / manifest["publication"]["allowlist"])
     history_config = manifest["publication"]["history"]
@@ -2543,6 +2694,11 @@ def verify_release(project_root: Path) -> dict[str, Any]:
             "avg_relevancy": e2e_metrics["avg_relevancy"],
         },
         "provider_crosscheck": provider_crosscheck_summary,
+        **(
+            {"severance_refusal_policy": severance_policy_summary}
+            if severance_policy_summary is not None
+            else {}
+        ),
         "deployment": deployment_summary,
         "privacy": {
             "official_trace_issues": len(trace_issues),

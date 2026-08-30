@@ -9,15 +9,32 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from rag.retrieval.pipeline import (
+    MULTI_VIEW_MERGE_POLICY_VERSION,
+    SEVERANCE_SEMANTIC_VIEW_SHA256,
+)
 from rag.retrieval.refusal_policy import decide_retrieval_refusal
 
 CANDIDATE_THRESHOLDS = (0.0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03)
+DECISION_CODE_PATHS = {
+    "policy": "src/rag/severance_refusal_policy.py",
+    "runner": "eval/run_severance_refusal_policy.py",
+    "pipeline": "src/rag/retrieval/pipeline.py",
+    "reranker": "src/rag/retrieval/reranker.py",
+    "refusal_policy": "src/rag/retrieval/refusal_policy.py",
+    "release_verifier": "src/rag/release_verification.py",
+}
 EXPECTED_QIDS = tuple(
     f"severance-policy-{number:03d}" for number in range(1, 31)
 )
 FORMAL_HIT_AT_5_BASELINE = 0.9666666666666667
 FORMAL_MRR_AT_10_BASELINE = 0.9055555555555554
 _GLOBAL_THRESHOLD = 0.03
+_SCHEMA_VERSION = "1.3"
+_PRECISION_MODE = "fp32"
+_SEMANTIC_VIEW_SHA256 = SEVERANCE_SEMANTIC_VIEW_SHA256
+_MERGE_POLICY_VERSION = MULTI_VIEW_MERGE_POLICY_VERSION
+_PRIMARY_SCORE_SEMANTICS = "full_precision_primary_query_top_score"
 
 _DATASET_FIELDS = {
     "qid",
@@ -36,6 +53,11 @@ _OBSERVATION_FIELDS = {
     "applied_routes",
     "hit_count",
     "top_score",
+    "candidate_count",
+    "route_plan_matched",
+    "first_stage_retrieval_calls",
+    "reranker_calls",
+    "reranker_scored_pairs",
 }
 _CASE_RESULT_FIELDS = {
     "qid",
@@ -45,6 +67,11 @@ _CASE_RESULT_FIELDS = {
     "applied_routes",
     "hit_count",
     "top_score",
+    "candidate_count",
+    "route_plan_matched",
+    "first_stage_retrieval_calls",
+    "reranker_calls",
+    "reranker_scored_pairs",
     "effective_threshold",
     "refused",
     "refusal_stage",
@@ -62,6 +89,11 @@ _GUARD_INPUT_FIELDS = {
     "hit_count",
     "top_score",
     "applied_routes",
+    "candidate_count",
+    "route_plan_matched",
+    "first_stage_retrieval_calls",
+    "reranker_calls",
+    "reranker_scored_pairs",
 }
 _GUARD_EVIDENCE_FIELDS = _GUARD_INPUT_FIELDS | {
     "has_hits",
@@ -82,12 +114,19 @@ _PROVENANCE_FIELDS = {
     "dataset_sha256",
     "corpus_snapshot_sha256",
     "source_artifact_sha256",
+    "decision_code_sha256",
     "embedding_model",
     "embedding_revision",
     "reranker_model",
     "reranker_revision",
     "retrieval_configuration",
     "execution_device",
+    "precision_mode",
+    "local_files_only",
+    "semantic_view_sha256",
+    "merge_policy_version",
+    "primary_score_semantics",
+    "source_tree_clean",
     "code_revision",
     "run_origin",
     "provider_adapters",
@@ -496,6 +535,11 @@ def build_case_observation(
     applied_routes: tuple[str, ...],
     top_score: float,
     hit_count: int,
+    candidate_count: int,
+    route_plan_matched: bool,
+    first_stage_retrieval_calls: int,
+    reranker_calls: int,
+    reranker_scored_pairs: tuple[int, ...],
 ) -> dict[str, Any]:
     """Return one validated content-free retrieval observation."""
 
@@ -521,12 +565,65 @@ def build_case_observation(
         )
     if any(rank > hit_count for rank in ranks.values()):
         raise ValueError(f"{case.qid}: source rank must not exceed hit_count")
+    execution = _validated_execution_evidence(
+        qid=case.qid,
+        routes=routes,
+        hit_count=hit_count,
+        candidate_count=candidate_count,
+        route_plan_matched=route_plan_matched,
+        first_stage_retrieval_calls=first_stage_retrieval_calls,
+        reranker_calls=reranker_calls,
+        reranker_scored_pairs=reranker_scored_pairs,
+        require_tuple=True,
+    )
     return {
         "qid": case.qid,
         "source_ranks": ranks,
         "applied_routes": list(routes),
         "hit_count": hit_count,
         "top_score": score,
+        **execution,
+    }
+
+
+def _validated_execution_evidence(
+    *,
+    qid: str,
+    routes: tuple[str, ...],
+    hit_count: int,
+    candidate_count: object,
+    route_plan_matched: object,
+    first_stage_retrieval_calls: object,
+    reranker_calls: object,
+    reranker_scored_pairs: object,
+    require_tuple: bool,
+) -> dict[str, Any]:
+    if type(candidate_count) is not int or not 0 <= candidate_count <= 20:
+        raise ValueError(f"{qid}: candidate_count must be between zero and twenty")
+    if hit_count > candidate_count or (candidate_count == 0) != (hit_count == 0):
+        raise ValueError(f"{qid}: candidate_count and hit_count disagree")
+    if route_plan_matched is not True:
+        raise ValueError(f"{qid}: route_plan_matched must be true")
+    if first_stage_retrieval_calls != 1 or type(first_stage_retrieval_calls) is not int:
+        raise ValueError(f"{qid}: first_stage_retrieval_calls must equal one")
+    expected_type = tuple if require_tuple else list
+    if not isinstance(reranker_scored_pairs, expected_type):
+        raise ValueError(
+            f"{qid}: reranker_scored_pairs must be a {expected_type.__name__}"
+        )
+    pairs = tuple(reranker_scored_pairs)
+    expected_calls = 0 if candidate_count == 0 else 2 if routes == _SEVERANCE_ROUTE else 1
+    expected_pairs = () if expected_calls == 0 else (candidate_count,) * expected_calls
+    if type(reranker_calls) is not int or reranker_calls != expected_calls:
+        raise ValueError(f"{qid}: reranker_calls do not match the exact route contract")
+    if pairs != expected_pairs:
+        raise ValueError(f"{qid}: reranker_scored_pairs do not match candidate_count")
+    return {
+        "candidate_count": candidate_count,
+        "route_plan_matched": True,
+        "first_stage_retrieval_calls": 1,
+        "reranker_calls": expected_calls,
+        "reranker_scored_pairs": list(pairs),
     }
 
 
@@ -577,6 +674,19 @@ def _validated_observations(observations: object) -> list[dict[str, Any]]:
             rank > hit_count for rank in normalized[-1]["source_ranks"].values()
         ):
             raise ValueError(f"{qid}: source rank must not exceed hit_count")
+        normalized[-1].update(
+            _validated_execution_evidence(
+                qid=qid,
+                routes=tuple(normalized[-1]["applied_routes"]),
+                hit_count=hit_count,
+                candidate_count=row["candidate_count"],
+                route_plan_matched=row["route_plan_matched"],
+                first_stage_retrieval_calls=row["first_stage_retrieval_calls"],
+                reranker_calls=row["reranker_calls"],
+                reranker_scored_pairs=row["reranker_scored_pairs"],
+                require_tuple=False,
+            )
+        )
     return normalized
 
 
@@ -658,6 +768,19 @@ def _validated_guard_rows(
                 "applied_routes": list(routes),
             }
         )
+        normalized[-1].update(
+            _validated_execution_evidence(
+                qid=qid,
+                routes=routes,
+                hit_count=hit_count,
+                candidate_count=row["candidate_count"],
+                route_plan_matched=row["route_plan_matched"],
+                first_stage_retrieval_calls=row["first_stage_retrieval_calls"],
+                reranker_calls=row["reranker_calls"],
+                reranker_scored_pairs=row["reranker_scored_pairs"],
+                require_tuple=False,
+            )
+        )
     if not any(row["top_score"] != round(row["top_score"], 4) for row in normalized):
         raise ValueError(
             f"{label} guard scores cannot be entirely four-decimal values"
@@ -665,7 +788,7 @@ def _validated_guard_rows(
     return normalized
 
 
-def _decision(
+def _route_ablation_decision(
     *,
     has_hits: bool,
     routes: list[str],
@@ -673,13 +796,15 @@ def _decision(
     candidate: float,
     global_threshold: float,
 ):
+    evaluation_threshold = (
+        candidate if tuple(routes) == _SEVERANCE_ROUTE else global_threshold
+    )
     return decide_retrieval_refusal(
         has_hits=has_hits,
         reranker_enabled=True,
         applied_routes=tuple(routes),
         top_score=score,
-        global_threshold=global_threshold,
-        severance_comparison_threshold=candidate,
+        global_threshold=evaluation_threshold,
     )
 
 
@@ -705,7 +830,7 @@ def _evaluate_target(
             route_contract = set(contract.required_routes) <= applied_routes and not (
                 set(contract.prohibited_routes) & applied_routes
             )
-        decision = _decision(
+        decision = _route_ablation_decision(
             has_hits=row["hit_count"] > 0,
             routes=row["applied_routes"],
             score=row["top_score"],
@@ -729,6 +854,11 @@ def _evaluate_target(
                 "applied_routes": list(row["applied_routes"]),
                 "hit_count": row["hit_count"],
                 "top_score": row["top_score"],
+                "candidate_count": row["candidate_count"],
+                "route_plan_matched": row["route_plan_matched"],
+                "first_stage_retrieval_calls": row["first_stage_retrieval_calls"],
+                "reranker_calls": row["reranker_calls"],
+                "reranker_scored_pairs": list(row["reranker_scored_pairs"]),
                 "effective_threshold": decision.effective_threshold,
                 "refused": decision.refused,
                 "refusal_stage": decision.refusal_stage,
@@ -767,7 +897,7 @@ def _stress_summary(
     rows: list[dict[str, Any]], *, candidate: float, global_threshold: float
 ) -> dict[str, Any]:
     decisions = [
-        _decision(
+        _route_ablation_decision(
             has_hits=row["hit_count"] > 0,
             routes=row["applied_routes"],
             score=row["top_score"],
@@ -800,7 +930,7 @@ def _formal_summary(
 ) -> dict[str, Any]:
     answerable = [row for row in rows if row["answerable"]]
     decisions = [
-        _decision(
+        _route_ablation_decision(
             has_hits=row["hit_count"] > 0,
             routes=row["applied_routes"],
             score=row["top_score"],
@@ -834,7 +964,7 @@ def _formal_summary(
     }
 
 
-def evaluate_candidate(
+def evaluate_route_ablation_candidate(
     observations: list[dict[str, Any]],
     *,
     candidate_threshold: float,
@@ -880,6 +1010,10 @@ def evaluate_candidate(
     }
 
 
+# Compatibility for callers predating the v0.3.6 retrieval-coverage pivot.
+evaluate_candidate = evaluate_route_ablation_candidate
+
+
 def _observations_from_case_results(cases: object) -> list[dict[str, Any]]:
     if not isinstance(cases, list) or len(cases) != 30:
         raise ValueError("candidate cases must contain thirty rows")
@@ -894,6 +1028,11 @@ def _observations_from_case_results(cases: object) -> list[dict[str, Any]]:
                 "applied_routes": row["applied_routes"],
                 "hit_count": row["hit_count"],
                 "top_score": row["top_score"],
+                "candidate_count": row["candidate_count"],
+                "route_plan_matched": row["route_plan_matched"],
+                "first_stage_retrieval_calls": row["first_stage_retrieval_calls"],
+                "reranker_calls": row["reranker_calls"],
+                "reranker_scored_pairs": row["reranker_scored_pairs"],
             }
         )
     return _validated_observations(observations)
@@ -1022,6 +1161,15 @@ def _validated_provenance(provenance: object) -> dict[str, Any]:
         field: _hex(source_hashes[field], field=field, length=64)
         for field in sorted(_SOURCE_ARTIFACT_FIELDS)
     }
+    decision_code_hashes = provenance["decision_code_sha256"]
+    if not isinstance(decision_code_hashes, dict) or set(
+        decision_code_hashes
+    ) != set(DECISION_CODE_PATHS):
+        raise ValueError("decision_code_sha256 fields are invalid")
+    normalized_code_hashes = {
+        field: _hex(decision_code_hashes[field], field=field, length=64)
+        for field in sorted(DECISION_CODE_PATHS)
+    }
     exact_strings = {
         "embedding_model": _EMBEDDING_MODEL,
         "embedding_revision": _EMBEDDING_REVISION,
@@ -1041,8 +1189,20 @@ def _validated_provenance(provenance: object) -> dict[str, Any]:
     if provenance["run_origin"] != _RUN_ORIGIN:
         raise ValueError("run_origin must equal fresh_offline_retrieval")
     execution_device = provenance["execution_device"]
-    if execution_device not in {"cpu", "cuda"}:
-        raise ValueError("execution_device must be the resolved cpu or cuda value")
+    if execution_device != "cpu":
+        raise ValueError("execution_device must equal cpu for authoritative evidence")
+    if provenance["precision_mode"] != _PRECISION_MODE:
+        raise ValueError("precision_mode must equal fp32")
+    if provenance["local_files_only"] is not True:
+        raise ValueError("local_files_only must be true")
+    if provenance["semantic_view_sha256"] != _SEMANTIC_VIEW_SHA256:
+        raise ValueError("semantic_view_sha256 must equal the approved view hash")
+    if provenance["merge_policy_version"] != _MERGE_POLICY_VERSION:
+        raise ValueError("merge_policy_version must equal the approved version")
+    if provenance["primary_score_semantics"] != _PRIMARY_SCORE_SEMANTICS:
+        raise ValueError("primary_score_semantics must bind full-precision PRIMARY scores")
+    if provenance["source_tree_clean"] is not True:
+        raise ValueError("source_tree_clean must be true")
     for field in ("provider_adapters", "provider_requests"):
         if type(provenance[field]) is not int or provenance[field] != 0:
             raise ValueError(f"{field} must be zero")
@@ -1056,9 +1216,16 @@ def _validated_provenance(provenance: object) -> dict[str, Any]:
             length=64,
         ),
         "source_artifact_sha256": normalized_hashes,
+        "decision_code_sha256": normalized_code_hashes,
         **exact_strings,
         "retrieval_configuration": dict(_RETRIEVAL_CONFIGURATION),
         "execution_device": execution_device,
+        "precision_mode": _PRECISION_MODE,
+        "local_files_only": True,
+        "semantic_view_sha256": _SEMANTIC_VIEW_SHA256,
+        "merge_policy_version": _MERGE_POLICY_VERSION,
+        "primary_score_semantics": _PRIMARY_SCORE_SEMANTICS,
+        "source_tree_clean": True,
         "code_revision": _hex(
             provenance["code_revision"], field="code_revision", length=40
         ),
@@ -1072,16 +1239,17 @@ _PUBLIC_KEYS = {
     "schema_version",
     "provenance",
     "candidate_thresholds",
-    "global_threshold",
-    "selected_threshold",
+    "production_threshold",
+    "route_ablation",
+    "highest_passing_candidate",
     "guard_evidence",
     "guard_evidence_binding_sha256",
+    "target_evidence_binding_sha256",
     "candidates",
     "cases",
     "evidence_class",
     "outcome",
     "official_export_allowed",
-    "expected_threshold",
     "target_observations",
     "failed_gates",
     "gates",
@@ -1113,6 +1281,11 @@ _PUBLIC_KEYS = {
     "source_ranks",
     "applied_routes",
     "top_score",
+    "candidate_count",
+    "route_plan_matched",
+    "first_stage_retrieval_calls",
+    "reranker_calls",
+    "reranker_scored_pairs",
     "effective_threshold",
     "refused",
     "refusal_stage",
@@ -1123,18 +1296,18 @@ _PUBLIC_KEYS = {
     "outcome_contract_passed",
     *_PROVENANCE_FIELDS,
     *_SOURCE_ARTIFACT_FIELDS,
+    *DECISION_CODE_PATHS,
     *_RETRIEVAL_CONFIGURATION,
     *_CANONICAL_SOURCE_KEYS,
 }
 _PUBLIC_STRINGS = {
-    "1.0",
-    "1.2",
-    "non_release_no_go",
+    _SCHEMA_VERSION,
+    "non_release_pivot_no_go",
     "no_go",
     "target",
     "stress",
     "formal",
-    "selection",
+    "route_ablation",
     "positive",
     "collision_negative",
     "threshold",
@@ -1147,8 +1320,10 @@ _PUBLIC_STRINGS = {
     _RERANKER_MODEL,
     _RERANKER_REVISION,
     _RUN_ORIGIN,
+    _PRECISION_MODE,
+    _MERGE_POLICY_VERSION,
+    _PRIMARY_SCORE_SEMANTICS,
     "cpu",
-    "cuda",
     *EXPECTED_QIDS,
     *_STRESS_QIDS,
     *_FORMAL_QIDS,
@@ -1214,12 +1389,6 @@ def build_official_artifact(
             **row,
             "source_ranks": dict(row["source_ranks"]),
             "applied_routes": list(row["applied_routes"]),
-            "top_score": round(row["top_score"], 6),
-            "effective_threshold": (
-                round(row["effective_threshold"], 6)
-                if row["effective_threshold"] is not None
-                else None
-            ),
         }
         for row in selected["cases"]
     ]
@@ -1233,19 +1402,99 @@ def build_official_artifact(
         }
         for result in candidates
     ]
+    target_evidence_binding = _canonical_sha256(
+        {
+            "cases": public_cases,
+            "provenance": normalized_provenance,
+        }
+    )
     artifact = {
-        "schema_version": "1.2",
+        "schema_version": _SCHEMA_VERSION,
         "provenance": normalized_provenance,
-        "candidate_thresholds": list(CANDIDATE_THRESHOLDS),
-        "global_threshold": selected["global_threshold"],
-        "selected_threshold": selected_threshold,
+        "production_threshold": selected["global_threshold"],
+        "route_ablation": {
+            "candidate_thresholds": list(CANDIDATE_THRESHOLDS),
+            "highest_passing_candidate": selected_threshold,
+            "candidates": public_candidates,
+        },
         "guard_evidence": guard_evidence,
         "guard_evidence_binding_sha256": guard_evidence_binding,
-        "candidates": public_candidates,
+        "target_evidence_binding_sha256": target_evidence_binding,
         "cases": public_cases,
     }
     _validate_public_tree(artifact)
     return artifact
+
+
+_OFFICIAL_FIELDS = {
+    "schema_version",
+    "provenance",
+    "production_threshold",
+    "route_ablation",
+    "guard_evidence",
+    "guard_evidence_binding_sha256",
+    "target_evidence_binding_sha256",
+    "cases",
+}
+_ROUTE_ABLATION_FIELDS = {
+    "candidate_thresholds",
+    "highest_passing_candidate",
+    "candidates",
+}
+
+
+def replay_official_artifact(artifact: object) -> dict[str, Any]:
+    """Recompute schema 1.3 acceptance without retrieval or model execution."""
+
+    if not isinstance(artifact, dict) or set(artifact) != _OFFICIAL_FIELDS:
+        raise ValueError("official artifact fields are invalid")
+    if artifact["schema_version"] != _SCHEMA_VERSION:
+        raise ValueError("schema_version must equal 1.3")
+    if artifact["production_threshold"] != _GLOBAL_THRESHOLD:
+        raise ValueError("production_threshold must equal 0.03")
+    production_threshold = _validated_global_threshold(artifact["production_threshold"])
+    route_ablation = artifact["route_ablation"]
+    if (
+        not isinstance(route_ablation, dict)
+        or set(route_ablation) != _ROUTE_ABLATION_FIELDS
+    ):
+        raise ValueError("route ablation fields are invalid")
+    if route_ablation["candidate_thresholds"] != list(CANDIDATE_THRESHOLDS):
+        raise ValueError("route ablation candidate grid mismatch")
+    if route_ablation["highest_passing_candidate"] != _GLOBAL_THRESHOLD:
+        raise ValueError("route ablation highest passing candidate must equal 0.03")
+    provenance = _validated_provenance(artifact["provenance"])
+    observations = _observations_from_case_results(artifact["cases"])
+    guard_evidence = artifact["guard_evidence"]
+    if not isinstance(guard_evidence, dict) or set(guard_evidence) != {
+        "stress",
+        "formal",
+    }:
+        raise ValueError("official guard evidence fields are invalid")
+    stress = _validated_guard_rows(
+        guard_evidence["stress"], label="stress", published_evidence=True
+    )
+    formal = _validated_guard_rows(
+        guard_evidence["formal"], label="formal", published_evidence=True
+    )
+    candidates = [
+        evaluate_route_ablation_candidate(
+            observations,
+            candidate_threshold=threshold,
+            global_threshold=production_threshold,
+            stress_rows=_guard_inputs(stress),
+            formal_rows=_guard_inputs(formal),
+        )
+        for threshold in CANDIDATE_THRESHOLDS
+    ]
+    rebuilt = build_official_artifact(
+        observations=observations,
+        candidate_results=candidates,
+        provenance=provenance,
+    )
+    if artifact != rebuilt:
+        raise ValueError("official artifact replay mismatch")
+    return rebuilt
 
 
 _NO_GO_FIELDS = {
@@ -1253,14 +1502,11 @@ _NO_GO_FIELDS = {
     "evidence_class",
     "outcome",
     "official_export_allowed",
-    "expected_threshold",
-    "selected_threshold",
     "provenance",
-    "candidate_thresholds",
-    "global_threshold",
+    "production_threshold",
+    "route_ablation",
     "target_observations",
     "guard_evidence",
-    "candidates",
     "failed_gates",
 }
 
@@ -1295,7 +1541,6 @@ def build_no_go_evidence(
     observations: list[dict[str, Any]],
     candidate_results: list[dict[str, Any]],
     provenance: dict[str, Any],
-    expected_threshold: float,
 ) -> dict[str, Any]:
     """Build deterministic, replayable evidence for a non-release NO-GO."""
 
@@ -1303,15 +1548,12 @@ def build_no_go_evidence(
     candidates = _validated_candidate_results(candidate_results)
     if _observations_from_case_results(candidates[0]["cases"]) != target_evidence:
         raise ValueError("candidate target evidence does not match observations")
-    expected = _unit_interval(expected_threshold, field="expected_threshold")
-    if expected != 0.015:
-        raise ValueError("expected_threshold must equal the approved 0.015")
     passing = [
         result["candidate_threshold"] for result in candidates if result["passed"]
     ]
     selected = max(passing) if passing else None
-    if selected == expected:
-        raise ValueError("passing expected threshold requires the official artifact")
+    if selected == _GLOBAL_THRESHOLD:
+        raise ValueError("passing 0.03 requires the official artifact")
     normalized_provenance = _validated_provenance(provenance)
     guard_evidence = {
         label: [dict(row) for row in candidates[0][f"{label}_evidence"]]
@@ -1324,8 +1566,8 @@ def build_no_go_evidence(
             for label in ("target", "stress", "formal")
             if not result[label]["passed"]
         ]
-        if result["candidate_threshold"] == selected and selected != expected:
-            gates.append("selection")
+        if result["candidate_threshold"] == _GLOBAL_THRESHOLD:
+            gates.append("route_ablation")
         if gates:
             failed_gates.append(
                 {
@@ -1334,18 +1576,19 @@ def build_no_go_evidence(
                 }
             )
     envelope = {
-        "schema_version": "1.0",
-        "evidence_class": "non_release_no_go",
+        "schema_version": _SCHEMA_VERSION,
+        "evidence_class": "non_release_pivot_no_go",
         "outcome": "no_go",
         "official_export_allowed": False,
-        "expected_threshold": expected,
-        "selected_threshold": selected,
         "provenance": normalized_provenance,
-        "candidate_thresholds": list(CANDIDATE_THRESHOLDS),
-        "global_threshold": candidates[0]["global_threshold"],
+        "production_threshold": candidates[0]["global_threshold"],
+        "route_ablation": {
+            "candidate_thresholds": list(CANDIDATE_THRESHOLDS),
+            "highest_passing_candidate": selected,
+            "candidates": _candidate_summaries(candidates),
+        },
         "target_observations": target_evidence,
         "guard_evidence": guard_evidence,
-        "candidates": _candidate_summaries(candidates),
         "failed_gates": failed_gates,
     }
     _validate_public_tree(envelope)
@@ -1372,10 +1615,10 @@ def replay_no_go_evidence(envelope: object) -> dict[str, Any]:
         guard_evidence["formal"], label="formal", published_evidence=True
     )
     candidates = [
-        evaluate_candidate(
+        evaluate_route_ablation_candidate(
             observations,
             candidate_threshold=threshold,
-            global_threshold=envelope["global_threshold"],
+            global_threshold=envelope["production_threshold"],
             stress_rows=_guard_inputs(stress),
             formal_rows=_guard_inputs(formal),
         )
@@ -1385,7 +1628,6 @@ def replay_no_go_evidence(envelope: object) -> dict[str, Any]:
         observations=observations,
         candidate_results=candidates,
         provenance=provenance,
-        expected_threshold=envelope["expected_threshold"],
     )
     if envelope != rebuilt:
         raise ValueError("NO-GO evidence replay mismatch")

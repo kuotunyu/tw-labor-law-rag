@@ -1,4 +1,4 @@
-"""Build the content-free v0.3.6 route-aware refusal calibration evidence."""
+"""Build the content-free v0.3.6 retrieval-pivot calibration evidence."""
 
 from __future__ import annotations
 
@@ -24,14 +24,19 @@ except ModuleNotFoundError:  # Direct execution starts with eval/ as import root
 _eval_bootstrap  # Keep the import for its documented src/ bootstrap side effect.
 
 from rag.config import PROJECT_ROOT, Settings  # noqa: E402
-from rag.retrieval.pipeline import plan_retrieval_query  # noqa: E402
+from rag.retrieval.pipeline import (  # noqa: E402
+    MULTI_VIEW_MERGE_POLICY_VERSION,
+    SEVERANCE_SEMANTIC_VIEW_SHA256,
+    plan_retrieval_query,
+)
 from rag.severance_refusal_policy import (  # noqa: E402
     CANDIDATE_THRESHOLDS,
+    DECISION_CODE_PATHS,
     SeverancePolicyCase,
     build_case_observation,
     build_no_go_evidence,
     build_official_artifact,
-    evaluate_candidate,
+    evaluate_route_ablation_candidate,
     load_cases,
 )
 from rag.wage_arrears_regression import require_cached_models  # noqa: E402
@@ -49,7 +54,7 @@ OFFICIAL_RESULT = (
 )
 DIAGNOSTIC_RESULT = (
     PROJECT_ROOT
-    / "eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json"
+    / "eval/diagnostics/severance_retrieval_pivot_v0.3.6_no_go.json"
 )
 RUNS_DIR = PROJECT_ROOT / "eval/runs"
 
@@ -67,7 +72,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--diagnostics-output", type=Path, default=DIAGNOSTIC_RESULT)
     parser.add_argument("--offline", action="store_true")
-    parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
+    parser.add_argument("--device", choices=["cpu"], default="cpu")
     parser.add_argument("--export-official", action="store_true")
     return parser
 
@@ -120,6 +125,11 @@ def _run_target_cases(
                 applied_routes=retrieval.applied_routes,
                 top_score=retrieval.top_score,
                 hit_count=len(retrieval.hits),
+                candidate_count=len(retrieval.candidates),
+                route_plan_matched=True,
+                first_stage_retrieval_calls=retrieval.first_stage_retrieval_calls,
+                reranker_calls=retrieval.reranker_calls,
+                reranker_scored_pairs=retrieval.reranker_scored_pairs,
             )
         )
         print(f"[target] {index}/{len(cases)} {case.qid}", flush=True)
@@ -159,19 +169,24 @@ def _run_guard_cases(
                 "hit_count": len(retrieval.hits),
                 "top_score": retrieval.top_score,
                 "applied_routes": list(retrieval.applied_routes),
+                "candidate_count": len(retrieval.candidates),
+                "route_plan_matched": True,
+                "first_stage_retrieval_calls": retrieval.first_stage_retrieval_calls,
+                "reranker_calls": retrieval.reranker_calls,
+                "reranker_scored_pairs": list(retrieval.reranker_scored_pairs),
             }
         )
         print(f"[guard] {index}/{len(rows)} {row['qid']}", flush=True)
     return evidence
 
 
-def _evaluate_candidates(
+def _evaluate_route_ablation(
     observations: list[dict[str, Any]],
     stress_rows: list[dict[str, Any]],
     formal_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     return [
-        evaluate_candidate(
+        evaluate_route_ablation_candidate(
             observations,
             candidate_threshold=threshold,
             global_threshold=0.03,
@@ -190,7 +205,7 @@ def _build_accepted_artifact(
     provenance: dict[str, Any],
     candidate_results: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    candidates = candidate_results or _evaluate_candidates(
+    candidates = candidate_results or _evaluate_route_ablation(
         observations, stress_rows, formal_rows
     )
     try:
@@ -201,9 +216,13 @@ def _build_accepted_artifact(
         )
     except RuntimeError as exc:
         raise RuntimeError(f"NO-GO: {exc}") from exc
-    if artifact["selected_threshold"] != 0.015:
+    if artifact["production_threshold"] != 0.03:
         raise RuntimeError(
-            "NO-GO: selected threshold does not equal the approved 0.015"
+            "NO-GO: production threshold does not equal the approved 0.03"
+        )
+    if artifact["route_ablation"]["highest_passing_candidate"] != 0.03:
+        raise RuntimeError(
+            "NO-GO: route ablation highest passing candidate must equal 0.03"
         )
     return artifact
 
@@ -234,6 +253,10 @@ def _build_provenance(
                 args.formal_dataset.read_bytes()
             ).hexdigest(),
         },
+        "decision_code_sha256": {
+            name: hashlib.sha256((PROJECT_ROOT / path).read_bytes()).hexdigest()
+            for name, path in DECISION_CODE_PATHS.items()
+        },
         "embedding_model": settings.embedding_model,
         "embedding_revision": settings.embedding_model_revision,
         "reranker_model": settings.reranker_model,
@@ -247,6 +270,12 @@ def _build_provenance(
             "rrf_k": settings.rrf_k,
         },
         "execution_device": settings.device,
+        "precision_mode": "fp32",
+        "local_files_only": True,
+        "semantic_view_sha256": SEVERANCE_SEMANTIC_VIEW_SHA256,
+        "merge_policy_version": MULTI_VIEW_MERGE_POLICY_VERSION,
+        "primary_score_semantics": "full_precision_primary_query_top_score",
+        "source_tree_clean": True,
         "code_revision": code_revision,
         "run_origin": "fresh_offline_retrieval",
         "provider_adapters": 0,
@@ -386,7 +415,7 @@ def main(argv: list[str] | None = None) -> int:
         observations = _run_target_cases(pipeline, cases)
         stress_evidence = _run_guard_cases(pipeline, stress_rows)
         formal_evidence = _run_guard_cases(pipeline, formal_rows)
-        candidates = _evaluate_candidates(
+        candidates = _evaluate_route_ablation(
             observations, stress_evidence, formal_evidence
         )
         provenance = _build_provenance(args, settings, candidate_revision)
@@ -400,19 +429,24 @@ def main(argv: list[str] | None = None) -> int:
             )
         except RuntimeError:
             artifact = None
-        if artifact is None or artifact["selected_threshold"] != 0.015:
+        if (
+            artifact is None
+            or artifact["production_threshold"] != 0.03
+            or artifact["route_ablation"]["highest_passing_candidate"] != 0.03
+        ):
             diagnostic = build_no_go_evidence(
                 observations=observations,
                 candidate_results=candidates,
                 provenance=provenance,
-                expected_threshold=0.015,
             )
             _write_public_json(args.diagnostics_output, diagnostic)
             print(
                 json.dumps(
                     {
                         "outcome": "no_go",
-                        "selected_threshold": diagnostic["selected_threshold"],
+                        "highest_passing_candidate": diagnostic["route_ablation"][
+                            "highest_passing_candidate"
+                        ],
                         "failed_gates": diagnostic["failed_gates"],
                     },
                     ensure_ascii=False,
@@ -427,7 +461,10 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(
                 {
                     "outcome": "accepted",
-                    "selected_threshold": artifact["selected_threshold"],
+                    "production_threshold": artifact["production_threshold"],
+                    "highest_passing_candidate": artifact["route_ablation"][
+                        "highest_passing_candidate"
+                    ],
                 },
                 ensure_ascii=False,
             ),

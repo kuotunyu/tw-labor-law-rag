@@ -20,7 +20,31 @@
 
 此 artifact 對後兩題只證明「未被檢索層誤停」，並不宣稱已執行或驗證 LLM 拒答；每題均固定 `generation_called=false`。它是快速展示用 regression，不取代 40 題 formal baseline、60 題 reliability stress suite 或 archived provider evidence。`release/manifest.json` 綁定 dataset、snapshot、result、model revisions、runtime config 與精確彙總；release verifier 會重算每題排名、路由與邊界算術。
 
-## v0.3.6 route-aware refusal calibration: NO-GO
+## v0.3.6 retrieval-coverage pivot contract
+
+The retained route-threshold calibration below is historical NO-GO evidence,
+not the current release policy. The approved pivot keeps the single production
+reranker threshold at `0.03` and uses exact singleton
+`severance_comparison` metadata only to add a rerank-only semantic view over
+the same Top-20 pool. The seven historical thresholds are now published only
+inside a named evaluation-only `route_ablation`; acceptance requires its
+`highest_passing_candidate` to equal the separately recorded
+`production_threshold=0.03`.
+
+Task 5 defines official schema `1.3` and its model-free replay/release-verifier
+contract. It preserves full-precision primary-query scores, exact target and
+guard routes, per-query retrieval/reranker call counts, `rrf_k`, pinned
+local-only model revisions, the semantic-view hash, merge-policy version,
+CPU/FP32 execution, a clean committed code revision, source hashes, privacy
+allowlisting, and zero provider construction/requests. The official artifact
+is not created by Task 5; only the fresh committed CPU/FP32 Task 6 acceptance
+run may export `severance_refusal_policy_v0.3.6.json`.
+
+Case `severance-policy-027` is an exact positive-hit `threshold` outcome below
+the unchanged `0.03` production gate. A `no_hits` outcome or generation
+admission does not satisfy its contract.
+
+## Superseded v0.3.6 route-threshold calibration: NO-GO
 
 2026-08-30 的 fresh offline calibration 以同一組固定 revision 的本機 retrieval
 pipeline 依序執行 30 題 target、60 題 stress 與 40 題 formal guard，且沒有建立
@@ -28,7 +52,7 @@ LLM adapter 或送出 provider request。七個候選門檻都通過 stress 與 
 但 target 都只有 `27/30`，因此沒有候選通過完整 gate，也沒有發布
 `severance_refusal_policy_v0.3.6.json` official artifact。
 
-Task 5 schema `1.2` 與 `eval/dataset/README.md` 是本次校準的現行契約，取代
+Historical schema `1.2` 與當時的 `eval/dataset/README.md` 是該次校準契約，取代
 原 Task 6 brief 中重算 v0.3.1 捨入分數與 schema `1.0` 的舊文字。Stress 與
 formal guard 和 target 都由同一 fresh offline pipeline 產生，v0.3.1 公開 trace
 只作 metric baseline，從未作 decision input。完整未捨入、content-free 的 NO-GO
@@ -38,7 +62,8 @@ formal guard 和 target 都由同一 fresh offline pipeline 產生，v0.3.1 公�
 失敗與候選門檻無關：`severance-policy-010` 與 `severance-policy-014` 的兩個必要
 法源只有一個進入 Top 5；`severance-policy-027` 沒有套用目標 route，但其 top
 score `0.02350945240753301` 低於維持不變的 global `0.03`，因此未符合預期的
-generation admission。這次結果不能用來綁定或發布 `0.015`；需要先另行審查
+generation admission。現行 pivot 已將 `027` 修正為精確 `threshold` 契約；這次
+歷史結果不能用來綁定或發布 `0.015`，也不得被 pivot runner 覆寫。需要先另行審查
 retrieval quality／target contract 的根因，不得藉由修改資料、gate 或分數讓本次
 calibration 通過。
 
