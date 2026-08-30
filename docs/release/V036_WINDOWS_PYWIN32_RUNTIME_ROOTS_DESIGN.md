@@ -82,6 +82,13 @@ adds the verified project roots, approved site root, and the exact verified
 runtime roots directly. It never imports `site`, executes `.pth` statements,
 or derives paths from `.pth` contents.
 
+Immediately before activation, the bootstrap reads the already verified
+`lock_selection.markers` and selected package inventory from the environment
+binding, re-derives the package- and platform-conditioned expected layout,
+requires exact type, order, spelling, and canonical equality with
+`runtime_import_layout`, and only then performs the second `lstat` and resolved
+containment validation. `sys.path` is unchanged until every check succeeds.
+
 The receipt contains only relative paths. Exact receipt equality on replay
 binds the runtime-root layout without publishing an absolute environment
 location.
@@ -94,16 +101,24 @@ Strict TDD covers both the original failure and the trust boundary.
   approved site root alone.
 - GREEN must prove that the exact two-root layout succeeds without processing
   `.pth` or adding `pythonwin`.
+- The real RED/GREEN evidence uses an internal test subprocess harness that
+  launches the authoritative bootstrap with `-B -I -S`, imports the bootstrap
+  as a private module, runs its pre-import validation and direct activation
+  helpers, and then constructs `portalocker.portalocker.Win32Locker`. It adds
+  no public CLI mode and never enters the evaluator, verifier, calibration, or
+  artifact path. The already preserved Task 6 pre-fix traceback is the real
+  RED evidence; the same model-free harness must succeed after the fix.
 - Unit tests reject a missing root, extra root, wrong order or spelling,
   non-Windows roots, roots without exact PyWin32 inventory, symlink, Windows
   junction/reparse point, path escape, special file, and receipt mismatch.
 - A malicious `.pth` side effect marker must remain absent.
 - Every validation failure occurs before project/cache/index/model/provider
   construction and before artifact writes.
-- A model-free external-environment smoke constructs and closes a local Qdrant
-  store before the next formal calibration. It uses an explicit temporary
-  directory outside the repository and no server, key, provider, query, model,
-  or network path.
+- A model-free external-environment smoke uses the same private `-B -I -S`
+  subprocess harness to construct and close a local Qdrant store before the
+  next formal calibration. It uses an explicit temporary directory outside
+  the repository and no server, key, provider, query, model, network, public
+  CLI mode, calibration, or artifact path.
 
 Existing schema `1.3`, exact revision binding, raw checkout-byte checks,
 privacy gates, CPU/FP32 requirement, model pins, and release metrics remain

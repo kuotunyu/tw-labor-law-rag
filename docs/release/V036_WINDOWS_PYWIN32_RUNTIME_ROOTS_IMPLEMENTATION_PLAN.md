@@ -80,11 +80,16 @@ Add a helper equivalent to:
 def _validated_runtime_import_roots(
     environment_root: Path,
     layout: Sequence[str],
+    selected: Sequence[Mapping[str, object]],
+    markers: Mapping[str, str],
 ) -> list[Path]:
     ...
 ```
 
-Validate each component with `lstat`, reject aliases/reparse points, resolve beneath the same external environment, require real directories, and require exact equality with the package- and platform-conditioned expected layout.
+First re-derive the expected layout from `selected` and `markers`, then require
+exact type, order, spelling, and canonical equality. Validate each component
+with `lstat`, reject aliases/reparse points, resolve beneath the same external
+environment, and require real directories.
 
 - [ ] **Step 6: Run focused verification**
 
@@ -104,13 +109,26 @@ Commit only the Task 1 implementation/tests/report. The reviewer must verify lea
 - Modify: `tests/test_v036_authoritative_bootstrap.py`
 - Update: `.superpowers/sdd/V036_WINDOWS_PYWIN32_RUNTIME_ROOTS_IMPLEMENTATION_PLAN/task-2-report.md`
 
-- [ ] **Step 1: Add an isolated RED import regression**
+- [ ] **Step 1: Add isolated fake and real RED import regressions**
 
 Create a temporary fake environment where one required module is available only from `win32` and another only from `win32/lib`. Include a malicious `.pth` side-effect marker. Launch the real bootstrap with `-B -I -S`; before activation support, the runner must fail and the marker must remain absent.
 
+Also preserve the existing Task 6 pre-fix traceback as the real RED evidence.
+Define one internal test subprocess harness that launches Python with
+`-B -I -S`, imports the authoritative bootstrap as a private module, runs its
+pre-import validation and direct activation helpers, and constructs
+`portalocker.portalocker.Win32Locker`. This harness is not a public CLI mode
+and must never enter evaluator, verifier, calibration, or artifact code.
+
 - [ ] **Step 2: Revalidate and directly activate the bound roots**
 
-Change activation to receive the verified environment binding, validate `runtime_import_layout` again immediately before modifying `sys.path`, and add the exact roots directly. Continue to avoid `site` and all `.pth` processing.
+Change activation to receive the verified environment binding. Immediately
+before modifying `sys.path`, read
+`environment_binding["lock_selection"]["markers"]` and its selected package
+inventory, re-derive the expected runtime layout, require exact
+type/order/canonical equality with `runtime_import_layout`, then repeat the
+`lstat` and containment checks. Add the exact roots directly only after all
+checks pass. Continue to avoid `site` and all `.pth` processing.
 
 - [ ] **Step 3: Complete GREEN security coverage**
 
@@ -118,14 +136,20 @@ Prove the isolated runner imports the split fake modules, the `.pth` marker rema
 
 - [ ] **Step 4: Run the real model-free Windows smoke**
 
-Using the already frozen external environment and the real authoritative receipt path:
+Using the already frozen external environment and the same private `-B -I -S`
+subprocess harness:
 
-1. run offline frozen sync-check and authoritative record validation;
+1. run offline frozen sync-check and authoritative record validation, then
+   load the resulting privacy-safe binding in the private harness;
 2. import `pywintypes` through the authoritative bootstrap;
 3. construct `portalocker.portalocker.Win32Locker`;
 4. construct and close a local Qdrant store in an explicit temporary directory outside the repository.
 
-The smoke must perform zero model loads, embeddings, reranks, queries, providers, network calls, and artifact writes.
+The smoke must add no public CLI mode and perform zero evaluator/verifier
+entry, calibration, model loads, embeddings, reranks, queries, providers,
+network calls, and artifact writes. The before/after evidence is the preserved
+Task 6 real traceback followed by success from this same model-free runtime
+path.
 
 - [ ] **Step 5: Run full scoped verification**
 
