@@ -124,6 +124,37 @@ def test_pipeline_with_reranker_reorders():
     assert [h.payload["chunk_id"] for h in result.hits] == ["c", "b"]
 
 
+def test_pipeline_uses_one_planned_query_and_exposes_only_applied_routes():
+    question = "公司 unpaid salary，我想 immediately resign。"
+    expected_query = (
+        f"{question} 勞動基準法 第十四條 不依勞動契約給付工作報酬 "
+        "勞工得不經預告終止契約"
+    )
+    calls = []
+
+    class RecordingRetriever:
+        def retrieve(self, query, top_k):
+            calls.append(("retrieve", query))
+            return [hit("labor-law")]
+
+    class RecordingReranker:
+        def rerank(self, query, candidates, top_k):
+            calls.append(("rerank", query))
+            return candidates[:top_k]
+
+    result = RetrievalPipeline(
+        RecordingRetriever(),
+        reranker=RecordingReranker(),
+        top_k_retrieve=20,
+        top_k_final=5,
+    ).run(question)
+
+    assert calls == [("retrieve", expected_query), ("rerank", expected_query)]
+    assert result.applied_routes == ("wage_arrears_termination",)
+    assert question in expected_query
+    assert "wage_arrears_termination" not in expected_query
+
+
 def test_pipeline_empty_candidates():
     pipeline = RetrievalPipeline(FakeRetriever([]), reranker=None, top_k_retrieve=20, top_k_final=5)
     result = pipeline.run("query")
