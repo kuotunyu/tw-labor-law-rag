@@ -48,14 +48,17 @@ _CASE_RESULT_FIELDS = {
     "generation_contract_passed",
     "passed",
 }
-_GUARD_FIELDS = {
+_GUARD_INPUT_FIELDS = {
     "qid",
     "answerable",
     "rank",
-    "has_hits",
-    "reranker_enabled",
+    "hit_count",
     "top_score",
     "applied_routes",
+}
+_GUARD_EVIDENCE_FIELDS = _GUARD_INPUT_FIELDS | {
+    "has_hits",
+    "reranker_enabled",
 }
 _CANDIDATE_FIELDS = {
     "candidate_threshold",
@@ -86,12 +89,13 @@ _SOURCE_ARTIFACT_FIELDS = {
     "stress_dataset",
     "formal_dataset",
 }
+_TOP_K_FINAL = 5
 _RETRIEVAL_CONFIGURATION = {
     "chunking": "structure",
     "retrieval": "hybrid",
     "reranker": True,
     "top_k_retrieve": 20,
-    "top_k_final": 5,
+    "top_k_final": _TOP_K_FINAL,
 }
 _EMBEDDING_MODEL = "BAAI/bge-m3"
 _EMBEDDING_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
@@ -534,14 +538,22 @@ def _expected_guard_answerability(label: str, index: int) -> bool:
     return index < (40 if label == "stress" else 30)
 
 
-def _validated_guard_rows(rows: object, *, label: str) -> list[dict[str, Any]]:
+def _validated_guard_rows(
+    rows: object,
+    *,
+    label: str,
+    published_evidence: bool = False,
+) -> list[dict[str, Any]]:
     expected_qids = _STRESS_QIDS if label == "stress" else _FORMAL_QIDS
     expected_routes = _STRESS_ROUTES if label == "stress" else _FORMAL_ROUTES
+    expected_fields = (
+        _GUARD_EVIDENCE_FIELDS if published_evidence else _GUARD_INPUT_FIELDS
+    )
     if not isinstance(rows, list) or len(rows) != len(expected_qids):
         raise ValueError(f"{label} rows must contain the exact committed qids")
     normalized = []
     for index, row in enumerate(rows):
-        if not isinstance(row, dict) or set(row) != _GUARD_FIELDS:
+        if not isinstance(row, dict) or set(row) != expected_fields:
             raise ValueError(f"{label} rows have invalid fields at row {index + 1}")
         qid = row["qid"]
         if qid != expected_qids[index]:
@@ -554,10 +566,35 @@ def _validated_guard_rows(rows: object, *, label: str) -> list[dict[str, Any]]:
             raise ValueError(f"{label} row {qid}: rank must be null or positive")
         if not answerable and rank is not None:
             raise ValueError(f"{label} row {qid}: unanswerable rank must be null")
-        has_hits = _boolean(row["has_hits"], field="has_hits", identity=qid)
-        reranker_enabled = _boolean(
-            row["reranker_enabled"], field="reranker_enabled", identity=qid
-        )
+        hit_count = row["hit_count"]
+        if (
+            type(hit_count) is not int
+            or hit_count < 0
+            or hit_count > _TOP_K_FINAL
+        ):
+            raise ValueError(
+                f"{label} row {qid}: hit_count must be between zero and "
+                f"{_TOP_K_FINAL}"
+            )
+        top_score = _unit_interval(row["top_score"], field="top_score")
+        if hit_count == 0 and (top_score != 0.0 or rank is not None):
+            raise ValueError(
+                f"{label} row {qid}: zero-hit rows require zero score and null rank"
+            )
+        if hit_count > 0 and top_score == 0.0:
+            raise ValueError(
+                f"{label} row {qid}: positive hit_count requires a positive score"
+            )
+        if rank is not None and rank > hit_count:
+            raise ValueError(f"{label} row {qid}: rank must not exceed hit_count")
+        has_hits = hit_count > 0
+        if published_evidence:
+            if row["has_hits"] is not has_hits:
+                raise ValueError(f"{label} row {qid}: has_hits derivation mismatch")
+            if row["reranker_enabled"] is not True:
+                raise ValueError(
+                    f"{label} row {qid}: reranker_enabled must match configuration"
+                )
         routes = _routes(
             row["applied_routes"], field="applied_routes", require_tuple=False
         )
@@ -568,9 +605,10 @@ def _validated_guard_rows(rows: object, *, label: str) -> list[dict[str, Any]]:
                 "qid": qid,
                 "answerable": answerable,
                 "rank": rank,
+                "hit_count": hit_count,
                 "has_hits": has_hits,
-                "reranker_enabled": reranker_enabled,
-                "top_score": _unit_interval(row["top_score"], field="top_score"),
+                "reranker_enabled": True,
+                "top_score": top_score,
                 "applied_routes": list(routes),
             }
         )
@@ -584,7 +622,6 @@ def _validated_guard_rows(rows: object, *, label: str) -> list[dict[str, Any]]:
 def _decision(
     *,
     has_hits: bool,
-    reranker_enabled: bool,
     routes: list[str],
     score: float,
     candidate: float,
@@ -592,7 +629,7 @@ def _decision(
 ):
     return decide_retrieval_refusal(
         has_hits=has_hits,
-        reranker_enabled=reranker_enabled,
+        reranker_enabled=True,
         applied_routes=tuple(routes),
         top_score=score,
         global_threshold=global_threshold,
@@ -619,7 +656,6 @@ def _evaluate_target(
         )
         decision = _decision(
             has_hits=True,
-            reranker_enabled=True,
             routes=row["applied_routes"],
             score=row["top_score"],
             candidate=candidate,
@@ -677,8 +713,7 @@ def _stress_summary(
 ) -> dict[str, Any]:
     decisions = [
         _decision(
-            has_hits=row["has_hits"],
-            reranker_enabled=row["reranker_enabled"],
+            has_hits=row["hit_count"] > 0,
             routes=row["applied_routes"],
             score=row["top_score"],
             candidate=candidate,
@@ -711,8 +746,7 @@ def _formal_summary(
     answerable = [row for row in rows if row["answerable"]]
     decisions = [
         _decision(
-            has_hits=row["has_hits"],
-            reranker_enabled=row["reranker_enabled"],
+            has_hits=row["hit_count"] > 0,
             routes=row["applied_routes"],
             score=row["top_score"],
             candidate=candidate,
@@ -818,10 +852,10 @@ def _recompute_candidate(result: object) -> dict[str, Any]:
     global_threshold = _validated_global_threshold(result["global_threshold"])
     observations = _observations_from_case_results(result["cases"])
     stress_evidence = _validated_guard_rows(
-        result["stress_evidence"], label="stress"
+        result["stress_evidence"], label="stress", published_evidence=True
     )
     formal_evidence = _validated_guard_rows(
-        result["formal_evidence"], label="formal"
+        result["formal_evidence"], label="formal", published_evidence=True
     )
     cases, target = _evaluate_target(
         observations,
@@ -1006,6 +1040,7 @@ _PUBLIC_KEYS = {
     "qid",
     "case_type",
     "rank",
+    "hit_count",
     "has_hits",
     "reranker_enabled",
     "source_ranks",
@@ -1025,7 +1060,7 @@ _PUBLIC_KEYS = {
     *_CANONICAL_SOURCE_KEYS,
 }
 _PUBLIC_STRINGS = {
-    "1.1",
+    "1.2",
     "positive",
     "collision_negative",
     "threshold",
@@ -1117,7 +1152,7 @@ def build_official_artifact(
         for result in candidates
     ]
     artifact = {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "provenance": normalized_provenance,
         "candidate_thresholds": list(CANDIDATE_THRESHOLDS),
         "global_threshold": selected["global_threshold"],

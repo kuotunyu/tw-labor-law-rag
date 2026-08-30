@@ -176,8 +176,10 @@ def _stress_rows():
         answerable = number <= 40
         if qid == "stress-037":
             score = 0.0175004
-        elif not answerable and number <= 57:
+        elif qid == "stress-041":
             score = 0.0
+        elif not answerable and number <= 57:
+            score = 0.0000004
         else:
             score = 0.5
         rows.append(
@@ -185,8 +187,7 @@ def _stress_rows():
                 "qid": qid,
                 "answerable": answerable,
                 "rank": 1 if answerable else None,
-                "has_hits": True,
-                "reranker_enabled": True,
+                "hit_count": 0 if qid == "stress-041" else 5,
                 "top_score": score,
                 "applied_routes": STRESS_ROUTES.get(qid, []),
             }
@@ -200,8 +201,7 @@ def _formal_rows():
             "qid": f"eval-{number:02d}",
             "answerable": True,
             "rank": rank,
-            "has_hits": True,
-            "reranker_enabled": True,
+            "hit_count": 5,
             "top_score": 0.5000004 if number == 3 else 0.5,
             "applied_routes": FORMAL_ROUTES.get(f"eval-{number:02d}", []),
         }
@@ -212,9 +212,12 @@ def _formal_rows():
             "qid": f"eval-{number:02d}",
             "answerable": False,
             "rank": None,
-            "has_hits": True,
-            "reranker_enabled": True,
-            "top_score": 0.0 if number <= 39 else 0.5,
+            "hit_count": 0 if number == 31 else 5,
+            "top_score": (
+                0.0
+                if number == 31
+                else 0.0000004 if number <= 39 else 0.5
+            ),
             "applied_routes": [],
         }
         for number in range(31, 41)
@@ -490,10 +493,21 @@ def test_candidate_recomputes_target_stress_and_formal_gates(cases):
         "qid": "stress-037",
         "answerable": True,
         "rank": 1,
+        "hit_count": 5,
         "has_hits": True,
         "reranker_enabled": True,
         "top_score": 0.0175004,
         "applied_routes": ["severance_comparison"],
+    }
+    assert result["stress_evidence"][40] == {
+        "qid": "stress-041",
+        "answerable": False,
+        "rank": None,
+        "hit_count": 0,
+        "has_hits": False,
+        "reranker_enabled": True,
+        "top_score": 0.0,
+        "applied_routes": [],
     }
 
 
@@ -517,16 +531,16 @@ def test_candidate_uses_unrounded_score_and_shared_equality_behavior(cases):
     ("mutate", "message"),
     [
         (
-            lambda stress, formal: stress[0].pop("has_hits"),
+            lambda stress, formal: stress[0].pop("hit_count"),
             "fields",
         ),
         (
-            lambda stress, formal: stress[0].update(has_hits=1),
-            "has_hits",
+            lambda stress, formal: stress[0].update(hit_count=True),
+            "hit_count",
         ),
         (
-            lambda stress, formal: formal[0].update(reranker_enabled="yes"),
-            "reranker_enabled",
+            lambda stress, formal: formal[0].update(reranker_enabled=False),
+            "fields",
         ),
         (
             lambda stress, formal: stress[0].update(
@@ -572,12 +586,77 @@ def test_guard_evidence_fields_and_identity_are_bound_to_qid(
         )
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("has_hits", False), ("reranker_enabled", False)],
+)
+def test_guard_input_rejects_caller_controlled_decision_flags(
+    cases, field, value
+):
+    stress = _stress_rows()
+    stress[36][field] = value
+
+    with pytest.raises(ValueError, match="fields"):
+        evaluate_candidate(
+            _observations(cases),
+            candidate_threshold=0.015,
+            global_threshold=0.03,
+            stress_rows=stress,
+            formal_rows=_formal_rows(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda stress: stress[0].update(hit_count=-1), "hit_count"),
+        (lambda stress: stress[0].update(hit_count=6), "hit_count"),
+        (
+            lambda stress: stress[0].update(
+                hit_count=0,
+                rank=None,
+                top_score=0.1,
+            ),
+            "zero-hit",
+        ),
+        (
+            lambda stress: stress[0].update(hit_count=0, top_score=0.0),
+            "zero-hit",
+        ),
+        (
+            lambda stress: stress[0].update(hit_count=1, rank=2),
+            "rank.*hit_count",
+        ),
+        (
+            lambda stress: stress[40].update(hit_count=5),
+            "positive hit_count",
+        ),
+    ],
+)
+def test_guard_input_rejects_hit_count_score_and_rank_inconsistency(
+    cases, mutate, message
+):
+    stress = _stress_rows()
+    mutate(stress)
+
+    with pytest.raises(ValueError, match=message):
+        evaluate_candidate(
+            _observations(cases),
+            candidate_threshold=0.015,
+            global_threshold=0.03,
+            stress_rows=stress,
+            formal_rows=_formal_rows(),
+        )
+
+
 @pytest.mark.parametrize("guard_name", ["stress", "formal"])
 def test_guard_evidence_rejects_four_decimal_source_substitution(cases, guard_name):
     stress = _stress_rows()
     formal = _formal_rows()
     rows = stress if guard_name == "stress" else formal
     for row in rows:
+        if row["hit_count"] > 0 and row["top_score"] < 0.0001:
+            row["top_score"] = 0.1000004
         row["top_score"] = round(row["top_score"], 4)
 
     with pytest.raises(ValueError, match="four-decimal"):
@@ -638,6 +717,14 @@ def test_evaluator_calls_shared_policy_with_exact_raw_boundary(monkeypatch, case
         "global_threshold": 0.03,
         "severance_comparison_threshold": 0.015,
     }
+    assert calls[70] == {
+        "has_hits": False,
+        "reranker_enabled": True,
+        "applied_routes": (),
+        "top_score": 0.0,
+        "global_threshold": 0.03,
+        "severance_comparison_threshold": 0.015,
+    }
 
 
 def test_selector_replays_policy_and_returns_highest_complete_pass(
@@ -659,6 +746,14 @@ def test_selector_replays_policy_and_returns_highest_complete_pass(
         "reranker_enabled": True,
         "applied_routes": ("severance_comparison",),
         "top_score": 0.0175004,
+        "global_threshold": 0.03,
+        "severance_comparison_threshold": 0.015,
+    } in calls
+    assert {
+        "has_hits": False,
+        "reranker_enabled": True,
+        "applied_routes": (),
+        "top_score": 0.0,
         "global_threshold": 0.03,
         "severance_comparison_threshold": 0.015,
     } in calls
@@ -707,8 +802,18 @@ def test_selector_rejects_fabricated_passing_point_zero_three(cases):
             "target aggregate",
         ),
         (
-            lambda result: result["stress_evidence"][40].update(top_score=0.5),
+            lambda result: result["stress_evidence"][41].update(top_score=0.5),
             "stress aggregate",
+        ),
+        (
+            lambda result: result["stress_evidence"][36].update(has_hits=False),
+            "has_hits",
+        ),
+        (
+            lambda result: result["formal_evidence"][0].update(
+                reranker_enabled=False
+            ),
+            "reranker_enabled",
         ),
         (
             lambda result: result["formal"].update(hit_at_5=1.0),
@@ -764,7 +869,7 @@ def test_official_artifact_recomputes_and_publishes_only_safe_truth(cases):
         "candidates",
         "cases",
     )
-    assert artifact["schema_version"] == "1.1"
+    assert artifact["schema_version"] == "1.2"
     assert artifact["candidate_thresholds"] == list(EXPECTED_CANDIDATES)
     assert artifact["global_threshold"] == 0.03
     assert artifact["selected_threshold"] == 0.015
@@ -866,6 +971,7 @@ def test_official_artifact_binding_tracks_the_actual_published_guard_rows(cases)
         ("schemeless_endpoint", "embedding_model"),
         ("credential_value", "embedding_revision"),
         ("invalid_run_origin", "run_origin"),
+        ("reranker_disabled", "approved primitives"),
         ("account_field", "provenance fields"),
         ("nested_endpoint_key", "retrieval_configuration fields"),
     ],
@@ -889,6 +995,8 @@ def test_official_artifact_rejects_nested_privacy_attacks(cases, attack, message
         provenance["embedding_revision"] = "sk-private-credential"
     elif attack == "invalid_run_origin":
         provenance["run_origin"] = "imported_public_trace"
+    elif attack == "reranker_disabled":
+        provenance["retrieval_configuration"]["reranker"] = False
     elif attack == "account_field":
         provenance["account"] = "person@example.com"
     else:
