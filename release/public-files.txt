@@ -58,6 +58,7 @@ eval/official/reliability_results.json
 eval/official/reliability_trace.jsonl
 eval/official/wage_arrears_regression_v0.3.4.json
 eval/run_e2e_eval.py
+eval/run_portfolio_demo_regression.py
 eval/run_provider_crosscheck.py
 eval/run_reliability_eval.py
 eval/run_retrieval_eval.py
