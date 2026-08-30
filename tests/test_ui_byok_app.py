@@ -105,17 +105,51 @@ def test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history(monkeypat
         assert app.segmented_control[0].value == "gemini"
         assert all(widget.label != "回答模型" for widget in app.sidebar.selectbox)
         assert any(
-            element.value == "🔐 開始安全問答" for element in app.subheader
+            element.value == "三步開始問答" for element in app.subheader
         )
+        assert any(
+            "知識庫快照：2026-08-29" in element.value for element in app.caption
+        )
+        assert any(
+            expander.label == "進階比較設定" for expander in app.sidebar.expander
+        )
+        example_buttons = [
+            button
+            for button in app.button
+            if button.label
+            in {
+                "每日與每週工時",
+                "普通傷病假",
+                "欠薪立即離職",
+                "新舊制比較",
+                "知識庫外問題",
+            }
+        ]
+        assert len(example_buttons) == 5
+        assert all(button.disabled for button in example_buttons)
         assert app.chat_input[0].disabled is True
         assert requests == [{"path": "/session"}]
 
         app.text_input[0].set_value("gemini-visitor-secret-key").run()
         assert app.chat_input[0].disabled is False
         assert any(
-            element.value == "API Key 已填入，可以開始問答。"
-            for element in app.success
+            element.value
+            == "API Key 已填入，但尚未向模型供應商驗證；第一次成功送出後才代表可用。"
+            for element in app.info
         )
+        hours_button = next(
+            button for button in app.button if button.label == "每日與每週工時"
+        )
+        assert hours_button.disabled is False
+        hours_button.click().run()
+        example_request = next(
+            item
+            for item in requests
+            if item.get("payload", {}).get("question")
+            == "勞工每天和每週的正常工作時間上限是多少？"
+        )
+        assert example_request["provider_key"] == "gemini-visitor-secret-key"
+        assert example_request["demo_session"] == "signed-session"
 
         app.segmented_control[0].set_value("openai").run()
         assert app.text_input[0].value == ""
@@ -127,7 +161,11 @@ def test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history(monkeypat
 
         app.chat_input[0].set_value("加班費如何計算？").run()
 
-        query_request = next(item for item in requests if item["path"] == "/query")
+        query_request = next(
+            item
+            for item in requests
+            if item.get("payload", {}).get("question") == "加班費如何計算？"
+        )
         assert query_request["provider_key"] == visitor_key
         assert query_request["demo_session"] == "signed-session"
         assert query_request["payload"]["provider"] == "openai"
@@ -135,7 +173,13 @@ def test_streamlit_byok_flow_keeps_visitor_key_out_of_rendered_history(monkeypat
         assert visitor_key not in repr(app.session_state["history"])
         rendered = "\n".join(
             str(element.value)
-            for collection in (app.markdown, app.caption, app.info, app.warning)
+            for collection in (
+                app.markdown,
+                app.caption,
+                app.info,
+                app.success,
+                app.warning,
+            )
             for element in collection
         )
         assert visitor_key not in rendered

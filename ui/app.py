@@ -2,9 +2,8 @@
 
 Talks to the FastAPI backend over HTTP only (no direct import of `rag`), so it
 runs unmodified whether the API is on localhost or the `api` service in
-docker-compose. The sidebar exposes chunking strategy / retrieval mode /
-reranker toggles so the same question can be re-run under different configs —
-a live version of the ablation study.
+docker-compose. Expert retrieval controls remain available behind progressive
+disclosure so first-time visitors can focus on the secure BYOK question flow.
 """
 
 import os
@@ -21,6 +20,7 @@ from ui.api_client import (
     requested_provider_for_display,
     submit_query,
 )
+from ui.content import BYOK_PRIVACY_POINTS, EXAMPLE_QUESTIONS, KNOWLEDGE_BASE
 from ui.refusal_labels import refusal_stage_label
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
@@ -30,8 +30,47 @@ MODE_LABELS = {"hybrid": "Hybrid (BM25 + 向量)", "vector": "純向量 (BGE-M3)
 PROVIDER_NAMES = {"gemini": "Gemini", "openai": "OpenAI"}
 
 st.set_page_config(page_title="勞動法規 RAG 問答", page_icon="⚖️", layout="centered")
-st.title("⚖️ 繁體中文勞動法規問答系統")
-st.caption("知識庫:全國法規資料庫 15 部勞動法規（OGDL 開放授權）｜ Hybrid Search + Reranker + 引用來源")
+st.markdown(
+    """
+    <style>
+    :root {
+      --law-ink: #20242c;
+      --law-muted: #667085;
+      --law-paper: #fbfaf7;
+      --law-line: #d8d2c5;
+      --law-accent: #a43b32;
+      --law-accent-soft: #f5e9e6;
+    }
+    .stApp { background: var(--law-paper); color: var(--law-ink); }
+    [data-testid="stHeader"] { background: rgba(251, 250, 247, .92); }
+    [data-testid="stSidebar"] { border-right: 1px solid var(--law-line); }
+    .block-container { max-width: 980px; padding-top: 2.25rem; }
+    .law-eyebrow {
+      color: var(--law-accent);
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      margin-bottom: .35rem;
+      text-transform: uppercase;
+    }
+    .law-rule { border-top: 1px solid var(--law-line); margin: 1.25rem 0; }
+    div.stButton > button { min-height: 2.75rem; border-color: var(--law-line); }
+    div.stButton > button:hover { border-color: var(--law-accent); color: var(--law-accent); }
+    @media (max-width: 700px) {
+      .block-container { padding: 1rem .85rem 5rem; }
+    }
+    </style>
+    <div class="law-eyebrow">Evidence-first legal retrieval</div>
+    """,
+    unsafe_allow_html=True,
+)
+st.title("⚖️ 繁體中文勞動法規問答")
+st.caption(
+    f"知識庫快照：{KNOWLEDGE_BASE.snapshot_date}　·　"
+    f"{KNOWLEDGE_BASE.laws} 部法規／{KNOWLEDGE_BASE.articles} 條非刪除條文　·　"
+    "Hybrid Search + Reranker + 法源引用"
+)
+st.caption("資料源為全國法規資料庫（OGDL 授權）；本系統僅供法規檢索與技術展示，不是法律意見。")
 
 
 @st.cache_data(ttl=60)
@@ -113,17 +152,30 @@ def render_generation_status(payload: dict) -> None:
 
 with st.sidebar:
     st.subheader("檢索設定")
-    strategy = st.selectbox("Chunking 策略", list(STRATEGY_LABELS), format_func=STRATEGY_LABELS.get)
-    mode = st.selectbox("檢索模式", list(MODE_LABELS), format_func=MODE_LABELS.get)
-    use_reranker = st.checkbox("啟用 Reranker (bge-reranker-v2-m3)", value=True)
+    with st.expander("進階比較設定", expanded=False):
+        strategy = st.selectbox(
+            "Chunking 策略",
+            list(STRATEGY_LABELS),
+            format_func=STRATEGY_LABELS.get,
+        )
+        mode = st.selectbox(
+            "檢索模式",
+            list(MODE_LABELS),
+            format_func=MODE_LABELS.get,
+        )
+        use_reranker = st.checkbox(
+            "啟用 Reranker (bge-reranker-v2-m3)", value=True
+        )
+        st.caption("這些選項用於比較消融設定；一般問答可維持預設值。")
     st.divider()
-    st.caption("調整設定後,下一個問題會用新設定重新檢索——可直接比較不同組合的效果與引用結果。")
+    st.caption("調整後，下一個問題會用新設定重新檢索；歷史回答仍保留原設定與引用。")
 
 selected_provider = None
 visitor_key = None
 with st.container(border=True):
-    st.subheader("🔐 開始安全問答")
-    st.caption("選擇模型並貼上你自己的 API Key；本站不使用站長的模型額度。")
+    st.subheader("三步開始問答")
+    st.caption("① 選模型　　② 貼上自己的 API Key　　③ 選範例或直接提問")
+    st.caption("本站不使用站長的模型額度，也不在伺服器保存訪客金鑰。")
 
     if available_providers:
         selected_provider = st.segmented_control(
@@ -143,7 +195,7 @@ with st.container(border=True):
             st.session_state["provider_key_provider"] = selected_provider
 
         provider_name = PROVIDER_NAMES.get(selected_provider, selected_provider)
-        key_column, clear_column = st.columns([4, 1], vertical_alignment="bottom")
+        key_column, clear_column = st.columns([5, 2], vertical_alignment="bottom")
         with key_column:
             visitor_key = st.text_input(
                 f"{provider_name} API Key",
@@ -160,14 +212,11 @@ with st.container(border=True):
             )
 
         if visitor_key.strip():
-            st.success("API Key 已填入，可以開始問答。")
+            st.info("API Key 已填入，但尚未向模型供應商驗證；第一次成功送出後才代表可用。")
         else:
-            st.info(f"請輸入 {provider_name} API Key，再到下方提出問題。")
+            st.info(f"請輸入 {provider_name} API Key，再選擇範例或提出問題。")
 
-        st.caption(
-            "只保留在目前瀏覽器工作階段　•　不寫入檔案或聊天紀錄　•　"
-            "模型費用由 API Key 持有人承擔"
-        )
+        st.caption("　•　".join(BYOK_PRIVACY_POINTS))
         query_limit = st.session_state.get("demo_query_limit")
         if query_limit:
             st.caption(f"每個展示工作階段最多 {query_limit} 次查詢。")
@@ -178,6 +227,32 @@ with st.container(border=True):
 
 if "history" not in st.session_state:
     st.session_state.history = []
+
+byok_ready = bool(
+    not requires_api_key
+    or (
+        isinstance(visitor_key, str)
+        and visitor_key.strip()
+        and st.session_state.get("demo_session")
+    )
+)
+
+st.subheader("試一個代表性問題")
+st.caption("範例不使用預先寫好的答案；點擊後會走與自行提問完全相同的檢索與生成流程。")
+pending_question = None
+example_columns = st.columns(2)
+for index, item in enumerate(EXAMPLE_QUESTIONS):
+    with example_columns[index % len(example_columns)]:
+        if st.button(
+            item.title,
+            key=f"example-{item.id}",
+            help=f"{item.category}｜{item.question}",
+            disabled=selected_provider is None or not byok_ready,
+            use_container_width=True,
+        ):
+            pending_question = item.question
+
+st.markdown('<div class="law-rule"></div>', unsafe_allow_html=True)
 
 
 def render_sources(sources: list[dict]) -> None:
@@ -240,18 +315,11 @@ for msg in st.session_state.history:
             render_generation_status(msg["payload"])
             render_debug(msg["payload"])
 
-byok_ready = bool(
-    not requires_api_key
-    or (
-        isinstance(visitor_key, str)
-        and visitor_key.strip()
-        and st.session_state.get("demo_session")
-    )
-)
-question = st.chat_input(
+typed_question = st.chat_input(
     "輸入你的勞動法規問題...",
     disabled=selected_provider is None or not byok_ready,
 )
+question = typed_question or pending_question
 if question:
     st.session_state.history.append({"role": "user", "content": question})
     with st.chat_message("user"):
