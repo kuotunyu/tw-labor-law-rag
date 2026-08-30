@@ -51,6 +51,42 @@ def test_decision_table(case, expected_stage, expected_threshold):
     assert decision.effective_threshold == expected_threshold
 
 
+def test_no_hits_has_priority_over_disabled_reranker():
+    decision = decide_retrieval_refusal(
+        has_hits=False,
+        reranker_enabled=False,
+        applied_routes=(),
+        top_score=0.5,
+        global_threshold=0.03,
+        severance_comparison_threshold=0.7,
+    )
+    assert decision.refusal_stage == "no_hits"
+    assert decision.effective_threshold is None
+
+
+@pytest.mark.parametrize("field,value", [
+    ("top_score", -0.01),
+    ("global_threshold", math.inf),
+    ("severance_comparison_threshold", math.nan),
+])
+@pytest.mark.parametrize(
+    ("has_hits", "reranker_enabled"),
+    [(False, True), (False, False), (True, False)],
+)
+def test_validation_precedes_short_circuit_decisions(has_hits, reranker_enabled, field, value):
+    kwargs = dict(
+        has_hits=has_hits,
+        reranker_enabled=reranker_enabled,
+        applied_routes=(),
+        top_score=0.5,
+        global_threshold=0.03,
+        severance_comparison_threshold=0.7,
+    )
+    kwargs[field] = value
+    with pytest.raises(ValueError):
+        decide_retrieval_refusal(**kwargs)
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
