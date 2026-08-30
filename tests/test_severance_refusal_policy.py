@@ -110,9 +110,9 @@ OFFICIAL_CASE_FIELDS = {
     "refusal_stage",
     "source_contract_passed",
     "route_contract_passed",
-    "generation_expected",
+    "expected_outcome",
     "generation_allowed",
-    "generation_contract_passed",
+    "outcome_contract_passed",
     "passed",
 }
 FORMAL_RANKS = [
@@ -1023,6 +1023,8 @@ def _observations(cases):
         score = 0.015 if index == 0 else 0.5
         if case.qid == "severance-policy-023":
             score = 0.0
+        elif case.qid == "severance-policy-027":
+            score = 0.029
         observations.append(
             build_case_observation(
                 case,
@@ -1159,6 +1161,20 @@ def test_reviewed_dataset_has_exact_order_contracts_and_style_coverage(cases):
     assert all(len(case.question) >= 12 and case.question[-1] in "？?" for case in cases)
 
 
+def test_reviewed_dataset_uses_exact_outcomes_with_only_027_reclassified(cases):
+    outcomes = {case.qid: case.expected_outcome for case in cases}
+
+    assert set(outcomes.values()) == {"generation", "no_hits", "threshold"}
+    assert outcomes["severance-policy-023"] == "no_hits"
+    assert outcomes["severance-policy-024"] == "generation"
+    assert outcomes["severance-policy-027"] == "threshold"
+    assert all(
+        outcome == "generation"
+        for qid, outcome in outcomes.items()
+        if qid not in {"severance-policy-023", "severance-policy-027"}
+    )
+
+
 def test_reviewed_questions_match_committed_route_semantics(cases):
     expected = [("severance_comparison",)] * 15
     expected.extend([()] * 4)
@@ -1196,7 +1212,7 @@ def _dataset_rows():
             "duplicates",
         ),
         (lambda rows: rows[0].update(answerable=1), "answerable"),
-        (lambda rows: rows[0].update(expect_generation=1), "expect_generation"),
+        (lambda rows: rows[0].update(expected_outcome=True), "expected_outcome"),
         (lambda rows: rows[0].update(case_type="collision_negative"), "ordering"),
         (lambda rows: rows.pop(), "qids"),
         (
@@ -1318,6 +1334,28 @@ def test_evaluator_recomputes_canonical_source_and_route_contracts(cases):
         )
 
 
+def test_positive_route_contract_requires_the_exact_singleton_route(cases):
+    observations = _observations(cases)
+    observations[0] = {
+        **observations[0],
+        "applied_routes": [
+            "severance_comparison",
+            "off_hours_employer_message",
+        ],
+    }
+
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    assert result["cases"][0]["route_contract_passed"] is False
+    assert result["cases"][0]["passed"] is False
+
+
 def test_collision_route_contract_allows_additional_non_prohibited_route(cases):
     observations = _observations(cases)
     observations[19] = {
@@ -1362,6 +1400,80 @@ def test_collision_route_contract_rejects_any_prohibited_route(cases):
 
     collision = result["cases"][19]
     assert collision["route_contract_passed"] is False
+    assert collision["passed"] is False
+
+
+def test_027_requires_a_positive_hit_threshold_refusal_without_generation(cases):
+    observations = _observations(cases)
+    observations[26] = build_case_observation(
+        cases[26],
+        source_ranks={},
+        applied_routes=(),
+        top_score=0.029,
+        hit_count=5,
+    )
+
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    collision = result["cases"][26]
+    assert collision["route_contract_passed"] is True
+    assert collision["refusal_stage"] == "threshold"
+    assert collision["generation_allowed"] is False
+    assert collision["expected_outcome"] == "threshold"
+    assert collision["outcome_contract_passed"] is True
+    assert collision["passed"] is True
+
+
+def test_027_rejects_a_nonempty_route_tuple(cases):
+    observations = _observations(cases)
+    observations[26] = build_case_observation(
+        cases[26],
+        source_ranks={},
+        applied_routes=("off_hours_employer_message",),
+        top_score=0.029,
+        hit_count=5,
+    )
+
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    collision = result["cases"][26]
+    assert collision["route_contract_passed"] is False
+    assert collision["passed"] is False
+
+
+def test_027_rejects_no_hits_instead_of_its_required_threshold_refusal(cases):
+    observations = _observations(cases)
+    observations[26] = build_case_observation(
+        cases[26],
+        source_ranks={},
+        applied_routes=(),
+        top_score=0.0,
+        hit_count=0,
+    )
+
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    collision = result["cases"][26]
+    assert collision["refusal_stage"] == "no_hits"
+    assert collision["outcome_contract_passed"] is False
     assert collision["passed"] is False
 
 

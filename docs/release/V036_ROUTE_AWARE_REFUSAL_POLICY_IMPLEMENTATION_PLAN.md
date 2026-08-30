@@ -1,5 +1,11 @@
 # v0.3.6 Route-Aware Refusal Policy Implementation Plan
 
+> **Status:** Superseded by `V036_RETRIEVAL_COVERAGE_PIVOT_IMPLEMENTATION_PLAN.md`
+> on 2026-08-30. This historical plan and its completed/NO-GO evidence remain
+> intact for audit only. Active work uses the pivot plan: it keeps the global
+> `0.03` production threshold and corrects case `027` to an exact
+> positive-hit `threshold` outcome rather than generation.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:subagent-driven-development` (recommended) or
 > `superpowers:executing-plans` to implement this plan task-by-task. Every

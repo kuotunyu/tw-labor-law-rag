@@ -1,6 +1,14 @@
 # v0.3.6 Route-Aware Refusal Policy Design
 
-**Status:** Approved design
+**Status:** Superseded by the v0.3.6 Retrieval Coverage Pivot on 2026-08-30.
+
+> **Supersession note (2026-08-30):** This approved route-aware lower-threshold
+> design is retained unchanged as the audit trail for its NO-GO evidence. The
+> pivot design in `V036_RETRIEVAL_COVERAGE_PIVOT_DESIGN.md` replaces its active
+> decision: production remains at the global `0.03` threshold, and the
+> severance coverage change is retrieval-only. Do not use this document's
+> `0.015` threshold or generation expectation for case `027` as an active
+> implementation contract.
 
 **Date:** 2026-08-30
 

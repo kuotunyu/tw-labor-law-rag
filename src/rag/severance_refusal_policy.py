@@ -27,7 +27,7 @@ _DATASET_FIELDS = {
     "sources",
     "required_routes",
     "prohibited_routes",
-    "expect_generation",
+    "expected_outcome",
     "style_tags",
 }
 _OBSERVATION_FIELDS = {
@@ -50,9 +50,9 @@ _CASE_RESULT_FIELDS = {
     "refusal_stage",
     "source_contract_passed",
     "route_contract_passed",
-    "generation_expected",
+    "expected_outcome",
     "generation_allowed",
-    "generation_contract_passed",
+    "outcome_contract_passed",
     "passed",
 }
 _GUARD_INPUT_FIELDS = {
@@ -168,7 +168,7 @@ class SeverancePolicyCase:
     sources: tuple[dict[str, str], ...]
     required_routes: tuple[str, ...]
     prohibited_routes: tuple[str, ...]
-    expect_generation: bool
+    expected_outcome: Literal["generation", "no_hits", "threshold"]
     style_tags: tuple[str, ...]
 
 
@@ -179,7 +179,7 @@ class _CaseContract:
     source_keys: tuple[str, ...]
     required_routes: tuple[str, ...]
     prohibited_routes: tuple[str, ...]
-    expect_generation: bool
+    expected_outcome: Literal["generation", "no_hits", "threshold"]
 
 
 def _collision(
@@ -188,7 +188,7 @@ def _collision(
     answerable: bool = True,
     required_routes: tuple[str, ...] = (),
     prohibited_routes: tuple[str, ...] = _SEVERANCE_ROUTE,
-    expect_generation: bool = True,
+    expected_outcome: Literal["generation", "no_hits", "threshold"] = "generation",
 ) -> _CaseContract:
     return _CaseContract(
         case_type="collision_negative",
@@ -196,7 +196,7 @@ def _collision(
         source_keys=source_keys,
         required_routes=required_routes,
         prohibited_routes=prohibited_routes,
-        expect_generation=expect_generation,
+        expected_outcome=expected_outcome,
     )
 
 
@@ -206,7 +206,7 @@ _POSITIVE_CONTRACT = _CaseContract(
     source_keys=(_PENSION_12, _LABOR_17),
     required_routes=_SEVERANCE_ROUTE,
     prohibited_routes=(),
-    expect_generation=True,
+    expected_outcome="generation",
 )
 _CASE_CONTRACTS = {
     **{qid: _POSITIVE_CONTRACT for qid in EXPECTED_QIDS[:15]},
@@ -220,12 +220,14 @@ _CASE_CONTRACTS = {
     "severance-policy-021": _collision((_PENSION_24,)),
     "severance-policy-022": _collision((_LABOR_54,)),
     "severance-policy-023": _collision(
-        (), answerable=False, expect_generation=False
+        (), answerable=False, expected_outcome="no_hits"
     ),
     "severance-policy-024": _collision((), answerable=False),
     "severance-policy-025": _collision((_PENSION_12,)),
     "severance-policy-026": _collision((_LABOR_17,)),
-    "severance-policy-027": _collision((), answerable=False),
+    "severance-policy-027": _collision(
+        (), answerable=False, expected_outcome="threshold"
+    ),
     "severance-policy-028": _collision((_LABOR_16,)),
     "severance-policy-029": _collision((_LABOR_30,)),
     "severance-policy-030": _collision(
@@ -364,9 +366,9 @@ def _parse_case(row: object, index: int) -> SeverancePolicyCase:
     if case_type != expected_type:
         raise _invalid(qid, "case_type ordering must be fifteen positives then negatives")
     answerable = _boolean(row["answerable"], field="answerable", identity=qid)
-    expect_generation = _boolean(
-        row["expect_generation"], field="expect_generation", identity=qid
-    )
+    expected_outcome = row["expected_outcome"]
+    if expected_outcome not in {"generation", "no_hits", "threshold"}:
+        raise _invalid(qid, "expected_outcome must be a supported exact outcome")
     sources = _sources(row["sources"], identity=qid)
     required_routes = _strings(
         row["required_routes"],
@@ -394,7 +396,7 @@ def _parse_case(row: object, index: int) -> SeverancePolicyCase:
         tuple(_source_key(source) for source in sources),
         required_routes,
         prohibited_routes,
-        expect_generation,
+        expected_outcome,
     )
     expected_contract = (
         contract.case_type,
@@ -402,7 +404,7 @@ def _parse_case(row: object, index: int) -> SeverancePolicyCase:
         contract.source_keys,
         contract.required_routes,
         contract.prohibited_routes,
-        contract.expect_generation,
+        contract.expected_outcome,
     ) if contract else None
     if actual_contract != expected_contract:
         raise _invalid(qid, "does not match its canonical contract")
@@ -414,7 +416,7 @@ def _parse_case(row: object, index: int) -> SeverancePolicyCase:
         sources=sources,
         required_routes=required_routes,
         prohibited_routes=prohibited_routes,
-        expect_generation=expect_generation,
+        expected_outcome=expected_outcome,
         style_tags=style_tags,
     )
 
@@ -472,7 +474,7 @@ def _case_matches_contract(case: SeverancePolicyCase) -> _CaseContract:
         tuple(_source_key(source) for source in case.sources),
         case.required_routes,
         case.prohibited_routes,
-        case.expect_generation,
+        case.expected_outcome,
     )
     expected = (
         contract.case_type,
@@ -480,7 +482,7 @@ def _case_matches_contract(case: SeverancePolicyCase) -> _CaseContract:
         contract.source_keys,
         contract.required_routes,
         contract.prohibited_routes,
-        contract.expect_generation,
+        contract.expected_outcome,
     )
     if actual != expected:
         raise ValueError(f"{case.qid}: case does not match canonical contract")
@@ -695,9 +697,14 @@ def _evaluate_target(
             for source in contract.source_keys
         )
         applied_routes = set(row["applied_routes"])
-        route_contract = set(contract.required_routes) <= applied_routes and not (
-            set(contract.prohibited_routes) & applied_routes
-        )
+        if contract.case_type == "positive":
+            route_contract = tuple(row["applied_routes"]) == _SEVERANCE_ROUTE
+        elif row["qid"] == "severance-policy-027":
+            route_contract = tuple(row["applied_routes"]) == ()
+        else:
+            route_contract = set(contract.required_routes) <= applied_routes and not (
+                set(contract.prohibited_routes) & applied_routes
+            )
         decision = _decision(
             has_hits=row["hit_count"] > 0,
             routes=row["applied_routes"],
@@ -706,8 +713,11 @@ def _evaluate_target(
             global_threshold=global_threshold,
         )
         generation_allowed = not decision.refused
-        generation_contract = generation_allowed is contract.expect_generation
-        passed = route_contract and generation_contract and (
+        actual_outcome = (
+            "generation" if decision.refusal_stage is None else decision.refusal_stage
+        )
+        outcome_contract = actual_outcome == contract.expected_outcome
+        passed = route_contract and outcome_contract and (
             source_contract or contract.case_type == "collision_negative"
         )
         case_results.append(
@@ -724,9 +734,9 @@ def _evaluate_target(
                 "refusal_stage": decision.refusal_stage,
                 "source_contract_passed": source_contract,
                 "route_contract_passed": route_contract,
-                "generation_expected": contract.expect_generation,
+                "expected_outcome": contract.expected_outcome,
                 "generation_allowed": generation_allowed,
-                "generation_contract_passed": generation_contract,
+                "outcome_contract_passed": outcome_contract,
                 "passed": passed,
             }
         )
@@ -745,7 +755,7 @@ def _evaluate_target(
         ),
         "collision_contracts": sum(
             row["route_contract_passed"]
-            and row["generation_contract_passed"]
+            and row["outcome_contract_passed"]
             for row in collisions
         ),
         "passed": passed_cases == 30,
@@ -1108,9 +1118,9 @@ _PUBLIC_KEYS = {
     "refusal_stage",
     "source_contract_passed",
     "route_contract_passed",
-    "generation_expected",
+    "expected_outcome",
     "generation_allowed",
-    "generation_contract_passed",
+    "outcome_contract_passed",
     *_PROVENANCE_FIELDS,
     *_SOURCE_ARTIFACT_FIELDS,
     *_RETRIEVAL_CONFIGURATION,
@@ -1129,6 +1139,7 @@ _PUBLIC_STRINGS = {
     "collision_negative",
     "threshold",
     "no_hits",
+    "generation",
     "structure",
     "hybrid",
     _EMBEDDING_MODEL,
