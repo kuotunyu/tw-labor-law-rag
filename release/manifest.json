@@ -201,6 +201,14 @@
       "laws": 15,
       "articles": 884
     },
+    "article_snapshot": {
+      "path": "release/corpus_article_snapshot.json",
+      "sha256": "7a7613c961384d2eb728c734f2d4ae18392b1298bb4999cc9134544afec234d7",
+      "schema_version": "1.0",
+      "snapshot_date": "2026-08-30",
+      "laws": 15,
+      "articles": 884
+    },
     "samples": [
       {
         "path": "data/sample/勞工請假規則.json",

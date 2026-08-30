@@ -17,6 +17,15 @@ from typing import Any
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _DELETED_ARTICLE = re.compile(r"^[（(]\s*刪除\s*[）)]$")
 _LAW_FIELDS = ("last_amended", "effective_date", "num_articles", "content_sha256")
+_CHANGE_KINDS = (
+    "added",
+    "removed",
+    "sha256",
+    "last_amended",
+    "effective_date",
+    "num_articles",
+    "content_sha256",
+)
 
 
 def _canonical_json_bytes(value: object) -> bytes:
@@ -165,3 +174,174 @@ def compare_snapshots(
                     }
                 )
     return changes
+
+
+def summarize_changes(changes: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    """Summarize source/law changes without retaining corpus content."""
+
+    counts = {kind: 0 for kind in _CHANGE_KINDS}
+    laws: set[str] = set()
+    has_source_change = False
+    total = 0
+    for change in changes:
+        kind = change.get("kind")
+        if kind not in counts:
+            raise ValueError(f"unknown corpus change kind: {kind}")
+        law = str(change.get("law", "")).strip()
+        source = str(change.get("source", "")).strip()
+        if bool(law) == bool(source):
+            raise ValueError("corpus change requires exactly one law or source")
+        if law:
+            laws.add(law)
+        else:
+            has_source_change = True
+        counts[kind] += 1
+        total += 1
+    return {
+        "total_changes": total,
+        "subjects_changed": len(laws) + int(has_source_change),
+        **counts,
+    }
+
+
+def build_article_snapshot(
+    laws: Iterable[Mapping[str, Any]],
+    *,
+    snapshot_date: str,
+) -> dict[str, Any]:
+    """Build content-free per-article fingerprints from normalized law records."""
+
+    try:
+        date.fromisoformat(snapshot_date)
+    except ValueError as exc:
+        raise ValueError("snapshot_date must be ISO YYYY-MM-DD") from exc
+
+    law_rows: list[dict[str, Any]] = []
+    law_names: set[str] = set()
+    for raw_law in laws:
+        name = str(raw_law.get("name", "")).strip()
+        if not name:
+            raise ValueError("law name is required")
+        if name in law_names:
+            raise ValueError(f"duplicate law name: {name}")
+        law_names.add(name)
+        articles: list[dict[str, str]] = []
+        article_labels: set[str] = set()
+        for raw_article in raw_law.get("articles", []):
+            content = str(raw_article.get("content", "")).strip()
+            if not content or _DELETED_ARTICLE.fullmatch(content):
+                continue
+            article = str(raw_article.get("no", "")).strip()
+            if not article:
+                raise ValueError(f"article label is required: {name}")
+            if article in article_labels:
+                raise ValueError(f"duplicate article: {name} {article}")
+            article_labels.add(article)
+            canonical = {
+                "no": article,
+                "chapter": str(raw_article.get("chapter", "")).strip(),
+                "content": content,
+            }
+            articles.append(
+                {"article": article, "sha256": _canonical_sha256(canonical)}
+            )
+        articles.sort(key=lambda row: row["article"])
+        law_rows.append({"name": name, "articles": articles})
+
+    law_rows.sort(key=lambda row: row["name"])
+    return {
+        "schema_version": "1.0",
+        "snapshot_date": snapshot_date,
+        "law_count": len(law_rows),
+        "article_count": sum(len(row["articles"]) for row in law_rows),
+        "laws": law_rows,
+    }
+
+
+def _article_snapshot_map(snapshot: Mapping[str, Any]) -> dict[str, dict[str, str]]:
+    if "laws" not in snapshot:
+        rows: dict[str, dict[str, str]] = {}
+        for raw_law, raw_articles in snapshot.items():
+            law = str(raw_law).strip()
+            if not law or not isinstance(raw_articles, Mapping):
+                raise ValueError("article snapshot laws must map to article hashes")
+            articles: dict[str, str] = {}
+            for raw_article, raw_digest in raw_articles.items():
+                article = str(raw_article).strip()
+                digest = str(raw_digest).strip()
+                if not article or not _SHA256.fullmatch(digest):
+                    raise ValueError("article snapshot identity or sha256 is invalid")
+                articles[article] = digest
+            rows[law] = articles
+        return rows
+
+    raw_laws = snapshot.get("laws")
+    if not isinstance(raw_laws, list):
+        raise ValueError("article snapshot laws must be a list")
+    rows = {}
+    for raw_law in raw_laws:
+        if not isinstance(raw_law, Mapping) or set(raw_law) != {"name", "articles"}:
+            raise ValueError("article snapshot law fields are invalid")
+        law = str(raw_law["name"]).strip()
+        if not law or law in rows or not isinstance(raw_law["articles"], list):
+            raise ValueError("article snapshot law identity is invalid")
+        articles = {}
+        for row in raw_law["articles"]:
+            if not isinstance(row, Mapping) or set(row) != {"article", "sha256"}:
+                raise ValueError("article snapshot article fields are invalid")
+            article = str(row["article"]).strip()
+            digest = str(row["sha256"]).strip()
+            if not article or article in articles or not _SHA256.fullmatch(digest):
+                raise ValueError("article snapshot identity or sha256 is invalid")
+            articles[article] = digest
+        rows[law] = articles
+    return rows
+
+
+def compare_article_snapshots(
+    committed: Mapping[str, Any], live: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Return deterministic added/removed/changed article fingerprints."""
+
+    old_laws = _article_snapshot_map(committed)
+    new_laws = _article_snapshot_map(live)
+    summary = {"added": 0, "removed": 0, "changed": 0, "unchanged": 0}
+    changes: list[dict[str, Any]] = []
+    for law in sorted(old_laws.keys() | new_laws.keys()):
+        old_articles = old_laws.get(law, {})
+        new_articles = new_laws.get(law, {})
+        for article in sorted(old_articles.keys() | new_articles.keys()):
+            if article not in old_articles:
+                summary["added"] += 1
+                changes.append(
+                    {
+                        "law": law,
+                        "article": article,
+                        "kind": "added",
+                        "new": new_articles[article],
+                    }
+                )
+            elif article not in new_articles:
+                summary["removed"] += 1
+                changes.append(
+                    {
+                        "law": law,
+                        "article": article,
+                        "kind": "removed",
+                        "old": old_articles[article],
+                    }
+                )
+            elif old_articles[article] != new_articles[article]:
+                summary["changed"] += 1
+                changes.append(
+                    {
+                        "law": law,
+                        "article": article,
+                        "kind": "changed",
+                        "old": old_articles[article],
+                        "new": new_articles[article],
+                    }
+                )
+            else:
+                summary["unchanged"] += 1
+    return {"summary": summary, "changes": changes}
