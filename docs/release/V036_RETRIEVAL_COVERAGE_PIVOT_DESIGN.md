@@ -226,5 +226,33 @@ calibration. Documentation-only commits after the bound source revision may
 not alter those inputs. Deterministic regeneration runs from a clean checkout
 of the recorded source commit.
 
+### Revision-binding amendment: tracked Python closure
+
+The first Task 5 implementation attempted to infer the decision dependency
+closure from Python imports. Five review-fix rounds demonstrated that this is
+not a reliable release boundary: Python import and execution semantics include
+aliases, namespace access, decorators, class bodies, lambdas, and point-order
+effects that a small static analyzer cannot prove complete.
+
+Schema `1.3` therefore uses a simpler conservative contract:
+
+- bind the SHA-256 and Git blob identity of **every Git-tracked `*.py` file in
+  the repository at the recorded source revision**, including tests;
+- additionally bind `pyproject.toml`, `uv.lock`, `legal_terms.txt`, and the
+  separately declared corpus, dataset, model, and replay source artifacts;
+- require the artifact's tracked-code path set to equal the set obtained from
+  `git ls-tree -r --name-only <recorded revision>` under those rules;
+- require the current checkout to match those recorded blobs and to be clean,
+  so an untracked local module cannot participate in acceptance or replay;
+- reject missing, extra, renamed, untracked, or changed bound code before any
+  model construction.
+
+This conservative superset deliberately invalidates acceptance after any
+tracked Python change, even when that file might not execute in one run. It
+replaces the incomplete import-closure and dynamic-execution analyzer; release
+correctness no longer depends on proving Python control flow. Documentation and
+non-code public packaging may still change after acceptance only where the
+existing replay verifier proves that no bound input changed.
+
 The preliminary multi-view ablation is design evidence, not a release result.
 Only the committed CPU/FP32 acceptance run may establish the release claim.

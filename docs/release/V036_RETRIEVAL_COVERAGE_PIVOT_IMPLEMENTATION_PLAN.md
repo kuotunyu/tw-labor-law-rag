@@ -120,6 +120,12 @@ Work:
    mismatches without model execution.
 8. Refactor the large evaluator only where needed to keep production and
    calibration responsibilities visibly separated.
+9. Bind the exact Git-revision set and hashes of every tracked `*.py` file,
+   plus `pyproject.toml`, `uv.lock`, and `legal_terms.txt`; delete the attempted
+   import-closure/dynamic-execution analyzer. Tests must prove that a changed,
+   added, removed, renamed, untracked, or extra Python file invalidates replay
+   before model construction, while documentation-only changes remain governed
+   by their existing public/release contracts.
 
 ## Task 6: Run fresh offline acceptance and export the official artifact
 
