@@ -211,3 +211,62 @@ The historical NO-GO file and the blob at commit `9890c785` both hash to
 artifact are absent. This review fix performed no model inference/download,
 provider call, network access, acceptance run, artifact export, deployment, or
 secret access. The Task 6/Task 7 handoff above is unchanged.
+
+## Review-fix round 3
+
+Review-fix implementation commit:
+`6a4806dd7048125cc1ef8b25263f2c327bcdaab9`.
+
+### Root cause and RED evidence
+
+The round-2 detector recognized only three call spellings. It did not resolve
+bindings, so ordinary renames of `importlib`, `import_module`, `builtins`, or
+`__import__`, assigned callable aliases, direct or nested `getattr`, and
+`eval`/`exec`/`compile` indirection bypassed the fail-closed policy. It also
+rejected clearly user-defined functions named `import_module` or `__import__`.
+
+The first table-driven RED run reported `20 failed, 2 passed`. The failures
+covered all four reviewed import forms, renamed and assigned aliases, direct
+and nested `getattr`, `__builtins__`, all three dynamic-code builtins, and the
+two user-defined-name false positives. A follow-up traversal audit produced
+`2 failed, 50 passed`, exposing a parameter-annotation bypass and lambda-local
+shadowing false positive before those branches were implemented.
+
+### Fix
+
+- A scoped, binding-aware AST visitor now resolves direct and renamed imports
+  from `importlib` and `builtins`, assigned callable aliases, builtin `getattr`
+  aliases, literal attribute/subscript access, and nested `__call__` lookup.
+- Calls resolving to `__import__`, `import_module`, `eval`, `exec`, or
+  `compile` fail closed. The visitor also inspects evaluated defaults,
+  decorators, assignment/function annotations, and lambda/function/class
+  scopes while allowing clearly user-bound similarly named functions and
+  unrelated object attributes.
+- The importer-wide allowlist was removed. There is deliberately no dynamic
+  exception path; any future exception must resolve and bind an exact target
+  rather than exempt an entire decision-relevant file.
+- The authoritative evaluator and release verifier continue to invoke this
+  closure validator before accepting or replaying evidence. The current
+  authoritative import graph remains valid without an exception.
+
+### GREEN evidence
+
+```text
+.venv\Scripts\python.exe -m pytest tests\test_severance_refusal_policy.py -q -p no:cacheprovider -k "static_local_import_closure"
+30 passed, 140 deselected in 1.63s
+
+.venv\Scripts\python.exe -m pytest tests\test_config.py tests\test_refusal_policy.py tests\test_answerer.py tests\test_reliability.py tests\test_portfolio_demo_regression.py tests\test_provider_crosscheck.py tests\test_pipeline.py tests\test_severance_refusal_policy.py -q -p no:cacheprovider
+372 passed, 2 skipped in 52.98s
+
+.venv\Scripts\python.exe -m pytest tests\test_release_verification.py -q -p no:cacheprovider -k "not test_release_verifier_recomputes_committed_evidence and not test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions"
+105 passed, 2 deselected in 7.95s
+
+.venv\Scripts\python.exe -m ruff check eval/run_severance_refusal_policy.py src/rag/release_verification.py src/rag/severance_refusal_policy.py tests/test_severance_refusal_policy.py
+All checks passed!
+
+git diff --check
+```
+
+No model inference/download, provider call, network access, acceptance run,
+artifact export, deployment, or secret access occurred. The historical and
+artifact-integrity checks and the Task 6/Task 7 handoff remain unchanged.
