@@ -270,3 +270,72 @@ git diff --check
 No model inference/download, provider call, network access, acceptance run,
 artifact export, deployment, or secret access occurred. The historical and
 artifact-integrity checks and the Task 6/Task 7 handoff remain unchanged.
+
+## Review-fix round 4
+
+Review-fix implementation commit:
+`b8a87be91f4bbb72b34cec2881b11b62e612f5a3`.
+
+### Root cause and RED evidence
+
+The round-3 call-taint visitor still depended on source order and only rejected
+a dangerous binding when it could trace a later call. It therefore lost taint
+across forward module/enclosing bindings, class-to-method lookup, branch and
+try joins, conditional expressions, and destructuring. It also treated
+`del eval` and a value-less `eval: object` annotation as safe runtime bindings,
+while rejecting two harmless user functions defined after the nested function
+that referenced them.
+
+The exact review table plus acquisition-without-call cases reported `17
+failed`. All nine reviewed unsafe programs escaped, both reviewed harmless
+forward-bound programs were rejected, and six unused dynamic-API acquisition
+forms were accepted. A further self-audit added and RED-proved direct access to
+builtin `eval` before a later module definition (`1 failed, 6 passed`).
+
+### Simplified policy
+
+- Decision code now has a no-acquisition/no-access contract instead of a
+  call-only taint contract. Importing `importlib`, importing `builtins`, or
+  importing their dynamic APIs is rejected immediately, even when the acquired
+  object is never called. References resolving to builtin `eval`, `exec`,
+  `compile`, or `__import__` are likewise rejected at access time.
+- Builtin `getattr` is allowed only for a literal attribute that is proven not
+  to acquire a dynamic API; non-literal acquisition and access through
+  `__builtins__` fail closed. Clearly user-bound functions and object
+  attributes with similar names remain allowed.
+- Python's `symtable` supplies module/function/class/free/global resolution. A
+  separate runtime-binding pass joins branch, loop, try/handler/finally, and
+  with-statement outcomes; handles destructuring and conditional expressions;
+  models `Delete` as unbound; and does not treat a value-less annotation as a
+  runtime binding. Method lookup skips the class namespace, as Python does.
+- Same-scope access uses bindings available before the reference. Nested
+  global/free access uses the enclosing scope's final binding set, which admits
+  the two exact harmless forward definitions without admitting direct builtin
+  access before a later definition.
+- There is still no importer-wide allowlist. Errors name the source line and
+  the unproven or forbidden acquisition.
+
+The authoritative evaluator and release verifier continue to run this public
+closure validator before evidence acceptance/replay.
+
+### GREEN evidence
+
+```text
+.venv\Scripts\python.exe -m pytest tests\test_severance_refusal_policy.py -q -p no:cacheprovider -k "static_local_import_closure"
+48 passed, 140 deselected in 1.42s
+
+.venv\Scripts\python.exe -m pytest tests\test_config.py tests\test_refusal_policy.py tests\test_answerer.py tests\test_reliability.py tests\test_portfolio_demo_regression.py tests\test_provider_crosscheck.py tests\test_pipeline.py tests\test_severance_refusal_policy.py -q -p no:cacheprovider
+390 passed, 2 skipped in 72.62s
+
+.venv\Scripts\python.exe -m pytest tests\test_release_verification.py -q -p no:cacheprovider -k "not test_release_verifier_recomputes_committed_evidence and not test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions"
+105 passed, 2 deselected in 10.76s
+
+.venv\Scripts\python.exe -m ruff check eval/run_severance_refusal_policy.py src/rag/release_verification.py src/rag/severance_refusal_policy.py tests/test_severance_refusal_policy.py
+All checks passed!
+
+git diff --check
+```
+
+No model inference/download, provider call, network access, acceptance run,
+artifact export, deployment, or secret access occurred. The historical and
+artifact-integrity checks and the Task 6/Task 7 handoff remain unchanged.
