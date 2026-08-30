@@ -121,11 +121,15 @@ Work:
 8. Refactor the large evaluator only where needed to keep production and
    calibration responsibilities visibly separated.
 9. Bind the exact Git-revision set and hashes of every tracked `*.py` file,
-   plus `pyproject.toml`, `uv.lock`, and `legal_terms.txt`; delete the attempted
-   import-closure/dynamic-execution analyzer. Tests must prove that a changed,
-   added, removed, renamed, untracked, or extra Python file invalidates replay
-   before model construction, while documentation-only changes remain governed
-   by their existing public/release contracts.
+   plus `pyproject.toml`, `uv.lock`, `.python-version`, the deployment
+   `Dockerfile`, and `legal_terms.txt`; delete the attempted import-closure and
+   dynamic-execution analyzer. Use a committed stdlib-only `python -I -S`
+   bootstrap that validates recorded/current Git sets, modes/blobs, checkout
+   bytes, ignored/untracked importable artifacts, clean state, isolated
+   `sys.path`, interpreter/platform/ABI, and installed distributions before
+   importing project, cache, index, or model code. Tests must prove that a
+   changed, added, removed, renamed, untracked, ignored, aliased, or extra
+   importable file invalidates replay with zero constructors called.
 
 ## Task 6: Run fresh offline acceptance and export the official artifact
 
@@ -167,6 +171,9 @@ Work:
 2. Run the already-committed replay gates without changing their logic. Any
    needed replay/verifier code change invalidates the artifact and returns to
    Task 5 then Task 6.
+   Every tracked Python file, including tests, is read-only in Task 7; any
+   Python edit likewise returns to Task 5 then Task 6. Task 7 may add or edit
+   only unbound documentation/public packaging after acceptance.
 3. Verify no private paths, URLs, identities, credentials, question text, or
    legal excerpts leak into release artifacts.
 4. Document the multi-view ranking behavior and retained global threshold.

@@ -238,14 +238,45 @@ Schema `1.3` therefore uses a simpler conservative contract:
 
 - bind the SHA-256 and Git blob identity of **every Git-tracked `*.py` file in
   the repository at the recorded source revision**, including tests;
-- additionally bind `pyproject.toml`, `uv.lock`, `legal_terms.txt`, and the
-  separately declared corpus, dataset, model, and replay source artifacts;
+- additionally bind `pyproject.toml`, `uv.lock`, `.python-version`, the
+  deployment `Dockerfile`, `legal_terms.txt`, and the separately declared
+  corpus, dataset, model, and replay source artifacts;
 - require the artifact's tracked-code path set to equal the set obtained from
-  `git ls-tree -r --name-only <recorded revision>` under those rules;
-- require the current checkout to match those recorded blobs and to be clean,
-  so an untracked local module cannot participate in acceptance or replay;
+  NUL-delimited full `git ls-tree -r -z <recorded revision>` records under
+  those rules, preserving normalized repo-relative POSIX path, Git mode,
+  object type, blob OID, and SHA-256;
+- require the current `HEAD`/index tracked-code set and each actual checkout
+  byte sequence to equal the recorded set and blobs. Add, remove, rename, mode
+  change, sparse/missing file, duplicate/case-fold collision, symlink, gitlink,
+  submodule, path escape, or extra binding fails closed even if a blob is
+  unchanged;
+- scan the repository before project imports and reject ignored or untracked
+  importable artifacts (`.py`, case variants such as `.PY`, `.pyc`, `.pyo`,
+  platform extension modules, `.pth`, and importable archives) plus
+  `__pycache__`, virtual-environment, and cache trees inside repository import
+  roots;
 - reject missing, extra, renamed, untracked, or changed bound code before any
   model construction.
+
+Acceptance and replay start through a committed stdlib-only bootstrap invoked
+with isolated Python (`-I -S`). Before adding the verified repository root or
+third-party paths to `sys.path`, it must:
+
+1. clear/reject `PYTHONPATH`, disable user-site and site customization, and
+   reject zip/`.pth`/unapproved external local import roots;
+2. validate the recorded/current Git sets, blobs, checkout bytes, declared
+   input artifacts, ignored/untracked importable scan, and clean tree;
+3. bind and verify Python implementation, full version, ABI, OS/platform, and
+   the exact installed distribution name/version inventory against the frozen
+   lock/environment used by `uv --frozen --no-sync`;
+4. add only the verified repository root and the recorded interpreter's
+   `purelib`/`platlib` directories directly, without processing `.pth` files,
+   then import evaluator/model code.
+
+Tests monkeypatch every cache/model/index/provider constructor and prove zero
+calls for each bootstrap failure. The claim covers repository source plus the
+recorded frozen Python environment; it does not claim to defend a compromised
+OS, interpreter binary, or package installation outside that boundary.
 
 This conservative superset deliberately invalidates acceptance after any
 tracked Python change, even when that file might not execute in one run. It
