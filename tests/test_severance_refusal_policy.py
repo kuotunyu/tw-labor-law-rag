@@ -2832,6 +2832,214 @@ def test_static_local_import_closure_rejects_dynamic_api_acquisition_without_cal
 
 
 @pytest.mark.parametrize(
+    "source",
+    [
+        (
+            "def run():\n"
+            "    return eval('40 + 2')\n"
+            "run()\n"
+            "def eval(value):\n"
+            "    return value\n"
+        ),
+        (
+            "def run():\n"
+            "    exec('answer = 42')\n"
+            "run()\n"
+            "def exec(value):\n"
+            "    return value\n"
+        ),
+        (
+            "def run():\n"
+            "    return compile('40 + 2', '<value>', 'eval')\n"
+            "run()\n"
+            "def compile(*values):\n"
+            "    return values\n"
+        ),
+        (
+            "def run():\n"
+            "    return __import__('rag.hidden')\n"
+            "run()\n"
+            "def __import__(value):\n"
+            "    return value\n"
+        ),
+        (
+            "def execute():\n"
+            "    return eval('40 + 2')\n"
+            "run = execute\n"
+            "run()\n"
+            "def eval(value):\n"
+            "    return value\n"
+        ),
+        (
+            "def execute():\n"
+            "    return eval('40 + 2')\n"
+            "flag = True\n"
+            "if flag:\n"
+            "    run = execute\n"
+            "else:\n"
+            "    run = lambda: None\n"
+            "run()\n"
+            "def eval(value):\n"
+            "    return value\n"
+        ),
+        (
+            "def execute():\n"
+            "    return eval('40 + 2')\n"
+            "try:\n"
+            "    run = execute\n"
+            "except RuntimeError:\n"
+            "    run = lambda: None\n"
+            "run()\n"
+            "def eval(value):\n"
+            "    return value\n"
+        ),
+        (
+            "def outer():\n"
+            "    return inner()\n"
+            "def inner():\n"
+            "    return eval('40 + 2')\n"
+            "outer()\n"
+            "def eval(value):\n"
+            "    return value\n"
+        ),
+        (
+            "run = lambda: eval('40 + 2')\n"
+            "run()\n"
+            "def eval(value):\n"
+            "    return value\n"
+        ),
+        (
+            "(lambda: eval('40 + 2'))()\n"
+            "def eval(value):\n"
+            "    return value\n"
+        ),
+        (
+            "def run():\n"
+            "    return eval('40 + 2')\n"
+            "class ImportTimeBody:\n"
+            "    result = run()\n"
+            "def eval(value):\n"
+            "    return value\n"
+        ),
+    ],
+    ids=(
+        "eval-before-late-shadow",
+        "exec-before-late-shadow",
+        "compile-before-late-shadow",
+        "dunder-import-before-late-shadow",
+        "aliased-module-call",
+        "branch-joined-call",
+        "try-joined-call",
+        "nested-local-call-chain",
+        "lambda-alias-call",
+        "immediate-lambda-call",
+        "class-body-call",
+    ),
+)
+def test_static_local_import_closure_rejects_import_time_calls_before_safe_shadow(
+    tmp_path, source
+) -> None:
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(source, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="dynamic import or code execution"):
+        policy.validate_decision_import_closure(
+            tmp_path,
+            roots=("runner.py",),
+            manifest={"runner": "runner.py"},
+        )
+
+
+@pytest.mark.parametrize(
+    ("api", "body"),
+    [
+        ("eval", "return eval('harmless')"),
+        ("exec", "return exec('harmless')"),
+        ("compile", "return compile('harmless')"),
+        ("__import__", "return __import__('harmless')"),
+    ],
+)
+def test_static_local_import_closure_allows_import_time_calls_after_safe_shadow(
+    tmp_path, api, body
+) -> None:
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(
+        f"def run():\n    {body}\n"
+        f"def {api}(*values):\n    return values\n"
+        "run()\n",
+        encoding="utf-8",
+    )
+
+    assert policy.validate_decision_import_closure(
+        tmp_path,
+        roots=("runner.py",),
+        manifest={"runner": "runner.py"},
+    ) == frozenset({"runner.py"})
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "globals()['eval']('40 + 2')\n",
+        "globals().get('eval')('40 + 2')\n",
+        "import sys\nsys.modules['builtins'].__dict__['eval']('40 + 2')\n",
+        "import sys\nvars(sys.modules['builtins'])['eval']('40 + 2')\n",
+        "namespace = globals\nnamespace()['exec']('answer = 42')\n",
+        "namespace = locals()\nnamespace.get('compile')('x', 'y', 'eval')\n",
+        "namespace = vars()\nnamespace['__import__']('rag.hidden')\n",
+        "import sys as runtime\nruntime.modules.get('builtins').eval('40 + 2')\n",
+        "from sys import modules as registry\nregistry['builtins'].exec('x = 1')\n",
+        "import builtins as namespace\nnamespace.__dict__['compile']('x', 'y', 'eval')\n",
+    ],
+    ids=(
+        "globals-subscript",
+        "globals-get",
+        "sys-modules-builtins-dict",
+        "vars-sys-modules",
+        "globals-alias",
+        "locals-get",
+        "vars-subscript",
+        "sys-alias-modules-get",
+        "sys-modules-import-alias",
+        "builtins-dict",
+    ),
+)
+def test_static_local_import_closure_rejects_dynamic_namespace_acquisition(
+    tmp_path, source
+) -> None:
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(source, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="dynamic import or code execution"):
+        policy.validate_decision_import_closure(
+            tmp_path,
+            roots=("runner.py",),
+            manifest={"runner": "runner.py"},
+        )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "values = {'eval': 'harmless'}\nvalues['eval']\n",
+        "values = {'compile': 'harmless'}\nvalues.get('compile')\n",
+    ],
+    ids=("ordinary-dict-subscript", "ordinary-dict-get"),
+)
+def test_static_local_import_closure_allows_proven_ordinary_mapping_access(
+    tmp_path, source
+) -> None:
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(source, encoding="utf-8")
+
+    assert policy.validate_decision_import_closure(
+        tmp_path,
+        roots=("runner.py",),
+        manifest={"runner": "runner.py"},
+    ) == frozenset({"runner.py"})
+
+
+@pytest.mark.parametrize(
     "changed_dependency",
     [
         "retrieval_refusal_policy",

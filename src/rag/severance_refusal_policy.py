@@ -430,6 +430,8 @@ def _imported_local_paths(
 
 _PROVEN_SAFE = "safe"
 _PROVEN_CLASS = "class"
+_PROVEN_SYS_MODULE = "sys-module"
+_LOCAL_FUNCTION_PREFIX = "local-function:"
 _UNKNOWN_BINDING = "unknown"
 _UNBOUND = "unbound"
 _DYNAMIC_API_NAMES = {
@@ -440,6 +442,24 @@ _DYNAMIC_API_NAMES = {
     "compile",
 }
 _DYNAMIC_BUILTINS_IMPORTS = {*_DYNAMIC_API_NAMES, "getattr", "*"}
+_DYNAMIC_NAMESPACE_NAMES = {"globals", "locals", "vars"}
+
+
+def _local_function_binding(
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
+) -> str:
+    name = node.name if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) else "lambda"
+    return (
+        f"{_LOCAL_FUNCTION_PREFIX}{node.lineno}:{node.col_offset}:{name}"
+    )
+
+
+def _bindings_are_proven_safe(bindings: set[str]) -> bool:
+    return bool(bindings) and all(
+        binding in {_PROVEN_SAFE, _PROVEN_CLASS, _PROVEN_SYS_MODULE}
+        or binding.startswith(_LOCAL_FUNCTION_PREFIX)
+        for binding in bindings
+    )
 
 
 def _join_binding_environments(
@@ -468,6 +488,17 @@ class _AccessScope:
         self.parent = parent
         self._children = list(table.get_children())
         self._used_children: set[int] = set()
+        self._child_scopes: dict[int, _AccessScope] = {}
+        if parent is None:
+            self.function_definitions: dict[
+                str,
+                tuple[
+                    ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
+                    _AccessScope,
+                ],
+            ] = {}
+        else:
+            self.function_definitions = parent.function_definitions
         self.final_bindings = self._final_bindings()
 
     def _is_local_target(self, name: str) -> bool:
@@ -496,8 +527,12 @@ class _AccessScope:
     def _expression_bindings(
         self, node: ast.AST, environment: dict[str, set[str]]
     ) -> set[str]:
-        if isinstance(node, (ast.Constant, ast.Lambda)):
+        if isinstance(node, ast.Constant):
             return {_PROVEN_SAFE}
+        if isinstance(node, ast.Lambda):
+            binding = _local_function_binding(node)
+            self.function_definitions[binding] = (node, self)
+            return {binding}
         if isinstance(node, ast.Name):
             return set(environment.get(node.id, {_UNKNOWN_BINDING}))
         if isinstance(node, ast.IfExp):
@@ -536,10 +571,12 @@ class _AccessScope:
         environment = {name: set(kinds) for name, kinds in initial.items()}
         for statement in statements:
             if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                binding = _local_function_binding(statement)
+                self.function_definitions[binding] = (statement, self)
                 self._bind_target(
                     environment,
                     ast.Name(id=statement.name, ctx=ast.Store()),
-                    {_PROVEN_SAFE},
+                    {binding},
                 )
             elif isinstance(statement, ast.ClassDef):
                 self._bind_target(
@@ -565,7 +602,11 @@ class _AccessScope:
                         binding = (
                             _UNKNOWN_BINDING
                             if module in {"importlib", "builtins"}
-                            else _PROVEN_SAFE
+                            else (
+                                _PROVEN_SYS_MODULE
+                                if module == "sys"
+                                else _PROVEN_SAFE
+                            )
                         )
                     else:
                         module = (statement.module or "").split(
@@ -669,6 +710,9 @@ class _AccessScope:
         return []
 
     def bindings_before(self, name: str, node: ast.AST) -> set[str]:
+        return self.environment_before(node).get(name, {_UNBOUND})
+
+    def environment_before(self, node: ast.AST) -> dict[str, set[str]]:
         line = getattr(node, "lineno", -1)
         column = getattr(node, "col_offset", -1)
         preceding = [
@@ -680,12 +724,12 @@ class _AccessScope:
                 and getattr(statement, "end_col_offset", -1) <= column
             )
         ]
-        environment = self._analyze_statements(
-            preceding, self._initial_bindings()
-        )
-        return environment.get(name, {_UNBOUND})
+        return self._analyze_statements(preceding, self._initial_bindings())
 
     def child(self, node: ast.AST) -> _AccessScope:
+        cached = self._child_scopes.get(id(node))
+        if cached is not None:
+            return cached
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             expected_type, expected_name = "function", node.name
         elif isinstance(node, ast.Lambda):
@@ -703,7 +747,9 @@ class _AccessScope:
                 and child.get_lineno() == node.lineno
             ):
                 self._used_children.add(index)
-                return _AccessScope(node, child, self)
+                resolved = _AccessScope(node, child, self)
+                self._child_scopes[id(node)] = resolved
+                return resolved
         raise ValueError(
             f"cannot resolve decision scope {expected_name!r} at line {node.lineno}"
         )
@@ -712,8 +758,18 @@ class _AccessScope:
 class _DynamicAccessVisitor(ast.NodeVisitor):
     """Reject acquisition or access to dynamic execution APIs."""
 
-    def __init__(self, scope: _AccessScope) -> None:
+    def __init__(
+        self,
+        scope: _AccessScope,
+        *,
+        module_bindings: dict[str, set[str]] | None = None,
+        import_time: bool = False,
+        call_stack: frozenset[str] = frozenset(),
+    ) -> None:
         self.scope = scope
+        self.module_bindings = module_bindings
+        self.import_time = import_time
+        self.call_stack = call_stack
         self.reason: str | None = None
 
     def _reject(self, node: ast.AST, reason: str) -> None:
@@ -754,12 +810,13 @@ class _DynamicAccessVisitor(ast.NodeVisitor):
             return self._enclosing_bindings(name)
         if symbol.is_global():
             module = self._module_scope()
+            if self.module_bindings is not None:
+                return self.module_bindings.get(name, {_UNBOUND})
             return module.final_bindings.get(name, {_UNBOUND})
         return {_UNKNOWN_BINDING}
 
     def _name_is_proven_safe(self, name: str, node: ast.AST) -> bool:
-        bindings = self._resolved_bindings(name, node)
-        return bool(bindings) and bindings <= {_PROVEN_SAFE, _PROVEN_CLASS}
+        return _bindings_are_proven_safe(self._resolved_bindings(name, node))
 
     def _expression_is_proven_safe(self, node: ast.AST) -> bool:
         if isinstance(node, (ast.Constant, ast.Lambda)):
@@ -778,6 +835,8 @@ class _DynamicAccessVisitor(ast.NodeVisitor):
         imported = {alias.name for alias in node.names}
         if module == "importlib" or (
             module == "builtins" and imported & _DYNAMIC_BUILTINS_IMPORTS
+        ) or (
+            module == "sys" and "modules" in imported
         ):
             self._reject(
                 node,
@@ -789,6 +848,13 @@ class _DynamicAccessVisitor(ast.NodeVisitor):
             return
         if node.id == "__builtins__":
             self._reject(node, "access to the builtin namespace is forbidden")
+        elif node.id in _DYNAMIC_NAMESPACE_NAMES and not self._name_is_proven_safe(
+            node.id, node
+        ):
+            self._reject(
+                node,
+                f"builtin namespace acquisition via {node.id!r} is forbidden",
+            )
         elif node.id in _DYNAMIC_API_NAMES and not self._name_is_proven_safe(
             node.id, node
         ):
@@ -802,7 +868,15 @@ class _DynamicAccessVisitor(ast.NodeVisitor):
             self._reject(node, "builtin getattr may only perform literal safe access")
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
-        if node.attr in _DYNAMIC_API_NAMES and not self._expression_is_proven_safe(
+        if node.attr == "__dict__":
+            self._reject(node, "dynamic namespace __dict__ access is forbidden")
+        elif node.attr == "modules" and (
+            isinstance(node.value, ast.Name)
+            and _PROVEN_SYS_MODULE
+            in self._resolved_bindings(node.value.id, node.value)
+        ):
+            self._reject(node, "sys.modules namespace access is forbidden")
+        elif node.attr in _DYNAMIC_API_NAMES and not self._expression_is_proven_safe(
             node.value
         ):
             self._reject(
@@ -843,6 +917,51 @@ class _DynamicAccessVisitor(ast.NodeVisitor):
             for keyword in node.keywords:
                 self.visit(keyword.value)
             return
+        if self.import_time:
+            if isinstance(node.func, ast.Name):
+                callable_name = node.func.id
+                bindings = self._resolved_bindings(node.func.id, node.func)
+            elif isinstance(node.func, ast.Lambda):
+                callable_name = "lambda"
+                binding = _local_function_binding(node.func)
+                self.scope.function_definitions[binding] = (node.func, self.scope)
+                bindings = {binding}
+            else:
+                callable_name = "callable"
+                bindings = set()
+            function_bindings = sorted(
+                binding
+                for binding in bindings
+                if binding.startswith(_LOCAL_FUNCTION_PREFIX)
+            )
+            for binding in function_bindings:
+                if binding in self.call_stack:
+                    continue
+                definition = self.scope.function_definitions.get(binding)
+                if definition is None:
+                    self._reject(
+                        node,
+                        f"cannot resolve import-time local call {callable_name!r}",
+                    )
+                    break
+                function, defining_scope = definition
+                module_bindings = self.module_bindings
+                if module_bindings is None:
+                    module_bindings = self._module_scope().environment_before(node)
+                called = _DynamicAccessVisitor(
+                    defining_scope.child(function),
+                    module_bindings=module_bindings,
+                    import_time=True,
+                    call_stack=self.call_stack | {binding},
+                )
+                if isinstance(function, ast.Lambda):
+                    called.visit(function.body)
+                else:
+                    for statement in function.body:
+                        called.visit(statement)
+                if called.reason is not None:
+                    self.reason = called.reason
+                    break
         self.generic_visit(node)
 
     def _visit_function_header(
@@ -875,27 +994,45 @@ class _DynamicAccessVisitor(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._visit_function_header(node)
-        self._visit_nested_scope(node, node.body)
+        if not self.import_time:
+            self._visit_nested_scope(node, node.body)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self._visit_function_header(node)
-        self._visit_nested_scope(node, node.body)
+        if not self.import_time:
+            self._visit_nested_scope(node, node.body)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         for expression in (*node.decorator_list, *node.bases):
             self.visit(expression)
         for keyword in node.keywords:
             self.visit(keyword.value)
-        self._visit_nested_scope(node, node.body)
+        if self.import_time:
+            module_bindings = self.module_bindings
+            if module_bindings is None:
+                module_bindings = self._module_scope().environment_before(node)
+            child_visitor = _DynamicAccessVisitor(
+                self.scope.child(node),
+                module_bindings=module_bindings,
+                import_time=True,
+                call_stack=self.call_stack,
+            )
+            for statement in node.body:
+                child_visitor.visit(statement)
+            if self.reason is None:
+                self.reason = child_visitor.reason
+        else:
+            self._visit_nested_scope(node, node.body)
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
         for default in (*node.args.defaults, *node.args.kw_defaults):
             if default is not None:
                 self.visit(default)
-        child_visitor = _DynamicAccessVisitor(self.scope.child(node))
-        child_visitor.visit(node.body)
-        if self.reason is None:
-            self.reason = child_visitor.reason
+        if not self.import_time:
+            child_visitor = _DynamicAccessVisitor(self.scope.child(node))
+            child_visitor.visit(node.body)
+            if self.reason is None:
+                self.reason = child_visitor.reason
 
 
 def _dynamic_execution_reason(
@@ -904,9 +1041,14 @@ def _dynamic_execution_reason(
     # No file-level allowlist exists. A future exception must resolve and bind
     # an exact target rather than exempting an importer wholesale.
     table = symtable.symtable(source, filename, "exec")
-    visitor = _DynamicAccessVisitor(_AccessScope(tree, table, None))
+    root_scope = _AccessScope(tree, table, None)
+    visitor = _DynamicAccessVisitor(root_scope)
     visitor.visit(tree)
-    return visitor.reason
+    if visitor.reason is not None:
+        return visitor.reason
+    import_time_visitor = _DynamicAccessVisitor(root_scope, import_time=True)
+    import_time_visitor.visit(tree)
+    return import_time_visitor.reason
 
 
 def validate_decision_import_closure(
