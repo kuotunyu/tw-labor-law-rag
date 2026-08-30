@@ -144,12 +144,17 @@ def _parse_case(row: object, index: int) -> PortfolioCase:
         raise _invalid(qid, "answerable cases require sources")
     if not answerable and sources:
         raise _invalid(qid, "unanswerable cases must not have sources")
-    if answerable == expect_threshold_refusal:
-        raise _invalid(qid, "answerability must oppose threshold refusal")
     expected_stage = row["expected_refusal_stage"]
-    required_stage = "threshold" if expect_threshold_refusal else None
-    if expected_stage != required_stage:
-        raise _invalid(qid, f"expected_refusal_stage must be {required_stage!r}")
+    if answerable:
+        if expect_threshold_refusal or expected_stage is not None:
+            raise _invalid(qid, "answerable cases must reach the generation boundary")
+    else:
+        if expected_stage not in {"threshold", "llm"}:
+            raise _invalid(
+                qid, "unanswerable expected_refusal_stage must be threshold or llm"
+            )
+        if expect_threshold_refusal is not (expected_stage == "threshold"):
+            raise _invalid(qid, "threshold expectation must match refusal stage")
     source_ids = {(source["law"], source["article"]) for source in sources}
     prohibited_ids = {
         (source["law"], source["article"]) for source in prohibited_sources
@@ -263,9 +268,9 @@ def build_result(
     ) and all(route not in normalized_routes for route in case.prohibited_routes)
     threshold_contract_passed = threshold_refused is case.expect_threshold_refusal
     answerability_contract_passed = (
-        (not threshold_refused and source_contract_passed)
+        not threshold_refused and source_contract_passed
         if case.answerable
-        else threshold_refused
+        else threshold_contract_passed and source_contract_passed
     )
     passed = (
         answerability_contract_passed
@@ -284,6 +289,7 @@ def build_result(
         "threshold_expected": case.expect_threshold_refusal,
         "threshold_refused": threshold_refused,
         "threshold_contract_passed": threshold_contract_passed,
+        "expected_refusal_stage": case.expected_refusal_stage,
         "refusal_stage": "threshold" if threshold_refused else None,
         "generation_allowed": not threshold_refused,
         "generation_called": False,
