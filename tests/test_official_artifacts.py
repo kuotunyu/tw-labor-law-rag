@@ -244,6 +244,36 @@ def test_official_artifacts_have_no_local_paths_or_secret_fields():
     assert not re.search(r'(?i)api[_-]?key|password|bearer\\s', combined)
 
 
+def test_article_snapshot_is_content_free_unique_and_complete():
+    path = PROJECT_ROOT / "release/corpus_article_snapshot.json"
+    snapshot = json.loads(path.read_text(encoding="utf-8"))
+
+    assert set(snapshot) == {
+        "schema_version",
+        "snapshot_date",
+        "law_count",
+        "article_count",
+        "laws",
+    }
+    assert snapshot["law_count"] == 15
+    assert snapshot["article_count"] == 884
+    assert len({law["name"] for law in snapshot["laws"]}) == 15
+    identities = [
+        (law["name"], article["article"])
+        for law in snapshot["laws"]
+        for article in law["articles"]
+    ]
+    assert len(identities) == len(set(identities)) == 884
+    assert all(
+        re.fullmatch(r"[0-9a-f]{64}", article["sha256"])
+        for law in snapshot["laws"]
+        for article in law["articles"]
+    )
+    serialized = path.read_text(encoding="utf-8")
+    for prohibited in ('"content"', '"chapter"', '"url"'):
+        assert prohibited not in serialized
+
+
 @pytest.mark.parametrize(
     "filename",
     [

@@ -65,6 +65,7 @@ eval/run_reliability_eval.py
 eval/run_retrieval_eval.py
 eval/run_wage_arrears_regression.py
 pyproject.toml
+release/corpus_article_snapshot.json
 release/corpus_snapshot.json
 release/manifest.json
 release/public-files.txt

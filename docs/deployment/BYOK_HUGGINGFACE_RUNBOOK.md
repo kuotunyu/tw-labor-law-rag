@@ -43,17 +43,24 @@ Windows 專案路徑若含中文，`PYTHONUTF8=1` 可避免 `pip-audit` 的 `pip
 在已驗證的 worktree 執行。`YYYYMMDD_HASH` 是操作人員依日期與已提交 snapshot 短雜湊選定的非秘密名稱；兩次出現必須完全相同，例如 `labor_laws_20260830_deadbeef`。
 
 ```powershell
-uv run python scripts/download_corpus.py --force-download
 uv run python scripts/audit_corpus.py
+$auditExit = $LASTEXITCODE
+if ($auditExit -eq 2) { throw '官方來源無法取得或資料無效；停止更新。' }
+if ($auditExit -eq 1) { throw '偵測到法規或條文差異；先審閱輸出的法規、欄位與條號，另開 release 任務。' }
+if ($auditExit -ne 0) { throw "未知 audit exit code: $auditExit" }
+
+uv run python scripts/download_corpus.py --force-download
 $candidateBase = 'labor_laws_YYYYMMDD_HASH'
 uv run python scripts/rebuild_qdrant_blue_green.py --candidate-base $candidateBase
 ```
 
-dry-run 只讀本機 official archives、15 部 normalized laws 與 `release/corpus_snapshot.json`；語料資料夾只允許第一層 law JSON 與選用的 `manifest.json`，任何子目錄、額外 JSON、Markdown、文字或 PDF 都會停止。它不讀 writer Key、不檢查或載入模型、不建立 Qdrant client、不寫 receipt。任何 snapshot、來源雜湊、法規 metadata、條文數或內容雜湊差異都必須停止，另開 release 任務審閱；不得用參數略過或自動改寫 committed snapshot。
+`audit_corpus.py` 直接從法務部官方來源比對已提交的 law/source 與逐條文 content-free baseline。exit `0` 才能繼續；exit `1` 必須先人工審閱輸出中具名的法規、變動欄位與條號；exit `2` 代表來源無法取得或資料無效，立即停止。不得在差異尚未審閱前建立 writer key，也不得用 `--write` 自動接受差異。專案沒有 audit 排程、cron、heartbeat 或自動更新。
+
+後續 dry-run 只讀本機 official archives、15 部 normalized laws、`release/corpus_snapshot.json` 與逐條文 baseline；語料資料夾只允許第一層 law JSON 與選用的 `manifest.json`，任何子目錄、額外 JSON、Markdown、文字或 PDF 都會停止。它不讀 writer Key、不檢查或載入模型、不建立 Qdrant client、不寫 receipt。任何 snapshot、來源雜湊、法規 metadata、條文數或內容雜湊差異都必須停止，另開 release 任務審閱；不得用參數略過或自動改寫 committed snapshot。
 
 ### 3.2 有人值守的 candidate build
 
-1. 在 Qdrant Cloud 為這一次維護建立 temporary writer key；它只在本 PowerShell 工作階段存在，不放進 `.env`、Hugging Face、聊天、issue 或 commit。
+1. 只有在 3.1 audit 為 current 且 dry-run 通過後，才在 Qdrant Cloud 為這一次維護建立 temporary writer key；它只在本 PowerShell 工作階段存在，不放進 `.env`、Hugging Face、聊天、issue 或 commit。
 2. 確認 BGE-M3 與 reranker 的固定 revision 已在本機 cache。維護工具只接受既有 cache，不會自動改用付費 GPU 或下載未審閱 revision。
 3. 使用遮罩輸入 endpoint 與 key，重複 candidate 名稱後才允許執行：
 
@@ -81,7 +88,7 @@ try {
 2. 建立一把只讀 transition key，暫時只允許讀取舊 pair 與 candidate pair；先把 Hugging Face Secret `QDRANT_API_KEY` 換成 transition key，保持舊 `COLLECTION_NAME` 重啟並確認健康。
 3. 將 Space 保持 private，把 Variable `COLLECTION_NAME` 改成 `$candidateBase` 後 Restart。
 4. 必須依序看到 Space `RUNNING`、domain `READY`、`/health` HTTP 200、啟動 logs 無敏感資料，再用訪客自己的低額度 API Key 驗收 Gemini 與 OpenAI 各一題；引用來源、修正日期與可用時的生效日期都要正確。
-5. 驗收成功後建立只可讀 candidate pair 的新 `tw-labor-runtime-reader`，更新 Space Secret 並再次重啟驗收；最後撤銷舊 reader 與 transition key。
+5. 驗收成功後建立只可讀 candidate pair 的新 `tw-labor-runtime-reader`，更新 Space Secret 並再次重啟驗收；最後撤銷舊 reader、temporary writer 與 transition key，並刪除本機 Downloads 中這次下載的所有 key 檔。
 6. 若任一驗收失敗，立即 rollback：把 `COLLECTION_NAME` 恢復成舊值，使用仍可讀舊 pair 的 transition key Restart，確認健康後再診斷 candidate。不得刪除舊 collections。
 
 舊 collections 的刪除是獨立、具破壞性的容量管理操作；不在 build 或 cutover 命令範圍內。Free Tier 空間不足時先停止更新並人工評估，不自動升級付費方案，也不以刪除正式 pair 換取空間。

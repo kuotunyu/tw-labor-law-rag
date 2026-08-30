@@ -37,10 +37,17 @@ else:
         validate_dump_zip,
     )
 
-from rag.corpus_audit import build_snapshot, compare_snapshots
+from rag.corpus_audit import (
+    build_article_snapshot,
+    build_snapshot,
+    compare_article_snapshots,
+    compare_snapshots,
+    summarize_changes,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SNAPSHOT = PROJECT_ROOT / "release" / "corpus_snapshot.json"
+DEFAULT_ARTICLE_SNAPSHOT = PROJECT_ROOT / "release" / "corpus_article_snapshot.json"
 
 
 def download_bytes(url: str) -> bytes:
@@ -50,12 +57,12 @@ def download_bytes(url: str) -> bytes:
     return response.content
 
 
-def build_live_snapshot(
+def build_live_snapshots(
     *,
     snapshot_date: str,
     downloader: Callable[[str], bytes] = download_bytes,
-) -> dict:
-    """Download, validate, and reduce the official corpus to public provenance."""
+) -> tuple[dict, dict]:
+    """Download once and reduce the corpus to law and article provenance."""
     sources = []
     selected_laws = []
     missing = []
@@ -86,11 +93,27 @@ def build_live_snapshot(
 
     if missing:
         raise ValueError(f"missing target laws: {', '.join(missing)}")
-    return build_snapshot(
-        sources=sources,
-        laws=selected_laws,
-        snapshot_date=snapshot_date,
+    return (
+        build_snapshot(
+            sources=sources,
+            laws=selected_laws,
+            snapshot_date=snapshot_date,
+        ),
+        build_article_snapshot(selected_laws, snapshot_date=snapshot_date),
     )
+
+
+def build_live_snapshot(
+    *,
+    snapshot_date: str,
+    downloader: Callable[[str], bytes] = download_bytes,
+) -> dict:
+    """Backward-compatible law/source snapshot wrapper."""
+
+    return build_live_snapshots(
+        snapshot_date=snapshot_date,
+        downloader=downloader,
+    )[0]
 
 
 def _resolve_project_path(path: Path) -> Path:
@@ -101,30 +124,92 @@ def _write_snapshot(path: Path, snapshot: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n"
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(payload, encoding="utf-8")
+    with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(payload)
     temporary.replace(path)
 
 
+def _read_snapshot(path: Path, label: str) -> dict:
+    if not path.is_file():
+        raise FileNotFoundError(f"committed {label} snapshot not found")
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError(f"committed {label} snapshot must be an object")
+    return value
+
+
+def _empty_article_summary() -> dict[str, int]:
+    return {"added": 0, "removed": 0, "changed": 0, "unchanged": 0}
+
+
+def _report(
+    *,
+    law_changes: list[dict],
+    article_report: dict,
+) -> dict:
+    return {
+        "status": "changed" if law_changes or article_report["changes"] else "current",
+        "changes": {
+            "laws": law_changes,
+            "articles": article_report["changes"],
+        },
+        "summary": {
+            "laws": summarize_changes(law_changes),
+            "articles": article_report["summary"],
+        },
+    }
+
+
 def _run(args: argparse.Namespace) -> int:
-    live = build_live_snapshot(snapshot_date=args.snapshot_date)
+    live, live_articles = build_live_snapshots(snapshot_date=args.snapshot_date)
     if args.write is not None:
-        target = _resolve_project_path(args.write)
-        _write_snapshot(target, live)
+        law_target = _resolve_project_path(args.write)
+        article_target = _resolve_project_path(args.article_write)
+        _write_snapshot(law_target, live)
+        _write_snapshot(article_target, live_articles)
         print(
-            f"wrote {target}: {live['law_count']} laws, "
-            f"{live['article_count']} non-deleted articles"
+            json.dumps(
+                {
+                    "status": "written",
+                    "laws": live["law_count"],
+                    "articles": live_articles["article_count"],
+                }
+            )
         )
         return 0
 
-    target = _resolve_project_path(args.check)
-    if not target.is_file():
-        raise FileNotFoundError(f"committed snapshot not found: {target}")
-    committed = json.loads(target.read_text(encoding="utf-8"))
-    changes = compare_snapshots(committed, live)
-    if changes:
-        print(json.dumps({"status": "changed", "changes": changes}, ensure_ascii=False, indent=2))
+    law_target = _resolve_project_path(args.check)
+    committed = _read_snapshot(law_target, "law/source")
+    law_changes = compare_snapshots(committed, live)
+
+    if args.bootstrap_article_snapshot is not None:
+        article_report = {"changes": [], "summary": _empty_article_summary()}
+        report = _report(law_changes=law_changes, article_report=article_report)
+        if law_changes:
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return 1
+        target = _resolve_project_path(args.bootstrap_article_snapshot)
+        _write_snapshot(target, live_articles)
+        print(
+            json.dumps(
+                {
+                    **report,
+                    "article_snapshot_written": True,
+                    "article_count": live_articles["article_count"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+
+    article_target = _resolve_project_path(args.article_check)
+    committed_articles = _read_snapshot(article_target, "article")
+    article_report = compare_article_snapshots(committed_articles, live_articles)
+    report = _report(law_changes=law_changes, article_report=article_report)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    if report["status"] == "changed":
         return 1
-    print(json.dumps({"status": "current", "changes": []}, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -132,9 +217,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--write", type=Path, metavar="PATH")
-    mode.add_argument("--check", type=Path, metavar="PATH", default=DEFAULT_SNAPSHOT)
+    mode.add_argument("--bootstrap-article-snapshot", type=Path, metavar="PATH")
+    parser.add_argument("--article-write", type=Path, metavar="PATH")
+    parser.add_argument("--check", type=Path, metavar="PATH", default=DEFAULT_SNAPSHOT)
+    parser.add_argument(
+        "--article-check",
+        type=Path,
+        metavar="PATH",
+        default=DEFAULT_ARTICLE_SNAPSHOT,
+    )
     parser.add_argument("--snapshot-date", default=date.today().isoformat())
     args = parser.parse_args(argv)
+    if (args.write is None) != (args.article_write is None):
+        parser.error("--write and --article-write must be provided together")
+    if args.bootstrap_article_snapshot is not None and args.article_write is not None:
+        parser.error("bootstrap mode cannot use --article-write")
 
     try:
         return _run(args)

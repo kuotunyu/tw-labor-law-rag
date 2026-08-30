@@ -1051,6 +1051,126 @@ def _verify_full_corpus_snapshot(
     }
 
 
+def _verify_article_snapshot(
+    project_root: Path,
+    snapshot_contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    relative_path = snapshot_contract["path"]
+    path = project_root / relative_path
+    _assert_equal(
+        f"article snapshot exists {relative_path}",
+        path.is_file(),
+        True,
+    )
+    _assert_equal(
+        "article snapshot SHA-256",
+        hashlib.sha256(path.read_bytes()).hexdigest(),
+        snapshot_contract["sha256"],
+    )
+    snapshot = _read_json(path)
+
+    _assert_equal(
+        "article snapshot fields",
+        set(snapshot),
+        {"schema_version", "snapshot_date", "law_count", "article_count", "laws"},
+    )
+    _assert_equal(
+        "article snapshot schema",
+        snapshot.get("schema_version"),
+        snapshot_contract["schema_version"],
+    )
+    _assert_equal(
+        "article snapshot date",
+        snapshot.get("snapshot_date"),
+        snapshot_contract["snapshot_date"],
+    )
+    try:
+        date.fromisoformat(snapshot["snapshot_date"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ReleaseVerificationError(
+            "article snapshot date is not ISO YYYY-MM-DD"
+        ) from exc
+
+    laws = snapshot.get("laws")
+    if not isinstance(laws, list):
+        raise ReleaseVerificationError("article snapshot laws must be a list")
+    law_names = [law.get("name") for law in laws if isinstance(law, Mapping)]
+    _assert_equal("article snapshot law rows", len(law_names), len(laws))
+    _assert_equal("article snapshot sorted law names", law_names, sorted(law_names))
+    _assert_equal("article snapshot unique law names", len(set(law_names)), len(laws))
+    _assert_equal("article snapshot target laws", set(law_names), set(TARGET_LAW_NAMES))
+    _assert_equal("article snapshot law count", snapshot.get("law_count"), len(laws))
+    _assert_equal(
+        "article snapshot contract laws",
+        len(laws),
+        snapshot_contract["laws"],
+    )
+
+    identities: set[tuple[str, str]] = set()
+    article_count = 0
+    for law in laws:
+        _assert_equal("article snapshot law fields", set(law), {"name", "articles"})
+        name = law["name"]
+        articles = law["articles"]
+        if not isinstance(articles, list):
+            raise ReleaseVerificationError(
+                f"article snapshot articles must be a list: {name}"
+            )
+        labels = [
+            article.get("article")
+            for article in articles
+            if isinstance(article, Mapping)
+        ]
+        _assert_equal(
+            f"article snapshot article rows: {name}",
+            len(labels),
+            len(articles),
+        )
+        _assert_equal(
+            f"article snapshot sorted articles: {name}",
+            labels,
+            sorted(labels),
+        )
+        for article in articles:
+            _assert_equal(
+                f"article snapshot article fields: {name}",
+                set(article),
+                {"article", "sha256"},
+            )
+            label = article["article"]
+            if not isinstance(label, str) or not label.strip():
+                raise ReleaseVerificationError(
+                    f"article snapshot invalid article label: {name}"
+                )
+            identity = (name, label)
+            if identity in identities:
+                raise ReleaseVerificationError(
+                    f"article snapshot duplicate article: {name} {label}"
+                )
+            identities.add(identity)
+            if not re.fullmatch(r"[0-9a-f]{64}", str(article["sha256"])):
+                raise ReleaseVerificationError(
+                    f"article snapshot invalid SHA-256: {name} {label}"
+                )
+        article_count += len(articles)
+
+    _assert_equal(
+        "article snapshot article arithmetic",
+        snapshot.get("article_count"),
+        article_count,
+    )
+    _assert_equal(
+        "article snapshot contract articles",
+        article_count,
+        snapshot_contract["articles"],
+    )
+    return {
+        "snapshot_date": snapshot["snapshot_date"],
+        "laws": len(laws),
+        "articles": article_count,
+    }
+
+
 def _verify_reliability_evidence(
     project_root: Path,
     contract: Mapping[str, Any],
@@ -2147,6 +2267,10 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         root,
         manifest["source_data"]["full_snapshot"],
     )
+    article_snapshot = _verify_article_snapshot(
+        root,
+        manifest["source_data"]["article_snapshot"],
+    )
     reliability_summary = _verify_reliability_evidence(
         root,
         reliability_contract,
@@ -2288,6 +2412,9 @@ def verify_release(project_root: Path) -> dict[str, Any]:
             "full_snapshot_date": full_snapshot["snapshot_date"],
             "full_snapshot_laws": full_snapshot["laws"],
             "full_snapshot_articles": full_snapshot["articles"],
+            "article_snapshot_date": article_snapshot["snapshot_date"],
+            "article_snapshot_laws": article_snapshot["laws"],
+            "article_snapshot_articles": article_snapshot["articles"],
         },
         "ci": {
             "action_pins": action_pin_count,

@@ -1,0 +1,3619 @@
+{
+  "schema_version": "1.0",
+  "snapshot_date": "2026-08-30",
+  "law_count": 15,
+  "article_count": 884,
+  "laws": [
+    {
+      "name": "勞動事件法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "79486e19d4043675490054fc4f251558d94486096a91bb9caf6a6494bb399179"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "fcacc5801b56aef88c0f93675f0138ff87a34814c421d8046a0b9ba4c8d3abdc"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "ccb5f63d4245f0f7c482bbe2fd5a77c3777d3b587eb36f79c07c8d3884904299"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "5f1a9e6b93a90cdf1da35a7a187d146a71bb4a2c7689e838a7eeb50d992018c0"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "373a6ef0ec5389c2fb0f5b502f1a992b9e32083a88c0f9c31e461c780bef0198"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "009921d53ff81149a45e058e9a42bd48536edd46d56f5eed8bf7f6fbd2d41fd1"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "0cf6adde40a1b40e3af380c8fb83e42a3b6ae2ccae5c59864d346b1898f5bd9a"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "eb9051e304179b5a026a53ac4cd72679a8eff530ed6cbc2ff8ef693eaf7df4cc"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "181cb7fc103d94c93fb31eb007f30382d0abbb05a84c7f5746586c8544cf7634"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "e5da8cc5c463de1f1b1344dd44d06943b9fa5349141b847ddd52ca37665ffd15"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "cd5d8a06966b7d03f83077a6e898cce7d0c6ae6c6f35909999e07d60d22685d2"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "0696a4121f86bd6bd885db035ecf5b1aaaafcd0cbb83854a1d98e654b8336c53"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "6615e41e417065f844855095e632fc9bd35571164ef37da80b576079ce261a00"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "67ea2c7e2cd17ff3349cd614efd30840617d99ab0a7fd0779a7786b945793aca"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "56dcbe6366f51a2e970422fc595a12e823f818c08420fbb7f9fcaf52e4b06209"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "24f20fb07137b7026accdfeee2f4c4eea77d726fadda98b3a94562ca237a883a"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "719788815a1345d0f71049af7217eb81c369abd7d81b57c58d110994b5bc3a49"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "0c2f315e63dacbf24155f1989893ed8c2501d9bf97fa878be8115894dd552409"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "e44a8b1e32e536c03c4e9f803790957bc2f6939ab6d729866be3d9e4a7f82b11"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "05d72c8c55f00ef97c154231f50800344e703c10abeb2974b2cde030656b559e"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "8c2a0c8ff56c34b6e0c7c664f7ee0a97cdcfda0e8cbd86987d205074f9cdb8a8"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "35e646663e58e7ab0d490efc844425b79cbce10cd68aa2f27d72811acda8b95f"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "717ac32499c86ad91e35ce5292c03a098e26bddda7f45c9163e301e350b0d54e"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "94fb8720386caeb996de629b1903bac5f4d52ac5b5d4f38f6ed6a90f8fdd1882"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "eb8141e0353acdf5949c95bcb6e2cee728cbbe0eb6087ba545574b40d305cc8e"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "b7ba1ffb09798b219d6e03cf0a8527306eaae95ecf2003f42133328555c37e27"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "aba99c5355d65be7103c2172bc4decfc8399c4e9c4ba61ce140628bd6da2dfca"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "93f2514b4563a806d0c37873788b70b0dd49c5b6eb247077b934cdf61747d9a4"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "be33cc13d9a3c9ce1fa8de636d255a34d8828eeb5f583d4b7715b41deb559515"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "269c56511406c4e8a97077e43443a3aad7bfb63930b59dfdffb5c94603a89e1e"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "f9fadd142b8ee78c0cce1dc0840997f3a1d2d6fa5e62a4ce4ec21b3d61256ecf"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "2eeed5326593cb510488ec4e95c1f6d9916ff4b3005cf198ebf7735fad4301a0"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "dc3d3ee2f41c4dfb56fe54d00a51924652ac94a59f841e1b103c4b12a4f1e532"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "0b7644865f882be5727097915cd682fd120212e9d18998710e89297a8654104b"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "f85fc518387bec5afa8b4530637a5ca1c7b0b4c1a8ce5f0f18d8963a63c71738"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "1b0707987f03b165bba7634338fb595ee3f5e7ebe9ae3de0c1cd98ca92ed7595"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "8f9f0ecd6a86b9baab659b6bf9d49aed77e699d848c21c9d2caeb19fd4a1fb5e"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "385788dcafdbd69cd19dc4a31e7f141b6c9d729529b0d6ea82bd36b6393f8fff"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "a3d20ace5487c937879e3a1f541a13f8b2d61417bb1ee4af29d540eb47e659a0"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "e1c07abaf81ac282cd2b0e2d3774acdab1d2c0daeded7927a1297ecc373b0eef"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "a0df23ae7850a0f40351ad57dbab74467df58336761005786f38b11a77bb3cf9"
+        },
+        {
+          "article": "第 47 條",
+          "sha256": "f0a11aaa9e2e31d146acca2df31106c9df21833a119f786303238e86f861324b"
+        },
+        {
+          "article": "第 48 條",
+          "sha256": "9479f58fa420a4648a667e1e387dc1561c694841ebd70580f8fe9bece45a5e2c"
+        },
+        {
+          "article": "第 49 條",
+          "sha256": "f1cb4a73e2bff2a6a6daba18c06f20f10280892cb3e170b0a97201cd80389bf9"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "8e44876ae79a63880812a6419760b0d728eb9a68502f3724eefa76d77b0bcaf3"
+        },
+        {
+          "article": "第 50 條",
+          "sha256": "9a7854a74fb0f9e3aa9fa7705ab05fd33bac31c3040ffb9b6ade5178a3e27c32"
+        },
+        {
+          "article": "第 51 條",
+          "sha256": "7c09dd791366634bb6a2d903b90a5da4af90ff84dfb2a95900a7ace151d3032a"
+        },
+        {
+          "article": "第 52 條",
+          "sha256": "9a58501fb9298024044cb54c4b493701de98ea31aff0fbdf9c50393d4894d77a"
+        },
+        {
+          "article": "第 53 條",
+          "sha256": "92da5a9a98d1ba65de54153adc21181a36ea79ff7c2bbe8dced025e619e1f254"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "99ca7d25ba1120bec10574137b450193b9eee24c6c8b565d4a9bb0d77887796c"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "d0f998e83e996682e7e54694d3d58a5f88ff8b0df9e9ba6d2ac74774d870a099"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "ed50afc83a02657eee21c90b01e0167b38ae39c6b426a777894ef978e2b91ac2"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "c39be958ed944467e2325d534d3c97e5c900dda8471d48c74c84366c33dfa804"
+        }
+      ]
+    },
+    {
+      "name": "勞動基準法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "b35421f081d1a56b50fe3cddb9baf972f503dea14e4b13d92c5f51a9eb766ee5"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "814153f660047c33dd6d92305b4a6180fd982428824e080fa88764ba5187c9ef"
+        },
+        {
+          "article": "第 10-1 條",
+          "sha256": "c4ce6b775737139f7aabe2bc64daf9d5039f01f86f3788ab980f06863f4ca4d2"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "b9980f9799b24206c3e0535a41a5144d094bf0a44fb424abf5ceb3ec22363d93"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "a6d96c9ba9907244da250777680b915b99f77940f31ea8b6280eae60fece3c9f"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "ee197b9fc5752de9b93ccfcff5737fd7a8d41f41c53fa8ffaa256a14a5231453"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "b68aad5605841061cc20a6db7ec410aebbac72cc5ef56c7edb4496bfe407bc4f"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "51e159ae9be3ec9acbecde02209c85b772440ff157e882f5feedb4ada22dac12"
+        },
+        {
+          "article": "第 15-1 條",
+          "sha256": "d213f4de37128b52011ac889aa92434d9cbab5186dc9f9ad192cbfeff05a89f2"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "a814df107bc0864e2d5de23cbc1e19f1e0628642eed76616f02851da7142b23e"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "158d489a41fd78221478be769d8b7a84d0033e79316141d4534d9429e9d5a951"
+        },
+        {
+          "article": "第 17-1 條",
+          "sha256": "960a1a001bd62260a258f0646496027cd673962007deeb4bcaaae2d63f8bd972"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "65989b8350860358cb4ccad24354c4ce63ed4b97951683682b1cf70a72cd9c18"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "b98ffa8a679a743c77fe11f280a9fc7972dd703604c1c6c060cad63274a6ac7d"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "51cf3951b7307280fc15da9e08933f6803cb77ffe79ea84f104fdacd87eabd46"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "7f0d2bfda7d067d414268022f70b3fc7e7099534d365843ad87b8e64f076b10e"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "fc5aa57c642646dee27e774ba066c0466b3cfeb388d51c2f0363cb601d402254"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "81c739f6596286e9af61e00da803a7f9f6330ec9a33ed463994c4858eb94013d"
+        },
+        {
+          "article": "第 22-1 條",
+          "sha256": "2c20fcd7ccc936d073cc6a73ddff7c75d2242de851606b6b59b98141a0013110"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "d9e9f0ec36c1df1241a360fe1d442b06e5754ac0f5b4975f20560cbb92d57fa2"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "cede501f58f2d11be7e2807d34a7f1d90b5cab565e76877960a9304c0a3c338d"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "599346e0020bcee49cb55848e235c1fb51d6fe7a5c54053bd3397b2a8f2c4664"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "cb9fda372c0b1666d1e71c49ab1d4eef2a7852a073caba3e07d2512a9a348ee1"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "a96f6599cdc001921ff570c839edec65f383f13f8ff9c690405dd327177bd139"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "cea26e3a0470e7313d03718ae454285255fdedd667806e76b454595fe447b2f6"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "c6cacb3d4c684455f14a63a3ce527fa22f69adcf7156ed3eb64b3657110f8d35"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "6f2045dd48f02751561200a81b3e634b71e7482433f781ed6a0fdb5c5f588e72"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "3c388e47e937a19e0ee8799207f859c0575da337672d333be00577bc7acc07c4"
+        },
+        {
+          "article": "第 30-1 條",
+          "sha256": "78addb3bc4c1af48bef6389a4c43f508bfdb5c2023cd9a13293106fa7d47416b"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "54c81d8bb4703783c2a4f7bcc9cf532e40438d235a3304f3e45d92c3b0d5dd30"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "7f9a59bc0c854ad3c264387ab0a2a27c0bb42d854b1d003a185b1cb92c79061c"
+        },
+        {
+          "article": "第 32-1 條",
+          "sha256": "20ddb58948d3b1b4e0d83a33512571f21833d1e18b331eb6666f498561c00691"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "1d828af952b99a45941419f5ed0e663ecb80c1ce643902270fd9e60beefc31e7"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "933e37e571bee042f83e7c826d5f70625c75f1a6d93e50e5918552e679192a97"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "c582503695744f2f53f8721622e8e70a680b2544a0fbaa25fedd060aeb324771"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "377627f2d812b26035b5950e5e4b5d1b5df3d9facc43cb85218a7175c90cee50"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "e9e16a83144bf4646031475b194d3bde80dc31fb43b7ac7993a8e858c46af740"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "778317c5c79a019b945e5457e74529a31eea985bd4adbce952fcc8a8a0657731"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "f8506dcfdcb217553e89d719e01d8e7a138e265a93d777ef81571ab28f8d2cbb"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "781324926ddbebb4647dbc4e4f1aabef97585ab1430d2098259b4dcd510b8ffd"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "8e7f57c67ccf9e9cd9dc787489e8f1c53f77a945b643d3fe80934097ce06de8b"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "5b1cc9b50bf9c88f132349e21e9c31f33824c729b78f3c20f527b6497c481ef2"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "bb55c7dc62a1db4600cefa31b3045572093bb88b3052789d251c294fe7ae1063"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "36ae91b27bc187766b821382a649b8344a052cc0d851ab7abfeaab98c6a122a0"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "a9904d0ffaa3382b0ad068fe7033b61a0304951ec3961a5c3a28bc1245f777e6"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "2190cb65f34c8d0877ce154ea4b279391cb3a256986215301cd256c13d142379"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "0539295ef34384b3bb7f5cf8a7489b7a4e5d97c4bdb39b9131f9eead6952791a"
+        },
+        {
+          "article": "第 47 條",
+          "sha256": "c964f837721a107724a82789e2920b231f4e7e228a7e2821d4e078b0f8d45308"
+        },
+        {
+          "article": "第 48 條",
+          "sha256": "c55c71de0d8a65729444753ee03196a7e39caea4810fbbd330ba96cbe5637a42"
+        },
+        {
+          "article": "第 49 條",
+          "sha256": "45062f8c01115a8c59aac5aa25017cd1dda25c00d0dce8c61dc850b1fe6d1018"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "1d567bdd059211cd590535eac92d634e8d2b659c9b2bed1b9d47ea4670e9e491"
+        },
+        {
+          "article": "第 50 條",
+          "sha256": "9725545598f02a1817820f69073b7d943ab51d9f0901e35713fd29278d4bc19c"
+        },
+        {
+          "article": "第 51 條",
+          "sha256": "a5b8a4fad6df95ca092592cc681027a3783be1ea4ac1607e3fe037680b994348"
+        },
+        {
+          "article": "第 52 條",
+          "sha256": "82a2cbfc938a071edb84391473a65fca12f3a8d9ec45963ca06dedb94ad496b0"
+        },
+        {
+          "article": "第 53 條",
+          "sha256": "787f70e99f6fe6929b48290dff214ae1acb19f07233bda78c3dccdbf8c0e82cd"
+        },
+        {
+          "article": "第 54 條",
+          "sha256": "c6e27f41ab02f899f037f8292f6390ff8b9afe700d16d1544db40f48c6834bb7"
+        },
+        {
+          "article": "第 55 條",
+          "sha256": "688452373c4da036390108cfe62e494fcaa5440bebfd3ad8953812d29825eabf"
+        },
+        {
+          "article": "第 56 條",
+          "sha256": "840f2b2c4c36ac2c843d5d6078fee3d197d5469465520515379d9c0ae909826e"
+        },
+        {
+          "article": "第 57 條",
+          "sha256": "b18fc9add8cd4aaaa8e404d9f3d3b6b94bca44a2418c6d677d0ba46bd6109e17"
+        },
+        {
+          "article": "第 58 條",
+          "sha256": "603900c88806df43107a3740f5854b2fbd4d70a651b2e65ac8e0ed956f120417"
+        },
+        {
+          "article": "第 59 條",
+          "sha256": "011314ed0b298697f231ca931d082b1124d624ae7e2b0bc8a7abac74c84f86a4"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "dcd83524e2b76c602d4238643c1caef9e3395eb54db9db0a6e81ab4362709f57"
+        },
+        {
+          "article": "第 60 條",
+          "sha256": "e949b0a95fe09eccb5f6136ec1c94269fcc539db341810330d12d64d9674b8e3"
+        },
+        {
+          "article": "第 61 條",
+          "sha256": "1c11bab8d7df79c64a73b43e067efa66c0b6853585b806f65501f6dfaacf6797"
+        },
+        {
+          "article": "第 62 條",
+          "sha256": "136c35c58869620a187067fcab719dbec4b15ad14de548601c6652e9503a0d12"
+        },
+        {
+          "article": "第 63 條",
+          "sha256": "97b440a1ca8b54518d530c0bc9da961c7cd91597d8bc9fbd82c94c6ca494a0b8"
+        },
+        {
+          "article": "第 63-1 條",
+          "sha256": "02d2ddc6cd48e2720c0266aed71303aea647a4b114bdf4de559e18bfcdbdfcab"
+        },
+        {
+          "article": "第 64 條",
+          "sha256": "93606a57290ea76a3e607d12cd0d50291db8ceec39b3890d9077f071908ee4c9"
+        },
+        {
+          "article": "第 65 條",
+          "sha256": "c6f064ed01425776f9205115b5ca19b75ed49499b917d0ccb35460aae0e49ded"
+        },
+        {
+          "article": "第 66 條",
+          "sha256": "0e529a613214f154aed21cc8a62873f7d5c84e689914000d98999fb08133dbcf"
+        },
+        {
+          "article": "第 67 條",
+          "sha256": "dc7be59c8dc8c1b4d4b573f8ed6120aa895ffa98a4e5360da6eee45dd2e4de3a"
+        },
+        {
+          "article": "第 68 條",
+          "sha256": "4bdae6368b6dfc4573f76ac0ec589667ff5c7a0f21a170910501ada454c4f51f"
+        },
+        {
+          "article": "第 69 條",
+          "sha256": "432bdf04086c1fdd28b5bbd4c9b6ddfc71df7881bb324c59a28df65b091d595e"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "4850a25b8922013c5bbfc82cc673824edb5a286198e64ce3b78dc3b72c1885a9"
+        },
+        {
+          "article": "第 70 條",
+          "sha256": "6bab2d729aa44df5c27b00f6d61cb9245af1e56a76b842b86b5354ab6bc88648"
+        },
+        {
+          "article": "第 71 條",
+          "sha256": "b415e51cf1d46de33a754ef670ed02846b4a633eeb5b8f713e080eaa992c06bd"
+        },
+        {
+          "article": "第 72 條",
+          "sha256": "1321becd37c89ba803076740aa685fee6c66dcbeb2ee08bbd42f54867451d070"
+        },
+        {
+          "article": "第 73 條",
+          "sha256": "ea2420e1321579a4af2f07a460336d1113b44ca7248a0ddd504921bda5ee709a"
+        },
+        {
+          "article": "第 74 條",
+          "sha256": "d991cde55045d6a684efdf987684f752e323bce9bc9e2164d32beae13873ade0"
+        },
+        {
+          "article": "第 75 條",
+          "sha256": "63cdcc0de54361afe1067035e4cbe636a55d6c04623c630721090bb7d3a8fa91"
+        },
+        {
+          "article": "第 76 條",
+          "sha256": "c2ec1722293b8051bafb1d95009d947f38dead28ade6537cb17619042b666cb5"
+        },
+        {
+          "article": "第 77 條",
+          "sha256": "a512334abbd40aac45cf0115b502f0f0d2c14cc22abea194d26bc72b3833150a"
+        },
+        {
+          "article": "第 78 條",
+          "sha256": "35329af3197ae7fc10370e65c451deae75b2eff0e74d8ed121afa05b7f62a8d1"
+        },
+        {
+          "article": "第 79 條",
+          "sha256": "4166e1556f6e62bd36e258f10e01ac59abae6c01e778352c74396cc104049018"
+        },
+        {
+          "article": "第 79-1 條",
+          "sha256": "1f0bfb1d835730c86a07db656296883cbf5b5cc58266ecdc479e79b913288ec8"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "81015afc84e4cd70d30d2c6c511730ac296cfb85951dec73c047e59e9ca8dd01"
+        },
+        {
+          "article": "第 80 條",
+          "sha256": "3da9ee9e57cab3886ab49f31db5b8cca010a8eccfef22ec4825c9ad52e2b80ba"
+        },
+        {
+          "article": "第 80-1 條",
+          "sha256": "24fe2a877163b549ddddf29c37302321ddfaff5c2077978332daf451db9438bb"
+        },
+        {
+          "article": "第 81 條",
+          "sha256": "e875d69501f56adf9987e0d2e001729e68cd5de0000165b5a1e00b2b87b43ad8"
+        },
+        {
+          "article": "第 82 條",
+          "sha256": "2573c670ecd995617e6d184648c235b73484a17425b91634e741307c71f5f177"
+        },
+        {
+          "article": "第 83 條",
+          "sha256": "4745ca0ca79e5c8259260369b891bb8c2c185d838a525413c6dda6adf7300627"
+        },
+        {
+          "article": "第 84 條",
+          "sha256": "0f6c4b690c9eb09dfaa894528d0f2c8064d46d640d2baaeb17193028154240c8"
+        },
+        {
+          "article": "第 84-1 條",
+          "sha256": "de11c212621603d006ac608fcae7206af2cc15c2920aa6901a06b1eacede0c6f"
+        },
+        {
+          "article": "第 84-2 條",
+          "sha256": "64daccc8d16e98a068db01ac344ea80bb9997b9b47887f8f8dc7d7122554b449"
+        },
+        {
+          "article": "第 85 條",
+          "sha256": "04f4a983717cd18a129ac5fc59db2a7e21a85c6c78a516aa895f2a3b672968fa"
+        },
+        {
+          "article": "第 86 條",
+          "sha256": "8b58271a165c6a01ad79ce4abfd4288a9f1b10173391dd951965b20429cf175a"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "7b09604c060a07368511de90a2b69832bb17f1723289e1f2557656b11346b486"
+        },
+        {
+          "article": "第 9-1 條",
+          "sha256": "07a76ba7a023d674a5ea01c1d9cbd568b4ffdab4ae872f93b71fd3d7e556dc5e"
+        }
+      ]
+    },
+    {
+      "name": "勞動基準法施行細則",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "f4a86e8554f4ae7dae0db60ecd45ccc74bf3b20a6349637d47681ed0e940e8db"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "12b397f7e880b34b6ee514f016057fb4c383b0ea14d2daf5a2845df4a6c45166"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "e3ec97b0dad4a329aeaf7249227d8f94d835cdd9807532e4375d8cee520e6dfa"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "e04f370d325901f6512085843b954398e549c56e0c7fd2dce3143ef78bae2ba2"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "78f398c61ea121088370f76d619584bffc72fc17bb7edb0a6966cc4c82eb05c7"
+        },
+        {
+          "article": "第 14-1 條",
+          "sha256": "db03c6e339177c5bc65cb899b462a66ee7770ffde0a9aec20551a2a198ad80f7"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "72d3f710d3b4ddc1622ed4c0fd2a8a0de59d7fd42946261d90f500e5eae092ed"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "bd8c965329cf0455d4cc54237bcbd90d4e2377c0ecc218803c3caf3454e59097"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "1335d280f852c3104c0775d105c328dc45eb69169efd42c4a69aa1aa159b8286"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "32c96b6d804ce39009e220d9d7d1be260befc8faa51be09170dc2a1155973be4"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "91431eec97d5c1e12f5f96b87fd1e280e889e44b76bbd9e9edbe633de2cc5534"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "b06ba395f310de731fb0184a6c82e9b0285e7c2069c425a34628c01f63ab4adf"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "0e17650c028ef62736bb42c4b77e5402ac37a60dd41c44b6427dd17c8100f24e"
+        },
+        {
+          "article": "第 20-1 條",
+          "sha256": "59a9b54fdb2a08b9978f782046265b4d966335a362d40e6f3621cd1f2d60bf7a"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "13a0a3f5c1fe43195aae05add19222c86dc573af8aa82efaf418f7e3f2ec9819"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "17e95d8bf304991f13d4b1de2b1c6e80a519b1bed8adc3d9ae757fbde59f075a"
+        },
+        {
+          "article": "第 22-1 條",
+          "sha256": "de589937f3c92d4063a84e975a03371878a756eee77751d8fc7b431a84077b9b"
+        },
+        {
+          "article": "第 22-2 條",
+          "sha256": "6cb784cf6b40114c7e396112fbd77763a34d94ba072d5ac13aef9183bc725a39"
+        },
+        {
+          "article": "第 22-3 條",
+          "sha256": "1043091aa2b31a62aa1c5f5992e2059b56dfa405cc1b8ceeae5c62cd9feeb9c0"
+        },
+        {
+          "article": "第 23-1 條",
+          "sha256": "b8ed8f02ac24d203f6b88123294f482a60ac8df0a4bbaf251f1b620adfc56836"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "83d8fd2bc434c6325ad554b0154ed7d6d4add37728742e42605174174e0b5877"
+        },
+        {
+          "article": "第 24-1 條",
+          "sha256": "2bcc468fc9d2d7eac66d447ae29a9810c07cfd8a86f80dd52c7d68c34b14cd6d"
+        },
+        {
+          "article": "第 24-2 條",
+          "sha256": "7dcc8422ffed31e28b3b1c58de1d7516173d20d14cf7414ae22277a1fb134b95"
+        },
+        {
+          "article": "第 24-3 條",
+          "sha256": "04e2f6d1de53246e2a2c31064090290feba69ed6368ffc85d0462d62573c3570"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "e2e99ef67b7debf8f71d73470055c721e237af5ce454e2c29b957353b75cae4f"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "8d38e599a9e94798046d4e5df83e8e32687806b6ca22cc092ab0d8345aba959f"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "94eb120970294c9c0f2a2d9040533725763ca990b2fa7cf02c8c0821575efd36"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "46d92d433388f8d9f7e8a61980090b9dc4669ca02f49ac1cb1ae7a4d892f32de"
+        },
+        {
+          "article": "第 29-1 條",
+          "sha256": "cc795bc1f38d05a9fac78214c416edf8ed66e6b0bbdd94578474dc8ecb8e7bb6"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "e50827d419ca4689c64e930f3d6e13478a4c45bc9bc64bd2d37713df6aaf6dc7"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "b06732c3f1ffda0f251769a452d560fd3c1f2d4d2de13affe84e04c95e6540b8"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "5f95c3df5401308ada89f26c94f60cdafc5302995d982f414b5e27d758cd40a7"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "b183d34ee3b1a6cce6d3fce471494bce50d5ce0ccc435d75d127cdf99752fc6b"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "075d70148a3af9c0a90ac82152bb0f3fe0303844d424513ecbbd427dfcaee0c0"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "18b79d2cb96c8e392054d29c7da856df52fa5d3360aceafb4f5cb479a2d03322"
+        },
+        {
+          "article": "第 34-1 條",
+          "sha256": "dcd971290f0bb626a27dc42d78f3f79adc946c20b2fbf1084ffe911f105d5b88"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "ab5fb1044c989c40dbad559dd16f77fc1f601d7270812bbfcb280e089e309022"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "c10463b371c2a69eff8ad6857adaba22623646160b63b36f60f5d79632140c2b"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "4f9f8dcc3e86fbcf828053972f83e2992ef757bbcd2cd026d53e733a85484459"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "f1a37c46db030437b200b13eab4d396c07cf7fa39417ec749a49f83404255b6c"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "1a8e37b363ed9d61b711125c4f1ae3c249faab81695a0e7f706653fcf8a894e5"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "6dd371ca3aedaf740469d4bf2710aacddfcb80b7b0d23db5f34ef461b6aca73a"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "ac1e71a9774c7c9ef9879c17678627db42d95b404ae4eff0064c60957a8243c9"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "2cb1633324dadcfded6baf195cb15358c51b9f17ce662a801aa5a09021c094d5"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "2f0b85990c93d9ee9927b92a7534dc06e3c193c1f3e070903456ade3f5635611"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "9f37d011f9fa96da93b4df90b05a1ce5c09a1d5819e30d43e980dc52fcb663ff"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "5c7c0ff4b71912b88b4e65ec3ee0145be7ded2650067da59bebed0b4a7d4af39"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "db4afa2b9da5cc37f69678ecdd58522f6c83371aa698a61a2d9aa48f0c241101"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "459b5e5c94e3db2a201fc174b7751e751811e30117ab56824284bb91936f66dc"
+        },
+        {
+          "article": "第 47 條",
+          "sha256": "c1f2b4a1cf211e8353e13b8ae05b3e1506b08ddfc552ddabd1acc62d0ef470ac"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "986c5ba02893c07552ed88f58e455209391b2355011fea760c432860177d3bb2"
+        },
+        {
+          "article": "第 50 條",
+          "sha256": "31c6e4a72af6712b57dd0bbd1b2fe0713734c6193cc613b40a26c90466a43229"
+        },
+        {
+          "article": "第 50-1 條",
+          "sha256": "49b89e19cc78a1023770cb204462321d24fce258b371a63e768841a85116c12f"
+        },
+        {
+          "article": "第 50-2 條",
+          "sha256": "d040814f8d01f0f3b90fa547b5f00ce8c01c6c5bb7b1e4cd2ed9fd9633aa3cc5"
+        },
+        {
+          "article": "第 50-3 條",
+          "sha256": "56f9f59e07a1d9f5d886a26b5430cb3919c9edf0f06fd60adb05b15b8869da43"
+        },
+        {
+          "article": "第 50-4 條",
+          "sha256": "f14e386f1d854e980c04c710d02feb8e585f9c65598d92d31217bab4cf7a31ee"
+        },
+        {
+          "article": "第 51 條",
+          "sha256": "5e6f78756ce9f836c341b8acf2e89e52f1a4ba3ab6ca749a74dcf02fd825fbde"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "48d71e25603b75b50592aa00ebc17ce27ff3545aeb36bf1689fff09d8318f7a4"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "0b7563d2ea47d0a6cd4324a4f80012d87332990fb71517ffe9b2298bb7d34ef0"
+        },
+        {
+          "article": "第 7-1 條",
+          "sha256": "82c9e5380af8f351b155234a716baec16ff7b6016f372949c0d498012ee90095"
+        },
+        {
+          "article": "第 7-2 條",
+          "sha256": "1edaf64e0643fd09993c476b6c3de7afc22a68b718640d75430aea79eb5b6f1a"
+        },
+        {
+          "article": "第 7-3 條",
+          "sha256": "32d5651f07f393859ccaf77fa62f8feb5a7346cf3a6e0fb2aa93a1df13743199"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "056cab8481e4e7a3825331bea7412aa6c34faf8c8d2c38408bb14295a4d66214"
+        }
+      ]
+    },
+    {
+      "name": "勞工保險條例",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "94e9b8151f9865cd352a2514fe7a3ef8c268b44202a9bbec85445da984ab24b7"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "c1024d29f709a5c5178cab0e9aca251ef26ae20d28774eaeeb23b14c86f8e9bb"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "33f102ad6d1ca1ea85a0e1a95370bc84d90b846328ab08ce3dcbf13a02e8d3af"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "1e8d66daa77ebe8f98b3e448147e40294d9d1d3e7ca26fbb662b8d10d38bf5ca"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "a1f1a9842dc12235b8defd0bf5e8707f4d992c1020de42b1c420bfee0e837528"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "2a9ac719eea986fa09c83988c44c8969b665b2bf6e2d7afada3318219e1674fd"
+        },
+        {
+          "article": "第 14-1 條",
+          "sha256": "563d6ec66a31eabc4eb816644883289a0b36a3b4497c1223dca23f69f4108bc7"
+        },
+        {
+          "article": "第 14-2 條",
+          "sha256": "cc5c501c8acacd066cf9ea332dad142ffb2432bfd667b88cd4361d6c6074a3ca"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "9c4955090bb91e31ff733d36000d4de37904e61399605b11587514a8d8cbc8ce"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "2eb69fddfbbd6691adfca487787acabf03cc11f6e66e598e2491e443adf08636"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "a80c26d712d3110f59d8f8c96c63dc7c97a26f5df683f4dd6eec197b5e027893"
+        },
+        {
+          "article": "第 17-1 條",
+          "sha256": "8f11e5d3fcf65be7a1665fa023f77e5590c0915bfe502b494dee98d347ad6774"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "8b3ffec97d6810b8b85530af751665255fd737ed98037fde8add4c681201399f"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "7f0206b445ec30585f8efec9f933bb4330e3576016323de3affdf0c51115837f"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "04bb17c6bfca1a38b96bc5b45f7d75f95d7c443288c9e0c905c381875abd5a19"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "d93ec979ddaa881cf6e5d41bd69a0217ca2ab5692fc03e8a415d007ac82956be"
+        },
+        {
+          "article": "第 20-1 條",
+          "sha256": "8cb23b215fa1641372019227e69761ce69fcac931ff7409a0b2ccf4d91ba8e30"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "e7c1681d8646e406e2bc7572731cdec780c56e1204d1e2fd09fbeeebeead6154"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "0074467191724b59df64385338ac5e788f31136e1a6b9b152f2d87b8b75fdfee"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "41222ad342aa8dddc73693ea8151fb75f97eab74453ca1ffcbb21816d6630870"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "c1d2d9f85f11fb93ed63814dfda8b05af2542fc6df05b83faa4d6ca8a39e99e8"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "82ba0a9f8411bfdf93521b175acaf8c6dfe961b136fd8d87badb6c53b6713ce8"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "edc571362b70ac965483b6e3f4e4bb7071d6895a8e8083f92d0d6816f18a6976"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "29a0c23ea82bec63069f12e220d5f6813572a62d79d6f1630e716db245a0bf2a"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "67ff7d7756213c5da40a8fde2c6243ddb019577cea2cebdad97b915db8396a71"
+        },
+        {
+          "article": "第 29-1 條",
+          "sha256": "51f9405e4d6554e458aff9a65a430d35bb89021f82e998f8219dc17ca552ee2a"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "0f06bb02bbf713f0befb18090f7dfc8569c39e46e61c5118093621f9c9b3f12a"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "c6c247766f4e970e28b1f59b964fc98e26b4e47922e43942d51b55e2f6336481"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "0f00e118091193f2e81e712cfd798493a714d34916c8db3a6302a3c885b5aa3e"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "ea9b2c343a020268ca2affee4733943bb1ab44b8e1f806ef285c96fbfe525ed2"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "7c98e378b3ee14e3c70975581e43a1e951100f8e341e888a78283ffd7e78a9a6"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "8bb7bc3f0bf172eb952a195449bbcfcf64e3ca8af719092c4c24863d1da950d4"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "84ff7b729d7ba8c6a9c27901ee28d4f0b59ca553bff808f7677ca8d7002b1bb7"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "f4688b56727fb8cf6976d884ee44b1b01a61b77deab70d9a0746e9f9137c38b5"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "b5c436341b0c1582c46cf403b03fe9b6db66af23d9b825e7a0393b09c09c0962"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "3ad4dbfe6fa8e5810ed7e12b3387a5aa19bab907f2ec3666b5dd0da60d769b2f"
+        },
+        {
+          "article": "第 39-1 條",
+          "sha256": "102aab7c219eb7b98ffb9b88f21dcde4b6686d3e6419bedc4de1e7b1ec7fa3e9"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "3097eda50c7fd949affd1d5746bbfdc08d89790ebf0f3471d63ca668f1b2848b"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "adc4429d5b5f42dc0fcd303f3a0f196551320a3e95ada8e8077ae759a205f2de"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "10f7aadf1048c25e911d803234dab92f1bc6213e2af9f36b87dbf8d425e44ba7"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "89ebbe40e9bba116ea9ebead3936de428ae29c5155d74ce6e99b0f4b7b51de23"
+        },
+        {
+          "article": "第 42-1 條",
+          "sha256": "9f9b4c33174a0e95d21398357a96c4976bd81a5d8afc7d1f45bef7c671a3b819"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "362db1ef48d43601e80876999951f5e03ffa905e87d02bd94e9f2df356e7fd63"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "749fe0719ac19e7c5216e4f62dbb54d9aff5d51876d672f40a2efeb779104f90"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "a780cfc779e493692981260d2eb21aa59d551121fb8c2b6b123c2673459f00d8"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "b6ed97067fff85e79186cf546c5ec0d72e3e47c95b5673f95e64575138e22c3a"
+        },
+        {
+          "article": "第 48 條",
+          "sha256": "ac1962661379ba16a6937a4ba012d87a14de65e13123d5e57ca203263cff9c64"
+        },
+        {
+          "article": "第 49 條",
+          "sha256": "792b84d39b285f4477b5b0cea6a8639126133a9bd50daacc069f2769e644b270"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "4ee38c75cf48d9e39ecb0147327a6a3e2bbd4a4940922a31d8b7802ae0ce7022"
+        },
+        {
+          "article": "第 50 條",
+          "sha256": "21a3c7b1930e7bcc9aaee0822c1debb0dffe00d27a5304d5ef734899ea484f88"
+        },
+        {
+          "article": "第 51 條",
+          "sha256": "ac337324d327005f2b855b95740849fb433d980450cdbd08190ace8fdcfb17ad"
+        },
+        {
+          "article": "第 52 條",
+          "sha256": "8ef272689290bffef370b241059baeaa07cd1c3619a878eebc4cfbffd421230e"
+        },
+        {
+          "article": "第 53 條",
+          "sha256": "a613ed988b1ba714379ac7f588e6f6ab023de66e399e7e0581bc57c4c4b7db6b"
+        },
+        {
+          "article": "第 54 條",
+          "sha256": "46f5a4ce9943888bf09a9eb5ecf62f7230733a1181f759bde860e071b476546f"
+        },
+        {
+          "article": "第 54-1 條",
+          "sha256": "2978bc4836db2f7905656770ed3bd48efec26f4d18fe877b03c1e276c388a605"
+        },
+        {
+          "article": "第 54-2 條",
+          "sha256": "a7315ca087946933068ce30928f58e00c1ac73136eaaf69e189c6c580fb4f272"
+        },
+        {
+          "article": "第 55 條",
+          "sha256": "e9962629a1ad202fce63b201075339e0e75af6b1ab47424ca979cc9605827dd4"
+        },
+        {
+          "article": "第 56 條",
+          "sha256": "5da22323851b98c80c2840bd67db8ea4b4cab0893e3353ed6c8d5bd93366f3de"
+        },
+        {
+          "article": "第 57 條",
+          "sha256": "9802b745c7738a2baa9ad1b3bd7becd0409769adc6c2cebfb58909a9bbc90459"
+        },
+        {
+          "article": "第 58 條",
+          "sha256": "2dd002a76ed6a3c1ac2c0db49817dda2e408ff2ea5447fa48ac0b681ec74069a"
+        },
+        {
+          "article": "第 58-1 條",
+          "sha256": "0204360ae47084a3c702decb3f8ce5ee395720de44ba38ccc6d28447316101a3"
+        },
+        {
+          "article": "第 58-2 條",
+          "sha256": "f6531a61f618359d264aedbead5087c331ed0b5d1a381ec86d170ce99357bd47"
+        },
+        {
+          "article": "第 59 條",
+          "sha256": "5e753f80aee3079c9c78ccd8fd2f366c6d549b5d3fa48e376623742a9dde17af"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "52c96785257ac1f45049a10edfc07aef94d366ad56a8a190639b1364c8afb2c5"
+        },
+        {
+          "article": "第 62 條",
+          "sha256": "bc40604ea6236f1fe59f3da7c4ff7f0766cd6729c9998013906e0b0564b0b06d"
+        },
+        {
+          "article": "第 63 條",
+          "sha256": "77c17169e787a0f4c78df9bb9c3e730d06e1cf8ab65bc6aec614415929d15125"
+        },
+        {
+          "article": "第 63-1 條",
+          "sha256": "9f1fc2d05734a5e53aea1acd1ecc830943955f2540080bd57e9026633df12a20"
+        },
+        {
+          "article": "第 63-2 條",
+          "sha256": "2606bd9146efa2c01be9c2a6810946dd086d10c6edf2ab5eef0521403e3e8129"
+        },
+        {
+          "article": "第 63-3 條",
+          "sha256": "9b56c7ecf142723861912a739675ad6c732b0cab05d3f2e409456ad54f664850"
+        },
+        {
+          "article": "第 63-4 條",
+          "sha256": "857fd49efb30ad532d61f75ebbe8645db62615f10f1036a0636debef5d94acdc"
+        },
+        {
+          "article": "第 64 條",
+          "sha256": "fc4e38d19bb5d588210be034536c48f580babf901997aa084a7421cc780938f4"
+        },
+        {
+          "article": "第 65 條",
+          "sha256": "856d1794c2b77f594ab438a3703abba2e2957705d1a4595643fd9bb3b00789a8"
+        },
+        {
+          "article": "第 65-1 條",
+          "sha256": "d1544475537b5de4d7f4b064e982e4c6c6ced9556df70f2e564ff67dc3cff294"
+        },
+        {
+          "article": "第 65-2 條",
+          "sha256": "c730ab38086ce785bfb7542f1d7bccf2ce3b4f8f68b99d28e5812492dc7e94e8"
+        },
+        {
+          "article": "第 65-3 條",
+          "sha256": "9bd0ee27e49e8cc103cd5479341c3703d660b5a9be3cd24d0ebd070d38b5e73d"
+        },
+        {
+          "article": "第 65-4 條",
+          "sha256": "e1b7b7b4d0f929c891aebf334e63a1f2d92977731226983a3816ae9cd0febbba"
+        },
+        {
+          "article": "第 65-5 條",
+          "sha256": "e526d57996101308159842ad8a0b2fa26f8441492c81dab515ad6be996dfd8a6"
+        },
+        {
+          "article": "第 66 條",
+          "sha256": "e77797132e8ededd55e1fd07980cc62e837c31b5914630367c5e7af47dd7857a"
+        },
+        {
+          "article": "第 67 條",
+          "sha256": "a7c156b22813333b76f34ca0d2f7db8b7bb7c9986c6c5a5dee3e27b9bb63fc31"
+        },
+        {
+          "article": "第 68 條",
+          "sha256": "fb6278f9a6f683a74c67c932c577d5dd5af0066d5aea54b6668ea4043536f2e9"
+        },
+        {
+          "article": "第 69 條",
+          "sha256": "3f4447ac7b91353a4bf47f52cba725309368cc1f6c20aafcb8a600cb5abc16ba"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "5bbb31d58b2ee101cc4532d502e33d418dad36da85b8030fe6766855541a0aff"
+        },
+        {
+          "article": "第 70 條",
+          "sha256": "2021033b681948c0f45e7ac015fe8bc232861fd5640bfef842c29b178c79bf57"
+        },
+        {
+          "article": "第 71 條",
+          "sha256": "cc1ffd33289e335b43839c6ca6a1dc63aaf1dd22d64d8a2ea4b151d2dce9b4f7"
+        },
+        {
+          "article": "第 72 條",
+          "sha256": "d1e93a212f73fec5ce78ac3b1ab3eafbca765e6d7ecd79cc491661e6f49192a4"
+        },
+        {
+          "article": "第 73 條",
+          "sha256": "81f3f2f31793e372e3a3e291b6e97078cb8d83ae02f48601f5d8c758c3b79eeb"
+        },
+        {
+          "article": "第 74 條",
+          "sha256": "79f621192f08d1d45b0cbeb78fc5a4f5652000fd13b1d7139543229e579ab69b"
+        },
+        {
+          "article": "第 74-1 條",
+          "sha256": "168a336b9939d148c79cd51ebdb438f6c9ebe75018e416a56a4188a2b2a036ce"
+        },
+        {
+          "article": "第 74-2 條",
+          "sha256": "9656df56a27e33c9a1668a6125da2325b3d895f458144431e1868d15d05c7d8f"
+        },
+        {
+          "article": "第 76 條",
+          "sha256": "9f753a8ed6c1ebfc20e4f6c5fa653dff8d81535c605aa200e7e3f2ebcbadf860"
+        },
+        {
+          "article": "第 76-1 條",
+          "sha256": "2f26a1337fdb341555313751d8a8718b6206122554eaadc095b480a46880b817"
+        },
+        {
+          "article": "第 77 條",
+          "sha256": "a9bb658948610f05b6912552384b7160f8ff0d15a11c08453d9c21e47350d39b"
+        },
+        {
+          "article": "第 78 條",
+          "sha256": "1829d08f7df4593669b3a6180f810ec84e4cf9288d322836eec3d788c26126b8"
+        },
+        {
+          "article": "第 79 條",
+          "sha256": "e73ee4d95b306f7023376eb187d5801a1550d638dddb0d08553d6f30b9babe2b"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "a490fefcde52874bb542143915eb418d9daf0f028b872d77774a9bcee2df49dc"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "bc0384ce99e49ace44d1e29a6ea9d76199c3462535ad5c628c742b1536d9e9b5"
+        },
+        {
+          "article": "第 9-1 條",
+          "sha256": "50bec4abbfa01959518b9e95320077b832da4ec55a0b4b087ec575a67184a088"
+        }
+      ]
+    },
+    {
+      "name": "勞工職業災害保險及保護法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "201a79bf0ae423d186f38442c42fc06dcece3eda5aacf85bc2abb5c46d4a9e0c"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "27aed2ab42fba70e10826243bbaa38a1b144069cd53783cb177db071ad7f90f9"
+        },
+        {
+          "article": "第 100 條",
+          "sha256": "262afa475437c2192778755d5fab06c9a247576b1c49d58c030c6e0adb461885"
+        },
+        {
+          "article": "第 101 條",
+          "sha256": "ba3016acade2491cde710df48c833edba8d46ec550bf6db94b50ad94f92c0ad2"
+        },
+        {
+          "article": "第 102 條",
+          "sha256": "38a64ab28a21b1bc4463511de0dccfef672a2e9ab7481781a41cf903c6de4a11"
+        },
+        {
+          "article": "第 103 條",
+          "sha256": "8871ba5c5c352752c6f986a305143975f460170eda9ba74810e0bbb9ab402876"
+        },
+        {
+          "article": "第 104 條",
+          "sha256": "54721489e9c2be5af52d080dc682204b24216f5bec330f4381659299b96cc5e1"
+        },
+        {
+          "article": "第 105 條",
+          "sha256": "ba5611558c36604bb554d801c7c9b399a22c0b97ef0596aa7b79148baa80f01f"
+        },
+        {
+          "article": "第 106 條",
+          "sha256": "5529bb66d2a3cc8880f75ff78c19cb386a235aacead5c0c4cb42c1d5e2f5b059"
+        },
+        {
+          "article": "第 107 條",
+          "sha256": "3334be0da33d206b1dbf6033caf37c2abfac94d1d19c646492079f1ef66fd535"
+        },
+        {
+          "article": "第 108 條",
+          "sha256": "9bb9499db0ab7785f9a2e3b1b7301969d4cac21fceb4e37a14d871e64285e8ed"
+        },
+        {
+          "article": "第 109 條",
+          "sha256": "84f223356c9799e48724630fcd84282db47d38f92cef3644fb89dd402e7b0206"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "7c30d66df46c0177b871ba547389f9e1a8fcb9fdc3d8107acc338c7277755c44"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "da6a936308a8241f4b85e8617ba76a1b8442eb6856ba245bc511a5aa238ca876"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "4856a91a77e6faa4b902430b85306b92c3a708d7aa13f9bfa82d5bdbaf7b15bb"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "f4f4e3f5eaa6bc55e510aa9156ce6ee80b65c376134d7f38e8d38ac3a3be4018"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "c783a7d2d299409c8052988477d9075047336dc3abbb70f97b34e848b27f2a3a"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "2d0e16ebb71e9a85db7a2494776dc8ad66c6c36e7b4de0a2900f3cfed66a68b2"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "fadaa02b0c0eff963d78e7df9fe0b1bb0171cc04aeb9947b6f2fa1ce8b25285a"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "8a3b2086da4be31fa3f061085fd2cbcf2af10cfc6185e232a6f787f3b164a45c"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "1d649151899fed7fba6769939f1a24e0cd82f2697ace4e750c8b8fa8fbc5a939"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "c7a706ab6cd3cbbce76d32124ef959f8835df394c9eb1a66f9d093fa96a6333c"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "7b9e68af73d131a40854c0b9c8b4cc14faea043b4ae5db19598313c9842fd4df"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "b6705dba8b2a8eba837afb04b13d3a598c72aebd5a7f8f8780549ebb3c8bbdbc"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "d16acbc492d74dc7328514b5eaf6d482fd55ee44fff2d5f2d70f9645a1a15d13"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "016ec3ce568b950da194299bc7cf8c9b98cecc1f2ce8c57973b12e5ab0e7f106"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "915953f0395e9646cd10eeb1fed2a323c5b8acb73488b4c73ba4d839028bb7b9"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "081424147d829095506b93f1e64c29cbcc9f1d0b76b61e8da3fed6763299ea98"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "1e1b0d61f95f54ece40ec24bbff7ded7f3e9e6cbeae5716b79ba8b7959a9efec"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "fed2a268c32c140a2dea3e95b9e1898fa227b312816ad9ddd5c22089f9238f65"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "afe93196fa4e558cf94c7a2c29bb9b052628fbfb349f0e1c7515ea2408320a5b"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "f2014362918b751193a25d7529dd72bb837803562dc9d7d1edbf2fed28eaf87b"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "99a4ccb86306358f3e2a825c3c953ace2ca742152d354c3ccff20dab8c18fc76"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "8a588be5004323667171da30d9d39ba6b3f36bb8b8978a68ba5f3212960c0d95"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "c8d978599ef27a79efa966356734c4d3cd9e6a8bde30a117c489e2f6d6fcdbd3"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "dd50e886323fac27c0fb5de155a8d88ae3efc451b112c71282621b9fbbc01132"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "3410a47297b9e1ac8b6e925c19532fd29a6434a6c87c2653f1f35d10648619f8"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "8904ab16c40e1228782086a0d6a857eda0f9276838a880da0827bedb08234934"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "987aa1c9e503638191f41664e699841c2a42c70ac86a331fdfde2299021340ca"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "6950b7c2d0086fb751b783c15f0278622d65d64b7e833c15083be755f307a12d"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "63800145228c9e1a0d7a8ed0a33ab24da9f612f891fa7151efc0896c3feb6e64"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "523388ecff3e7515338d26fceec0402ad2cba9ead9061858029ccd6f073a88ce"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "e5a64aebb9cfe66372c88d291a74b0559e7b83692a5f3577ec0db9fae6c8bcb9"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "416036aff5ed0a7f9368e411ed39a5a34475548e5150a0f2219a09fe6330f7c8"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "a3dbb09b6b6580f1224a267282a1481fe3d33db163f9cb0d789a66bf9670c4df"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "0d3de283334eb6913d98918ac5361599bfe9e662d2e78b58c06357f6bff1ca8f"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "1a4f9222670602ca542fc47f2e16f5cf681b4ac85d57a95eead64565fb30a8e0"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "1b8a57e87c028bc8f8abd5285db55e15a2175c40568d4feab48027f79a40ee36"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "cfca44d55adee8c9dd42827d62dff22aff4344c7857635e905321194fa04b7ca"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "69a29d66c7ae30284689ea509a5c431ea04389729dec6f95be7ae3f7d0d2aeee"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "208945b55538c2133fc39949ba17387569038dd29061698dc92c26cbd0d753fc"
+        },
+        {
+          "article": "第 47 條",
+          "sha256": "e840ace17e68eabd2561cc7a696a4ad1acca66f8632d93a9b7b20b57f784b36f"
+        },
+        {
+          "article": "第 48 條",
+          "sha256": "7adfb45c1670cdf9cd9cc687648799dd570e35bbe4f6b992994ad3e1f93ecd03"
+        },
+        {
+          "article": "第 49 條",
+          "sha256": "3b5510ec9ec140ce1684d65f90025d6f36887791b89969f41391fa80916a0677"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "05311ded3bb016628255b25f3e38cfeda10c78c13579ba8f408390032e2b1d06"
+        },
+        {
+          "article": "第 50 條",
+          "sha256": "ea896343b924bd136e0092459f3eb743f1492163d59563cea78df0223e1049e6"
+        },
+        {
+          "article": "第 51 條",
+          "sha256": "458325f18037546dc22cc20219cb629a50b536b71753a9e8dfd8d32e446aeb56"
+        },
+        {
+          "article": "第 52 條",
+          "sha256": "9342e786c3599027d9d819ac2f6b61e6e8155504e2411db7151270737ff81025"
+        },
+        {
+          "article": "第 53 條",
+          "sha256": "d85e3059a44b62efde31870e1c7f0bae9b52485ad3f134359dfb2ee434eb924b"
+        },
+        {
+          "article": "第 54 條",
+          "sha256": "8d8e2d0ce3b91c5cb3a247488997b110a48ff28feb1fb82013a76a1a788b0168"
+        },
+        {
+          "article": "第 55 條",
+          "sha256": "c39624a1e0c689f23c19b0bb8962da95a7021006478f898d4862853400897431"
+        },
+        {
+          "article": "第 56 條",
+          "sha256": "f1654e983036bc96464bd135703dac30436f8fe4d67e2807e5f8f847408f6b97"
+        },
+        {
+          "article": "第 57 條",
+          "sha256": "51263a3b09f7008b58cd4d0fc54bad1e1d7818166569120661f980f7200ebaf0"
+        },
+        {
+          "article": "第 58 條",
+          "sha256": "a44eef3fbcbeb3d4381cbb6832b2ccefe37ea61d9763b2604ddf183932ea2ad8"
+        },
+        {
+          "article": "第 59 條",
+          "sha256": "cd957b7c05b010855e41e5b32a20c9c113124c563553bb3508ef82c86fb5ba1a"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "4d3b3b58081b04922c79a3e750d5596ef8347d274195ccc386e8054427e07693"
+        },
+        {
+          "article": "第 60 條",
+          "sha256": "e4076f0cd2ebb024abdcf074ae8da3e3c982298c95c8eb1a7127d00f2a912e09"
+        },
+        {
+          "article": "第 61 條",
+          "sha256": "db6ea94c4d3fe83ead7254e30c19a0bc97ec1413529aaad6d4d3146eaac9be01"
+        },
+        {
+          "article": "第 62 條",
+          "sha256": "a95dd1eb5eb2408c5f8d3918a20803775318b44494c93fb0cad4286ad34b23bb"
+        },
+        {
+          "article": "第 63 條",
+          "sha256": "0e6f2d429408f2a5e899686b0a097bf378ae37d82edb996e2bb9cb8a59ff2e34"
+        },
+        {
+          "article": "第 64 條",
+          "sha256": "6056b119ec8db68957444634af085b7f95331d90b3699f6d4234610e3d8bb67d"
+        },
+        {
+          "article": "第 65 條",
+          "sha256": "872546c1ec573500736011e61ba90358a13c237c174fe04efb1d56593decf99f"
+        },
+        {
+          "article": "第 66 條",
+          "sha256": "09404942ddddd6520ed098504087607b1fbf6a8229569ca05e23ac955f73c32e"
+        },
+        {
+          "article": "第 67 條",
+          "sha256": "a1e363da27b8f5913ae463d9d844e3a8f63b4eada7b45c55167d681d4557dafa"
+        },
+        {
+          "article": "第 68 條",
+          "sha256": "13e25a28b414874884f1ef9ddaa93dd22bb9d0bca8b4d488ce30bcf7364ff469"
+        },
+        {
+          "article": "第 69 條",
+          "sha256": "0f5f8f77d56206d6d05b3335676cbd24c0a32ab8d18e37f65c8f76be3aacc336"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "eca4b18bd2410aa9690001136636f900b48c1a88344ebda0ae985215ac90567f"
+        },
+        {
+          "article": "第 70 條",
+          "sha256": "afec26c4f389f97d5b93da7738d6bdb676847a129a7f6a50e6cc3a089d75c556"
+        },
+        {
+          "article": "第 71 條",
+          "sha256": "248d8ff36853cde043c021aa1e35748e313b0ba0c2633e9cb8cb884614843fa4"
+        },
+        {
+          "article": "第 72 條",
+          "sha256": "4ee8a11384badf3b93b8fe6dc8d64f83dc07b1e848a162a079887fbade8e02bc"
+        },
+        {
+          "article": "第 73 條",
+          "sha256": "10c6520358e402fde00ba84473c274ed2a37007634391750a310128692d8bca4"
+        },
+        {
+          "article": "第 74 條",
+          "sha256": "e9a1a33da355e2881a8a416a28252a7c425a1df9c419501e32f6330efa08de46"
+        },
+        {
+          "article": "第 75 條",
+          "sha256": "00cb95e2c9ad064b563ae40d404198a6914bacb3963b5d0eeed79e4f9c942727"
+        },
+        {
+          "article": "第 76 條",
+          "sha256": "3f1bde4e6761312551dabfa47f474d6a9fc71f5ccb08a8cf5c7307f8361cb3ae"
+        },
+        {
+          "article": "第 77 條",
+          "sha256": "7554f62c3a9090b3177e467a1162812be2ef2dd880e4970c4b4c35fb4ad7c151"
+        },
+        {
+          "article": "第 78 條",
+          "sha256": "a96b301483b086c2ffd3b8795f61625efe23e4fed30f8ff2bdc5fb68e0d57c07"
+        },
+        {
+          "article": "第 79 條",
+          "sha256": "7e423f8f999048dbadcbda27dc0a207fb2ecf365d73f32caff65e5ba2e143627"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "a12f77096092c3f5f94a53a09827abcc369c3f73551f6da87931c2b8e4912757"
+        },
+        {
+          "article": "第 80 條",
+          "sha256": "a3bf8f7ea6da69b9717e52e45e0873071a2b784e683db20cf19fabe833bdece7"
+        },
+        {
+          "article": "第 81 條",
+          "sha256": "d73cccba13035296591a1a854818f87688c907008bc6634475289a3aebe9152b"
+        },
+        {
+          "article": "第 82 條",
+          "sha256": "b73b349025ac3821e797bd85a0ff28dedd36d1ff296e1122fbe5ba72bc2ec0d0"
+        },
+        {
+          "article": "第 83 條",
+          "sha256": "c8fd89c79c2d5d0b8f4bc4235c7085ca990a05155d2cdb487515abb2694e8aba"
+        },
+        {
+          "article": "第 84 條",
+          "sha256": "7d0e0355622b67e8b1d5f8f41e758f249e6b1e5c28f18e3aec95798dd459499a"
+        },
+        {
+          "article": "第 85 條",
+          "sha256": "5504eb9ac8d4e41b5d287e8d2e6a296060650431426e1f5f1b9692c1b9be845b"
+        },
+        {
+          "article": "第 86 條",
+          "sha256": "49a9050411175669da7fc74fa6526ceae9039d9b7cb944dddf9106083ac5b0e3"
+        },
+        {
+          "article": "第 87 條",
+          "sha256": "7031f30ee39872a9a3690a9c7437790295c48d694c77688cbad7aa1011bc8b69"
+        },
+        {
+          "article": "第 88 條",
+          "sha256": "9d8bc917ab323efaaf18654b48c640418d9180ab409a2a1a8bda49a4fccd596a"
+        },
+        {
+          "article": "第 89 條",
+          "sha256": "5c05f135432b9c61585f888c702b0bd81aa6daedb7b70a7d82a387ed8440424a"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "3d87922fa5b4d7110de4838c5bcf02b1011343f90b4f65f65bd7124a7c025027"
+        },
+        {
+          "article": "第 90 條",
+          "sha256": "850a3df2475fb14106d43caba3be52601686d4a18164ead1f5988b1cc9edc2a2"
+        },
+        {
+          "article": "第 91 條",
+          "sha256": "f984a92a8a3376c951682e8d17b5ac19cc9f8af45e227a441cd42afc1af695bd"
+        },
+        {
+          "article": "第 92 條",
+          "sha256": "d5f4978b7068ed517e536cb4f5e2034c2aed13266932d6df9b5b88e49f4d2fd0"
+        },
+        {
+          "article": "第 93 條",
+          "sha256": "93d5561ae89e7694ade1cf0170d9f20ab1ebdaad595dab260813186f1333bd66"
+        },
+        {
+          "article": "第 94 條",
+          "sha256": "d24e1b832493b926a899f0653b946f8243b3ee5c1a8b69680d8f75445d073fa5"
+        },
+        {
+          "article": "第 95 條",
+          "sha256": "dc74846504b29b1e048fd74e3d9a0961dd0bbd8da07f4c57d4576168407ec378"
+        },
+        {
+          "article": "第 96 條",
+          "sha256": "b96e98e2084cd9c9ad5e88a26d01a816d7f382d1339ae45fb79ee9751ea2a397"
+        },
+        {
+          "article": "第 97 條",
+          "sha256": "bd2953acb7995b281275373d70813d10808ab93091ba8eed5d94cfae91528271"
+        },
+        {
+          "article": "第 98 條",
+          "sha256": "9e9c104f01679f864c5e5081be167922df19cdca5f46071d61ae05467747a295"
+        },
+        {
+          "article": "第 99 條",
+          "sha256": "8fe3d3cbb8c856468b440a1e2efec5144c786da9220c3e9aa40ac45d6baf0b83"
+        }
+      ]
+    },
+    {
+      "name": "勞工請假規則",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "fd5b1deffdf9eb20cc62418fc30206ec53461936f7a3e2fe6344b05de3d4e7c2"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "fd3854f695efd0d61a6f78cf615b1cbdbd4cfdc8d5b3cf636b247d9444301fb5"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "6a168daf4ed8bab3d3cbb3ef026ff4689bda07488978cd45708dfb1fbced75a4"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "08b63ffae739c5b95cea563742d91553a46c827b3b2e2c4ccd256df8e17a4064"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "07b9954791ec9114b0dd70e266dc4734bf600a6b400584a91676ab0f104354c2"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "2cc8b616316b2f70a8c64f97b5fa71fc529283f7d06ef9ccfe1428f0847c6586"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "2a3b3661f8760b250e3d9e03598cccf3e7e59913b1c68b6d552db7072b9bb3d5"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "f7718235216c39553e2b33397955a0006d65fd84b9cee5d02b443e98022a03e5"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "84a516f3cbddb32ba93cbf518ecd115847d37e34ac84f11260ffc4baa49d24ac"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "3414a396c2656d0ec72b361a96a62587278e6db12c2bbc468d7d6b657f66ee29"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "67edbc1d288e2b7302603ae7548d19b0c9a7b7fdbc5a00f3908dd9bdd287cc95"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "2616c87d640434ee367e38ff0ab7020fb420814627e670797084ca4e9bad18eb"
+        },
+        {
+          "article": "第 9-1 條",
+          "sha256": "5e2b00bf88b1d551c491d6798d622b80f701c5af37e78a9fa92490c72fd6e608"
+        }
+      ]
+    },
+    {
+      "name": "勞工退休金條例",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "9b5ca565a5cc759900c5bc6c2d11df663bacb0f116cdce8c9855ac888bc0164a"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "e814c2764cca015edf5ee71173b6cd4438d5964f09ca2ad5b034a29a812ed8f4"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "cd77c520d99f228d13c884d5ff8eac0c206d0a8ff51d3283411a3d8c190b1c07"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "de7a30cc54b4489d67750740c3eaad338b01fa78d6c34304d1a05c1c3de053be"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "357edaef68dd4de4b38d547d2c0373f2e713e6841ca48eb661e562aa557a3520"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "9a73907a2cd94212dcae71d336b3f8be2f11969ccab458af2ed66d868aa341ba"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "1a1817d6b346a989718fcd5e6ee78d81679983d6bc3f0ce2000f587930a3fc64"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "8bf1f4860685c43df992c9fb5d47bb76bc424fdc6a7202906baff03a0192cffb"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "cc4cd11a1ddb85a16a71a76828f589e74f9e0a48166dc63e1335856f8b97ef51"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "498dafe90861092691c4014737e00f27931cd82ab283ad4f66473f2817bad635"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "0e3cfb28b08a8b56042db5f5f726043d3ed50db86b6e303cde624f50c647b762"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "7482460e3f8f5d767090e8937caeea3649e2f60a0880a99c592f7dfcdb0dfaec"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "f649f34261366a3029a65610b0deeb5f2cbd684549d7f299a3de13a2cc7434d6"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "f1314e92aa49e1be6abc204495d1dd18dfce06246b7418c5db925a255bb2286f"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "71d02f546b897fc8f9103f52c03e20f2fa07b0f5aab7556afa908c214da7ef2d"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "6da4752b457c4a074ebfec41a0d07539fd14269dac8c3630982423a99b8181d2"
+        },
+        {
+          "article": "第 24-1 條",
+          "sha256": "1a16e683e61d65b70719ba0d7a96f5b61927f0cbdb24cf478f80a6ce54b94857"
+        },
+        {
+          "article": "第 24-2 條",
+          "sha256": "f7872fea5db192ceb7d23276e217fe21fb1948510478e63fd29c03ad178d77d0"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "2272ee54a3a7369f02dd36433f8745ffac81f1c5d7d1adced611bdc8bdf51a5b"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "99a68da524f7f210d73a532f378a1e5daeae93f68ca03d0785065418b2ca3c97"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "ae0033bb65cee1b7109f5da410a897c511a59508661590032052ed23847a9150"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "6ff252714e4105890a85082639c54b1aba33472ff2d0d692239fac269dee12b8"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "13e759ce2d040d4c6e06188dcf9a9f916f6d054dd9157b6f0fae943aa0b3e01c"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "29936223e76a759a42dc25413ae1c6a768060268294951b04dd9252248bdf774"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "74f1a8961d1ec5f543f26b43b890453e8006a59e3301167519e1a9236c4bdf5b"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "f7a9a898f7cabf82d4c42b0795edc1b10c11ad203264338492da762da3dd1931"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "e0116018efee40f9eb6a372720137a61eda5eccbf9bdaa46af4d982796748e18"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "4f997952e844aa46a0c5a10bf0d4af2a78b03f8fb1a4263bcaaa3a65b12bd1c3"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "08001b79d2cad17693593d01a1e9dcfb1f22ff7f367211b8e97c8ed921328b2a"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "56a9d697c4d74cfa06a736228a95a74d2ace95bcd470c74045deec0aef4899ab"
+        },
+        {
+          "article": "第 35-1 條",
+          "sha256": "9614ae437411da3d3db6197317321053270d9639befddf13b0033e9b4d278153"
+        },
+        {
+          "article": "第 35-2 條",
+          "sha256": "274599b389989887e85961563f95bf5430483d269b4ce449378033d7e24ec823"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "68b2ced58d6b04c6a29816d37a5dbb128f5e1e9f84418706532ec655c986fc63"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "437b6e3c6a335294edcc1248d884d03788170b47d349df06c228b27d0bde563c"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "42953bff75616874da297c6c7da037e404ae0e13567215bd3d34b211a62fa73b"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "7ea16e683bc32dcd0f84cba9aa914ecfbc932f69a0f331d3d82c20906173e447"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "a9908401ea23c214f61f08ec333fe106b6366c275f81d151e1a072e654615377"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "1fe5e451eb8647f36a7a2084c02049feb74558bbb5f2a4638eeb87ebe732d4eb"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "52e3fe13b84e562756d095dfbe78baf2bde942375c4b1e6a91c8a7b918d676d8"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "06012545d6a7e1b21ed906231a80920cf0decd34ecd44f7deb928d6ff06a382b"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "e315c5962500b94383f9d2a976b840f040cca399bbc5326fed5b46be958d1006"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "ba2ff3ae0e281e79d3bb0cd5c1460efd74bfc322d8249b0b9246b41451f0ca4d"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "e0431297bbd3c77eceb9be6180b72f9e267ccf0771ab771153b8be5f22df53bf"
+        },
+        {
+          "article": "第 45-1 條",
+          "sha256": "5def46fd776914fb8e7ddebf5beec14fca6d48a5b0d97484e7841d23bcf1b679"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "c4059bca3ea17076feb9bc1e7b2217d96294d380753afb890d3f8261853e15b8"
+        },
+        {
+          "article": "第 48 條",
+          "sha256": "b8aea1a0091a0240974f7bcb519991c8d418cbfad3b3d711234b9ce3996ebea6"
+        },
+        {
+          "article": "第 49 條",
+          "sha256": "77c60135430fe73ebfd737b24888dbe9be6a49e6fab65049fc8c2eb47e921df9"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "a0553bcc6f9eacb095fcc3184d0b40beaf31f1814c009879d643340977f968ed"
+        },
+        {
+          "article": "第 50 條",
+          "sha256": "46ebec19aa20e835e1d34c4ded7a34f2eb3b623e8d72bd531d2e7307151fb6df"
+        },
+        {
+          "article": "第 51 條",
+          "sha256": "7eb631a7847627491e8d933b546b31f96f31015d7406201f58742eadcac8ec6c"
+        },
+        {
+          "article": "第 52 條",
+          "sha256": "7a66e6bc24296b19d920d46ee9002d91fb2957076e263f4aecae4fe5429d0abf"
+        },
+        {
+          "article": "第 53 條",
+          "sha256": "7c5ecf37346280fbee07ace000aa7d304604c10f162b68713663dfa81298174e"
+        },
+        {
+          "article": "第 53-1 條",
+          "sha256": "af8329e57e7ebdba12b83621475206b2943a8ef52656ceba38ffce8fd21bbe84"
+        },
+        {
+          "article": "第 54 條",
+          "sha256": "91332a830b4a04923b3a385315dc42194fa28b3e2254e18bbcae87e1d12bb463"
+        },
+        {
+          "article": "第 54-1 條",
+          "sha256": "f0af9398dd3845763868da5d2ac7ec7f237a210c863253abcf460a6ca16e60ba"
+        },
+        {
+          "article": "第 55 條",
+          "sha256": "75e32d20564b3a94dc8c12e39b5123bb81ccc76b44846f3fddcc07d8c4c51b3b"
+        },
+        {
+          "article": "第 56 條",
+          "sha256": "ba1e1b67036bda0f531e75ec485ef8c4a2cf08c0bfb4371a0018235ee64997bd"
+        },
+        {
+          "article": "第 56-1 條",
+          "sha256": "80d2302f3b85fb456a40fc0ee6df243b7fc7e8b1f965c3a4ea81dde778223307"
+        },
+        {
+          "article": "第 56-2 條",
+          "sha256": "9275c340afd76af92f34c8cd82d647323b5844dd852c16d3cdc9a523b89b49a0"
+        },
+        {
+          "article": "第 56-3 條",
+          "sha256": "627e8a25e721b6f622c5189d028fdedab6eb60c1ade5933117e219668f8cd057"
+        },
+        {
+          "article": "第 57 條",
+          "sha256": "fb161fefe9cd1b36cdf5987adffda684222e6c8999e58c727a57f8e09e2edad6"
+        },
+        {
+          "article": "第 58 條",
+          "sha256": "954b52ec8d295ac687ac722f1935aace66c8acaf9c7ec7d2695f5062a2ee6745"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "b374cc82f204b55329456c56bba2abf4e0f49d3a75a653ba246b4b663411697b"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "0ba5b6e58c9850e933aecbdd86f8cf413eecb8d980956c6772d27349ebaea02e"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "bea97bbfaf6e136bcc1ebe5f4bebbfe98579cb0a4d5f9c003dc90348feaede0b"
+        },
+        {
+          "article": "第 8-1 條",
+          "sha256": "994cf7bb79a871e1ea68dd818a2c6464f3f6d023c89e4b788c983942f8f75ba7"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "e232316d06f0f33e6c439e2eef3a19622e299ebb11a51ca39ecbc291c2d9bac0"
+        }
+      ]
+    },
+    {
+      "name": "勞資爭議處理法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "0a67b24dbd0d692b2311c0810fc1bc2cfd1286222f17795b5c08174aaf8b5721"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "b0dcf672489ceb9392b6f3bd7d1a71e18c2dc8b892ad9a1b4932bb277327464c"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "ffc541f5db61072edc78b73cf6d18d5a5950fb18dc4102371544be1ff23a26c4"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "6d1664672334c457b67f2d6f8a68dbb0b415404b47d481a945d938cdf24e56ee"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "65d1b64f0adf8b150c0ddc4fb8cbfd8c08ba6904faa88de6d9d6878fce7188bb"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "9dd7e123af83053f08f18fd20fb67e810be285d52bb680257e45ae33631e5868"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "17bd868ef7daaef9d5cf9276bfebdb6844f427fd8a01ee35fdde2bf20ae2a162"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "8bf1b4702b5f31b326797e6cfa6dcb436c29caa9f838455fed8900ed884106cd"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "ee13866c909a05e76795d4c9359f4df7f47303ca9e3de289012ab90fb0943724"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "28c19684de16f054374424991bda0a92b57b8d4667147b008f81b559d8f483c4"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "7311537113c60b151d0d37a7d753a8aa7b0be245766af8fc9349469b8c3d9c25"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "ac14f07268dcc40d67e81d1fea2ba041492d649404c966d0a40c1745c9039d00"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "c96e36cee1223ad92df3dd21f1c4fd2a32715c8edabebbf422fdf671d1140340"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "7fe2b972557788d8a495eca7076951fd64d1d5624900d7f796621acd84989be3"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "db900c1d36fe589bde396099e71f033cfbb2f401204f9d1b34c717fdd35edbe9"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "73adb304f99a5a068135a2f37547b37c55942d6860342f28b7291cebddd9661a"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "cf683ded55c3a37867adca8df800a26f9ded6f0c0eed5cca30f9aad03726e8ff"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "fc60ea2785a4051f2ad23505066b126a87f2eb6350423e6e2c502077371e0bd4"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "412f24e6b0d3d570e15d27944e55aa1c995a3a4af271a43a8ad34167fd0373ca"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "49347365acb4b983091e605d2e2bb4be5a2e32c6abfedde71dbae0f8a91eb0d3"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "9583ac2b23ca4656b051b5c950e7ec0477738424e551ff48a8f33737226e6965"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "1e3e51299740da427b6807345f66dc326a6e719234337a432773bf63bf1abc55"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "6fff50b1fe514c05f586df72fea6e4a8a91881470e081179f03c3976e55313e1"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "f4b77ad062ba10f7702eceb168afbef6b73f05527210d829ee6783e2dda8db26"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "0813382411764ddf79c12458aa6d99c1283906ff7c3f47d59952f8ee91836a0d"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "a2fc58bbba16bd9d3700fc494429c5276319ee1a6ef9572d42fc274ef0dc436c"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "36be221e30ee14cafe17ee6483aa7c3262555b3edccb1369101e65e88f051601"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "1a95b594b66e894874176c86f221ee5287e869733c4c3abcffbdd19205444213"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "6d90f13ca6045c4b68d9609e02cfab72b80d7f0386c2226481c147e93bdb4a94"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "59da82f5eb403a80afbf4e13acdebdc4080e0e11cc2f69a4d6ec4f78d828c9a6"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "e3334d9c8497e07036925e807247f9563894584a9e6a3a6edce19f6e60279d61"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "14ad7dfac01ce3e8efcf181e1cdbdcb3382fb981ed16316bff1c7e9aee2d2527"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "17ad6e9158125b776b0276ef678adb88a248bbf7a041551853070576c0f944c5"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "781324926ddbebb4647dbc4e4f1aabef97585ab1430d2098259b4dcd510b8ffd"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "14a9e1191173c607c9001892498ea25f41c8e806f8fb2e81cd8bbf4077c30107"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "6130acd93d5075c022f49f932a6acc9a4c636f0d61533951326ecf702203daf2"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "c573a1f7536ca049d5d1bfadf80ac89123a41218388ef1c067569285debeeaf2"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "d56df1b458be4d7cf5ff75e90a8d8842a7f77308a9368af0b650e15ab8c88984"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "13cee1edb9730e683e6e25ec8bd1593aef35be85c9cd57fab900e6f79783050e"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "c61dc5e2fddb1ed15384cc9c31ef92c9221144412640cfc9f1c823b8aa4a7a3c"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "41fb66cb5d81b45b1b70ae9d5a76f71428d2db0fdcab3fd0467614fc7f11c517"
+        },
+        {
+          "article": "第 47 條",
+          "sha256": "c13c6454909c6d60b07d28a4dd7060e5971b6d8de5804445b2588a260bdf0086"
+        },
+        {
+          "article": "第 47-1 條",
+          "sha256": "c6131a50695afaba4950bbad084f18c40654adb0fb8a0c64e0cee0e88571838e"
+        },
+        {
+          "article": "第 48 條",
+          "sha256": "1ce27ce7667eb1808dabae17744b1466888403265ff81933f4e36120e3ba6828"
+        },
+        {
+          "article": "第 49 條",
+          "sha256": "a2e63f5563b6dd394e7f1d06596a8d9664b0625d4b741e6f02acecc7c927166b"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "d5f157d9a68d44a6b5038ed214af2f331629187387c4078b9d422c6ad9fb6f75"
+        },
+        {
+          "article": "第 50 條",
+          "sha256": "037cfb80cfcf372af7b27e1db99cc63b38767db9782b013c80859466200e5d22"
+        },
+        {
+          "article": "第 51 條",
+          "sha256": "87acb20b60699a1a14446edc48b998aaa4e682752b7f8aebfec154553c366a66"
+        },
+        {
+          "article": "第 52 條",
+          "sha256": "714d4c72e9225915d64eba038aa95375fc09603fbc3f831cba988efcd3fa109f"
+        },
+        {
+          "article": "第 53 條",
+          "sha256": "dc87c29bd9eb8667a5a54d190df98b58b67b36f6c9260704527c4a6615a79ca9"
+        },
+        {
+          "article": "第 54 條",
+          "sha256": "9ad5113ce0b9b48107af9fc819df91a673aa5077f014c3b9734d45e8a27a266b"
+        },
+        {
+          "article": "第 55 條",
+          "sha256": "d0ee3c75ad03307b510e5b5a96cced943576283b61f5832ecf816835697ff65b"
+        },
+        {
+          "article": "第 56 條",
+          "sha256": "b9cc6efcf869d90537595f929fd765dac6f7685e543a01d6c36fb404e0ef4686"
+        },
+        {
+          "article": "第 57 條",
+          "sha256": "6f614522ed31722e009d33b31350fb32b6b3d7a55bb25c8015744e4d32e870ef"
+        },
+        {
+          "article": "第 58 條",
+          "sha256": "e78abb645c6396e1ffa5923846b0265d9a393f32d19838592c989bd52d6e7327"
+        },
+        {
+          "article": "第 59 條",
+          "sha256": "c7b31f989fd1d5e33368f14c3c2cd5887353b37f9211b7bd43c3523db08e5159"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "d5730794b29c793b7274d98649156093ea67eb1cbe3355b2f212ed0392f65a64"
+        },
+        {
+          "article": "第 60 條",
+          "sha256": "988762e27108c8a15d8e574719de2ed46f02974e2626303287f370bd68957a4d"
+        },
+        {
+          "article": "第 61 條",
+          "sha256": "f489756f43a4eab945df337bf00c16a4fbeb55b4811b9d3f9bde7f66b9311fc2"
+        },
+        {
+          "article": "第 62 條",
+          "sha256": "963b815e5e3703ff999eb1849c395836d3950ffdc96542f8f96da1961ead1f40"
+        },
+        {
+          "article": "第 63 條",
+          "sha256": "bfc5b13248d7a088ad6e4134a92928e86fd876c547cb6e507f22d58b9fba301a"
+        },
+        {
+          "article": "第 64 條",
+          "sha256": "f33ee83b003f0dbfd2cfee1dc02c3304cc7703861ca639c12b778c4101dcddab"
+        },
+        {
+          "article": "第 65 條",
+          "sha256": "3d9f3ed7f2d0be43875e5222a6524c1d0cd58053fe156de63b689e1908c14cfc"
+        },
+        {
+          "article": "第 66 條",
+          "sha256": "39df18f410bc0f249f4cf5b3feb3e91559aacd6ca73203efe99777cb5775cd53"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "eb4fa8d9ea9b5cf0079829abbb5ee485a00ea0fb07c99416d71b69b063f43947"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "0ff7d6b37f0760e099d015d35b5c472b82c5e4f915f6003caed035cb8bc3da01"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "5c093e45b3f8fe64460f3bffa7725052a70f1449c71ac0acdfd6c4802ec5c6f4"
+        }
+      ]
+    },
+    {
+      "name": "團體協約法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "39ab34bcbb95f86291a491164835aa5bcf18cbeabd2742ce25e56c49e6a677e1"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "9d5e3962df8989b0e453bbe5e18eb287de06b8a503fdb0a7945ebdea2c1dd99e"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "728c37f167dd56c3d5d74261c002ce99821f14d5dad39bfff1637713d6ce46d0"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "e0788a3bad36487cb94d0653d68ca384a5d202e2fae3c6f226c13c2af72a1b2d"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "5c9cc881fd765af028c0d1278b020f0bc86a9c87602866800e85f5d020d9c69a"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "09a0b6939a202f7d0165658a66f41344be7041a8e85b54bf9ce546fc05c3487f"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "2bb2d31b8718b8a00fa158b6c66abd1a67d15c2146e4391bbc372d7c19684a72"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "5bf502a65aa4568bff66116d0fddcc752f4145950b2a188dd8c2c130118f1b16"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "e25bef26cc071be4109f10799fdfa79e76634ad713a222b5937429716fec4272"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "6940bb5785b4070ad62387395208292bd7a356157321e82cc6e80a5b644ef78e"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "b2c8bfa1f7afe7c7928874e6d8430e6e4a5c34fb257349d56339f33b73f746c6"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "d8d0417f4b98c8d199f79cceef391c9f32f652dae2a0fd818c7528ab02860388"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "eb730a8188d1d3355a69558253bb754191ffe009c7c4ad2f6533561929d03396"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "d4a992d92e5caffb9d9e6c37f75928fb6a39f68e1a3ba0fb7272453035435a6a"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "0d7c98eb56aec386782b3b7b42dd224dbb00220831e19e4cf4a848146a9c9f15"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "8b8fb5637ee4afbd6a561c183ee11fe35a9a4a36100505e9e40e6e927d2910f1"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "8c1c91935771d243148d41960d7348bdc7e34f7264407535e06472288854f0a5"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "32f4685d5415c159b0ef19c5de6d472c009029d091feba43b728294f163369c0"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "a711b4d606f952b3f18cf6e06587364db98c0fdb4251f29b1f28a09f8be4c66c"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "b502fa787449664919d0f5c0e0cf0332d0e9aba94ee57ecfac65f7dc373bf0e1"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "2af69c1dd661ce2af8ae2cb07ef940047cc9bbbcf1a18ca07c433fd270fe8192"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "80ecd165de5f2558307e6e28c377d183c4348ce34d6022474e52bde2ecb5a39e"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "57c1b29bbc4a2cb7201289db47e776f805c139ad246a2c50afe553618e2b70bd"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "723affdc0fbb8fbd5ab563756571ea5000c9615a426d99aa915df8563defe444"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "3df2606543431cf5c781086ca71ca68baf7be09bb60e7737f629b9b0f85a0a6e"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "e23c1551862b3746214eaf462547fde45afe6daba38e975a676e25ff56a4ef6f"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "d9cd02c3cc35dac2b2c82c81484eb6ffd1994fb0664a5869210a66605a016576"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "09275e8d8d810df88292255af92a70a45ecad5fbe7b2157855ecb161efb0f1d8"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "40e8ad783a63be28e6b7f95e3027617f7cb19c29137b4f0fd8011c5ee730e57c"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "8e4e169b4eb36f8a11a806bd817b7e414690511756d37eeb7cb34f736aa407f2"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "c92d6240c048b904bc970b3059cf963a33f0e46712eb3be4c3fdf0e6b4cde401"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "9b7140df76a782136fa5b8d531d1b37da2126669a09bfa2004a5adf381869a60"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "b200ec72d2f9dce646b94bd5bd6e2525bc815d6fddae8cc997b1529cc89db15e"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "7f05ea3391e637e2ef323d62830390791a48bec9e97fda20e0d5183a71d8956b"
+        }
+      ]
+    },
+    {
+      "name": "大量解僱勞工保護法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "ac54dd1540250acaeb1033b99535e54201888dc35772dd81ba284f0cbf07875a"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "17bee533e374d208fb65c24e1af96e6185051de95d95114c6466ef7d3770f70d"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "3f724b6f25d6de56ad497387f2208106824c2d536192697602242a20f56033f2"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "346a81b423a4329a4040a963307cfcb1ee452d3c60a9b1c9a6d9ceee5cf35bf1"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "248194be64d17609dbf01d880539fcd707358fd3a963712f665bb4510149431b"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "ae813767a0c4d1d7f99f5e6abf36c5f7aaa63dffbdf547629baf9875a8ea3a31"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "399da34584c93aa388d84af5687be8f28503f5dd1648aac0d938dd19e36d643f"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "a9923d191dd6d467d77417f1d7a6792d16f4a540428bf3f231d4daea32b5ed58"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "b4d9ddf64304a838ab362009cd2d78238cf4fffc7752d83c75a2436a55f073d1"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "c5ef793c169ceb269b7980ae6b3b907c4f09db89c9c113a3e64df257f2508611"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "b2d2c13c6dff3dc9ebb93da001e50f050f789f15421e030e6d9c92946ec5f4b4"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "cba5d0884b3e1b6113939237ed6cd56ce6d0ffea44739e37b6d77fc4a6d19e21"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "bf5c34c7d32e9ee61bfe2dc2fa532aaa1cca91350bf5cc53c11dca2e47be45ff"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "d2a8aaf90c62b083ae5b7f3098ca1ebf84560b716e80313d50db80682a1f5ef0"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "056f41f8a5f78b08aa872abc1650e1d545ccc68ef0eb55615c56ba066ced1ce1"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "02bc389e7a10cfd5f36bb8d900a08a29572b22ed29787ed669db5839fad45875"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "dbcfb8d2a0db7a5f14b2994e2b4b0834537f61f83b2d7d110d53ca63c46856d3"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "b93eb453526df1c83e4aec419b59acf241d47a7defd277cb44868b157d3ad7f3"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "512c1c15bda8779e0a4324dae8de75adb21d451bc8cbdfcbc28a477787fcaf9a"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "2843ac4b05eed17e0c60efa860c600e2e0dbb8c0293f06593478b86a9cfdc69f"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "fdb5e12d929134bd1ed49263fadd787450fcd380ef20592c1da2e1a1771264a0"
+        }
+      ]
+    },
+    {
+      "name": "就業服務法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "337e8a2c4e1a31ca3112650fb7c2413543ce5098f4f33de2a90db3df66020773"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "ea2ab788f6188041ff3771b1e225bc2e08532cdb127ca33b2653eb17aadee4c0"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "421d930eb562d831a1f768c5ab5234fd45469c59753975b636e2686dbad8764f"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "66a2b651c223db305595496963ac75f197b9bb9aa3361790775283d6ae95a636"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "f11f7853079b247ff30f9e61ec442b59f710e31f1cc5f2698482885a8d114565"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "e138b5e986db5f3a50a9d411fbe3c9dbf54d4d33525be019dfed29e14628bccc"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "cd20b8c429a012f2707b18da6fcd13bd42655b29e3e3de31393f150147bbe275"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "3ebd0b875d44dfc138e93ee39849527f8bae27b718e972fea3270d1b65f19a47"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "57e916604b42737bb9093bd8d83c9620abdf9ae38ad4bcd1036bcfceb9914997"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "a68c06195766b564616607e7dcbd37b573a1eada6c2fc6b02b0201953931aa02"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "b063a7cea0519780842506594acb9e59e3a7435cab2a5c866cb83a330c7c1e5c"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "a17a4aa9711f386095c2d382e69eb9087e5501296b90f25c3c8961e23f93ddc9"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "0d52a9d81cb940cb821a021252c56e179d64cd8fc465bb930cf1b57d97e25c9b"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "fb2dfbce14ca730b46d2d66471a08a5a63eb6d76150273bfde7a99032dcac35f"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "0ffc71d7e21cb10a796cc42fb8234fbf1688ae2f168e204ad8fb1510a6d91c6a"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "b6ca0c521908299be5ddca47ec732165e44e794c76eb150a5de66ac0a680cc6c"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "2642ae7c31b3a77b2e258890d47ce34a611314941395e69314dcb405bff24bbe"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "4b08bf4fe38610283f6787d34be4d630be7483205901e227e18c063a66ad1517"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "cc04e9f5108aa80e245d0475372cf58636e97554a3ecdb1e491b77c62ca21229"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "efdfc360ac5f4deea160fda2ad9924411d1a95e96c04c7d94b0ca346407ad73f"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "6673ee2a9be567ada6bfd75237e2f6ce4a5de7e5cb70f4a4d2d30792c0e8c893"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "2142a14b711a9b81ea6b11099d430a6e5d40ada37b07ff68cadea31903333c95"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "08ba85f61c8a1fcadb5ed60d1a46f66fbf2502d6bfc7b083c051276798363af9"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "855ce12597060b250074d663178d8e1770286358231bd3af9a7b0eabcc5c3f2c"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "abbf75097c238eec7bd31f37acb859a8d5c46682c0c86846d3d1e16ea7044b41"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "cb6162964f5d7856dd7cfba892094fa4f21590382c01f6098cce879e8ee649cf"
+        },
+        {
+          "article": "第 33-1 條",
+          "sha256": "e73af2bb34b086fa6793f2d9dbd81c4200bcbc0eac58775327de4e1a3569a685"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "9e3689c68cd1f6b2869251da22ea25c8e522225ed94cbd0aeaaef9784a682030"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "32d394e5f86682a660c61f144eb19e9553f91ffa92a91687f26bfcc1b3685952"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "7c3c11ea6253fe9ea50393d92c87b023c1b6f95e7259dd0b429144af831ec3a8"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "aeb8048bf6b663b430510b0a91cd7de77f8de5c4c78199590b9049796feae9d3"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "a77da955ac3da519abb24f84b9167a810f0759b2d10fdca951adcc60f028869c"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "05afc0a899fd76247ed8a9f83cd15d075729ca41ea70c776a1831299c8d0bfb5"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "bcc7246741500877b5bf0f9fe6f29ded6713364e69490031b00a835494cb9c28"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "40ba7f586fb58e12e213ed9e8ae0cf16d549bc034570c0eaf5344ac2095305e9"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "ad22e37ad971579d57d6715bc73f6add5b5b5a2f1c4defdada7a87e85625fc2d"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "07e6051bdd9c8706563c8ba94b4653ae774eacc9fc2327a2737de75f326d4a54"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "de4241cff7dee2e6f6d715ceba05ffce81c6cd1a0c7378eca5bd5f8ee40d1f00"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "77d448d301dd98372fb87de11913ae35d4b95e6725acb8b31a5f71de98847606"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "3f1cb9550e0ac643727bb2fdf998327aa9f1b5fb35df7a4351382ef808f657f4"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "a63b32e4b06850c8d9a9d90448a1a37249c16c0d1137f9e85face82ae0e2e801"
+        },
+        {
+          "article": "第 47 條",
+          "sha256": "078699d4f7a2900e47a81e2f04f52a88f47f7d5b155606689edfbc86fdbbcf20"
+        },
+        {
+          "article": "第 48 條",
+          "sha256": "e209f39cfc1b8cb55f4f59d25c1b48fcd79a09d3fa3ee779ee178a809c21cdfb"
+        },
+        {
+          "article": "第 48-1 條",
+          "sha256": "281097ad4ace6b1ce7951b46347042741605d644adccb5f02cdd02a795a7a986"
+        },
+        {
+          "article": "第 49 條",
+          "sha256": "5d88db059b70e4a4e8986270a30f4ce58f9e72e67a2974356a15389c7356e57b"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "df0c77c63be3993a0af45ffdb7624e7ace5bda2264259d9ac72db07857060405"
+        },
+        {
+          "article": "第 50 條",
+          "sha256": "a80b4b4c14bbfff49c0866e1924aaa9ce80298a25b8db1077fb51713d2a7f4aa"
+        },
+        {
+          "article": "第 51 條",
+          "sha256": "954e776863ddff456d3f5846aec1e4da04669d02283200bcf4f9471fa830f054"
+        },
+        {
+          "article": "第 52 條",
+          "sha256": "bf444bec5e5d05033c2e192785a4e2cdbd039b1495b58d464ac3b8191263d359"
+        },
+        {
+          "article": "第 53 條",
+          "sha256": "a9a73de64b416b52c62058263e71473b6f7772cf476a2f88dea29195ef1885ea"
+        },
+        {
+          "article": "第 54 條",
+          "sha256": "9ad5520f89eef9fd573767756c1cddad6f2d26ad433d337138a3775fd6158c2c"
+        },
+        {
+          "article": "第 55 條",
+          "sha256": "acefa86324ee711a5081d6942aebc66f24093918a7860eb1150fcef79a89b5b9"
+        },
+        {
+          "article": "第 56 條",
+          "sha256": "48f8f6f282e03bf7839fde091035caa495d74ce2811dce0af961ef5cb06c59f9"
+        },
+        {
+          "article": "第 57 條",
+          "sha256": "931d04ad83074120080aa37d7c4c0f54f84dcb2a187599168396a3f4665e3962"
+        },
+        {
+          "article": "第 58 條",
+          "sha256": "c55eca0aefd6d79fa59b67b5252f43e01dd000d626c28263ea8a8ed930055e6a"
+        },
+        {
+          "article": "第 59 條",
+          "sha256": "7d2619c03bc76f29582d7e80addb03a477da733b09fddee270e49328b81f315a"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "134cb4602598489dc64ebdcc53384d617585b55dc41192c5a141a5e28103cbf8"
+        },
+        {
+          "article": "第 60 條",
+          "sha256": "c73e45dbdc518d5323bb17753b63a2427296bc72b0878b2171123e68fe0087ed"
+        },
+        {
+          "article": "第 61 條",
+          "sha256": "5c51040577d95c55c15913ee9d8a388af95cbfeccbcc735946441d6acc6b430b"
+        },
+        {
+          "article": "第 62 條",
+          "sha256": "1a8cb921d2ed0bd4f1521c0cd171a04063a252bbd212b28404ee8dd312a57f62"
+        },
+        {
+          "article": "第 63 條",
+          "sha256": "1a845ac1fa0c570ca8548697dc96b1fae673ccb964702df2cd5a38481eeb0622"
+        },
+        {
+          "article": "第 64 條",
+          "sha256": "88d7257f0adbc32a9872d6e6ab3236e81f6a7dccdb8478803828a67eb752c538"
+        },
+        {
+          "article": "第 65 條",
+          "sha256": "71842dcea44aaa466c2d0bfbaad319752dcbd5175dc261136cee2bac2fe30707"
+        },
+        {
+          "article": "第 66 條",
+          "sha256": "74ea38f5343a8e7f72e6b7949383373329a9f5f483d36995c81fab834779fcb9"
+        },
+        {
+          "article": "第 67 條",
+          "sha256": "ff12be617860df404025d1a355b06a6f2c4a7e1c389e7f0baf0d7a7c0a96bfbb"
+        },
+        {
+          "article": "第 68 條",
+          "sha256": "ba07295763abd95a1bd7bf4a2964b86514d356a4ac24ca62d121f0a6a298cddd"
+        },
+        {
+          "article": "第 69 條",
+          "sha256": "1f23845a39b8625092ca8f48fffffb320930f642d02c0f536e4afbbb4bcb1bc4"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "b4999303685a7a87c7525df127a24ec7b0d122e489f4342281523605eb3c81ed"
+        },
+        {
+          "article": "第 70 條",
+          "sha256": "cbd976c9908839dd2d07937a25ffb8b7dfcc2946377cb86e8d09c1002b4987c0"
+        },
+        {
+          "article": "第 71 條",
+          "sha256": "aa58236442871d015d7cfc52009fbf0ba33f6d4d71aced42b1486714b9df114a"
+        },
+        {
+          "article": "第 72 條",
+          "sha256": "08f6405412487daf16a563f9f4efcabc29c17ce99b5dfa71d93cdc7b99b9bb51"
+        },
+        {
+          "article": "第 73 條",
+          "sha256": "9e8cde3fc4cd9e9df385d88a114eafebb8790931f517eed418c330bf54a8e6d2"
+        },
+        {
+          "article": "第 74 條",
+          "sha256": "9c127de0269ac6b0ca642aff8949739268a7f2fb0dbf0449c3485b0ea7f95ffc"
+        },
+        {
+          "article": "第 75 條",
+          "sha256": "b8cc2fd1d62ae1aa11cacb9dd161be3db506106ceec2544acef108bd226118fc"
+        },
+        {
+          "article": "第 76 條",
+          "sha256": "0969ac874f474b90f17d6914e253949ece003966ec5a06b69bbff9a424c770ab"
+        },
+        {
+          "article": "第 77 條",
+          "sha256": "deeaa0b747e260c70638fe7eff648cfa5ada0665a11e30e1e1c364aa65af1a0e"
+        },
+        {
+          "article": "第 78 條",
+          "sha256": "3a45077fba534d1c49a3dfcbca8c6695ab33506b2bccefff46c1a1cf5a208218"
+        },
+        {
+          "article": "第 79 條",
+          "sha256": "d8b8a605bd64838b690b84d4262ddf50e0f952c951999f34ec9a7a0edcf6c036"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "333d6c1bf7bf86770a26e810374d1d219d61199d9ae452b8fbe3e5442faf2c35"
+        },
+        {
+          "article": "第 80 條",
+          "sha256": "dbd7e4513a1367049a84eba1ce21fddb524c58e4ff6d5455a3a0e0136ae24a30"
+        },
+        {
+          "article": "第 81 條",
+          "sha256": "daa44611e1e7447870190eb6320ad57053317c7686377e3e84f4df00727525fa"
+        },
+        {
+          "article": "第 82 條",
+          "sha256": "228bfd70b2e4d8e4947593903a59f4efd4ebb8285c94d3fe819e9cc481b6f39a"
+        },
+        {
+          "article": "第 83 條",
+          "sha256": "1befa0cc7e2c464e728625f13918686002f8864adc4e2f1bd6c7811021659651"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "9b2b82a1bd19288358fbf0836cdd54f03d84a37c16554b2fe9c9c41c22e11ce8"
+        }
+      ]
+    },
+    {
+      "name": "工會法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "4889db8b18bd1d3c74c5e2220c92c941e795483ab75d755f52f76385b6c0ae13"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "8e928e0c20d3abde8be05e40beb50643b88921ca28575119ef6b8093a6a9f79c"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "f8ef19c028602a3b04af48c5e1d432e33bf0dc328fd60b758f9dd9f86f0be562"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "c3161df38c13c67c7fcba8357bc56d4426bb9c7f897d6b187a3c66b66d0eaae0"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "16123c384908f265017c61c85dda972216b556d438e8ef524ae0ef14439d7c85"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "57cc38f18921b950f1a6a9bdbeff7252ccaad9252c98df3d5049d28017fed2be"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "17bd0fb004a77340baa8ef176bb05e3533237e0df1974e0d685226af02351ba2"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "0ca28cfb06c67166f19ec7a6a7cd5852419408ec0534229884aea5751a5aaff3"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "ca82deb82cc958178151f256497f707e0ff0988e7ab7ea733660c3076e241b82"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "cfe9c90bcef46a03a90e7b9a2097c0f726aa2df593a68c5e8df8f1975f4adf6b"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "7cb69e88444ccfd36cb2d5d235819eafd80b66515ab860c21a78f870d4948be9"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "28d2a679b364a743b8066e9f054101cb4195009746747bafcc809cf3a474ba03"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "22ffc97cfa32933e9f2a569717e52a328facc146f4a385bf6128553c485ce6d3"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "b9bd029782d80401367423041e856a012dde726cb0f6cfcc0ab5a1029cc3c25e"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "8f8ad8e50bb4a6bb833af030c42b325ac5b7fa39de0d5a2e1a3d588ae779164e"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "823c9605168e82086ad83f19e1e92d95a8ebfcf6394e63da3609313e9a0d0c12"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "a57ac95aefd542d5dc3bab278f64318f5540d5ebd0ae135b695b0f593c3110c2"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "7d087c67b23e678d79352584a4ac2ef52e3699ad50fffc3fad67081ee2c38a95"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "d64f94298f43376be9f57cf2b8d6de50f78fcf07142b6d2f8bc35ce53d1b0c6f"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "8ad2f41cb9e14fb1af2bc7ba682c264ef6dd18c9d700a042ea9f45e0fe1abeb6"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "e4f0089ca2e41fbb2ced058d615413535486c013217ddc7c96eab999d99edd31"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "6e43109f440a6b3f7137c0d6b5b6ff8e9f93ce068367e0b265d53e530346b968"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "8728a88558c1eaf166c43e2acecc1af4d965943bf707a38a55e08c43b9754065"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "d0058dde601543cd0cfe58e485bf35b8e8422f693519f008bdf5af894adf9127"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "74a680a05533fabd8086a7dbf8968976d858b3324f795539124b9db13e8a91fc"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "ac082f01dbfd6df0c401202dbfe0cd220a3f97bae759f61ea4aafea6e0745df1"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "861794b7573017df1c74b1a58b4083e11c76ab90c4216be396b726af76cb71a9"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "525b3741d2418da3062640098fff5eac8b2b060b495a9df0c7b8a02540520bb2"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "06682797808e9a9eb08b1214bd2b618cb3bf574d2cc07508a6af16835104f344"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "d6213e97addf6d3225221821dbfe32108f18980b4d437675876b1a72d0edbbe5"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "e64367f891d58bfc23d61ef27997b38959fe46410443a9a7fc385abe61cfd1ba"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "cb7c6d977da6bd72dc97cceb4f2de613a35220533bd840a4684fb7ce9fa7e9a4"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "c16d7bfd2910a098ed48bb0dcbc76a96d4bb358f6dca161e7527be5d74053dab"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "7bbc9aeaba97c00a908b904259f7586ef08de93976a8a1fb83dcba56e455fbbb"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "bf4c8c04aacac61b2a152918168c12e061950d3d900148e0eca24c7aa4abd577"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "230ec1cdc502fe7a80f5899fe570dc5972b700dde2a49fbcc7102f11f9867c0c"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "c2fda9e7984379b153138f83213d2da64f57ea0ecc11a30f0c941c2c39fe85cd"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "c431177e3196a6611bd131ab8585bb4e7406a6d56f94be7d03553b8fb5773c65"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "52157b63853ee3ab16c31f3d27821bee0fe255ede0fab635e52c54a96f8af1e1"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "6676f8d089e0efbd77db9f08e6885fb90793a3ef94febf66d80adcf7d5bdbca1"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "c8cd82e56051dc761b30239ecfa340b78caf0f489eddc7395c3596a3f8fc47b8"
+        },
+        {
+          "article": "第 47 條",
+          "sha256": "ae8e84f3553a88533a9def68901a2bde43f1cd7b4284ff6a7ad83131671cab4b"
+        },
+        {
+          "article": "第 48 條",
+          "sha256": "d060b12fdb360f7b7c666ae05fb5ec8360a60125b1ac17abf301cb97d0400e6b"
+        },
+        {
+          "article": "第 49 條",
+          "sha256": "5d262176af359b7d241e7313ed66e6aa2e2c358cc31b41acee0b0fc11dcc1fe1"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "23f23185705041f8fcba62c7e6a5342059ccea4517a5149cb42b148e05df3aff"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "c53aa393a5e398e2ef5b5c3b7b544f34a83983caca1db8da42f27546f4332ef1"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "c27da8d419d3ee9a56d0b1e02b5272cb7804334d593e9b9f0d2e4d12e6b0abe5"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "e11e3d4d497207e1db242c6389b22e8f9413fa4ee509a55afbe4dd4854446e7d"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "885eb1988e96940b0d7cab91ac6923e3c8cec5f77e25766c948ce294aa41fe6d"
+        }
+      ]
+    },
+    {
+      "name": "性別平等工作法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "2698c2f723e78d3ba570dae14f551823ae03bd2c754f5141cfdd319c477b762d"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "6a9463a453071b0f663dd8f073407c49e4ebe91b693ab14f7da807e726464ce6"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "84cbb6902ca9c268b7b33a3b447aa0fac7b1297e42dc3b5f52a39bfeddca011b"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "4299b881f5dc01bbb289f162de1b9ed44956d02defbc4fd1a8d80502646e8f5b"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "9c3cd93e053ab7d8798c8eb8ca0e26d1245a7d2a718937c5798739070bfaff43"
+        },
+        {
+          "article": "第 13-1 條",
+          "sha256": "7e568d71199ecbdb6eb65909ef0d2dd9b8b9ea30ac31f39da64a826949ca8415"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "d8cb3f4d6f529b62b7b1eadef8c77c5ce1e253a171643a0e816d5c5703340986"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "f499bd0f62c861dcd6b3a62208826207ebe56521cace1409221b90901285b8a1"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "fe7eda40f88ef302567de243e6a706f4a508550e5a46638057c8c4fdc5f1e0e7"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "8d0ab7851db787c206453e4a6a5ab72f3b5cc64a34a75f118b7598bef5a4f57e"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "7a1c520be33e8338bdc669cac06e5a95b237d9220d30f83f31c57a28450f8698"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "247c9d3746bc211bca9889c238fa7fc6e090b7037a2ef69996479d1d33d07062"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "9310a93bea552d08bbc033e5cd267e2a4d92a0dc7dcfe4b34b994c21810bd2d4"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "c4d28e7eb52a937b7b7426d595289f3491d3d7f7f1e3234fc65f597d0983f17f"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "f53a7423905e3cd72b08e74339e1d574287fe37a0b9875db975718567caaa4bb"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "e68dd876eb4072b7a9327952785f7b5de3af1e5b2851956efe14378b42c06b2b"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "675c1d149f26ab49c12c59fb1ed9cdc579d68c9923d2f07ec28b606a4d450006"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "b688e5bb06555968a8e383944cc15a8f1d7afeff730ad50758f469fb09dbd4f2"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "25500612f2b6a32459a346def0b2a87fd33b8bb281b68b5ab4d91e1afa09c314"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "d4d20066f7cb3641023f92ae22b101822e7d9ff6efb4cc5a4a753a6d627dc005"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "bce39117b8977360a3b6117202a45db3b425ab5b508cbd5060e4df579c0a2848"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "522faa06050199ca0437b032bc0207d1a1a08b173cf3acda077fa53dfd2a8d24"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "cc96edb38f577e38279e4f67c43c167e5d7b4229417641f285e5cf3738d842b7"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "72b3fd36eb201012c890bfb93800c8e54606267e9eaf4bb7f7dd47f3f5bb9446"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "80adb4ba6d78c072f88890603f7900f7b5cbedc2f3cb83fc6f767faa6124d23b"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "a02c463bb6c43eed4069faafac903b405f76c7c462aef4f830baad51b0a86b32"
+        },
+        {
+          "article": "第 32-1 條",
+          "sha256": "b542049cda1aa39f9c688c25adeeb9b66b953b2d64015021eb442a23734edbee"
+        },
+        {
+          "article": "第 32-2 條",
+          "sha256": "009b64e06453aad07514e66f5c1a2e7dccf902fca175ec38e0c0a0cf06b8961c"
+        },
+        {
+          "article": "第 32-3 條",
+          "sha256": "8448ad4600c0f779726fe6f6b2a62b74bf806d98bfe86b8de7f9ef12fc5cfd11"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "2b9be898b125491dca9667543c90b0e92672f71dc5c1feb682a4c75c49fb0a9f"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "9cf30f154bed6b5fb57037e195562067916bc1904dbbf72468fec5dc3f98fef6"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "5be60e77e4632faa196f0c36b0eb7c33c3147f80725d7152e5811742988d380e"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "1899f39601084cb585fb8f0fc82b08eab427334c27f80e6c06fa7b17708679f9"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "4704835b79b83d0fd0676e030d7e2d63fedc5b8dc9258a5887b029c52caf2e5a"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "a8a31722c92a0f667eacb2f5a452464ec35558e9b9783a22cc61636e14ba7cf5"
+        },
+        {
+          "article": "第 38-1 條",
+          "sha256": "ec99f93c28ca53ff49bbb63187f1660dc56c3d9a895271956bcec28c9d4cba67"
+        },
+        {
+          "article": "第 38-2 條",
+          "sha256": "3fa8771937b8506df47fd0d47747ec4dabab74a35081901c6292fdff5740c78b"
+        },
+        {
+          "article": "第 38-3 條",
+          "sha256": "cbcaefe1d526d55d8f7b76c536dddc3e993420e3a22b261c9a5e605e9d3209ef"
+        },
+        {
+          "article": "第 38-4 條",
+          "sha256": "b163d52c46c07a50f0a0f837bca036ac90f3f983c07e018df8006a84adc32ad4"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "9733b8e23492fdc40184a3b3b5bf0adf938898929eec8b8b55992e832360d4a5"
+        },
+        {
+          "article": "第 39-1 條",
+          "sha256": "8e9fa824dc75127453c0e311fc4bcd6309a4a5899dee7f75aa956e71d80c0a78"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "46a17fa6e7612c451dc75ef8eecaa36df3a77e7da3c1cbece7c50f37bdb570e0"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "a8bfcf53c63335b1b969b7dcc2e0bec0603e85bd7e3dc652487fdcd50979a0d0"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "063283a0c685ccb3034c5f801b8b51978509b09eaec5b0e2583f5ce9eb9d704f"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "8c2cd1f0ac3789e513e05d67ab1585da67643ccbcb2ad440ef4681fff2b57f47"
+        },
+        {
+          "article": "第 6-1 條",
+          "sha256": "7a2ba4c7151ee035b310989aec3d77b58505cc4a5b86e8e56fe6f06f0674ba6c"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "62b9e5f9b1809ca21501c4483027171700d3de1ee0a89ea88d52bb1bd1623401"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "77d175b0adcc88d8a63d9291e8103a446d7501d2e3a472f9f225cf1c171fe804"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "2a9af8d4e649e326be5f1ad2d6825eaa2f9b6c0522a940a7fc79d9e3f3080538"
+        }
+      ]
+    },
+    {
+      "name": "最低工資法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "0cb26d3d03f910f9adbd172fcc76159e0dc927a0ce271043e086a7eae7f6b2e8"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "e110f9b62e4f9a1655aa5a10757e11aea9019b54c3714d1380df2a21ea6a1cd0"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "bface2db8258e07d87fa0daa3ff9fafbc80049b07960d64118111c6d7b343a70"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "9f05bc7b6f5667ea78f08a6ff9dfc9b4a6ae4b9b58d3d25cbba03a9938e8155e"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "dcdf7276e211d16a7915667501a4538836a04dcd9797f2eef3e734593f65a080"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "1dd4864a72f98ee5379b75cd9cb1e8e45cbbbbb67d1c1d79f61c3d1f20051ea6"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "271fececcda91c8ed90f9df84e550124a3437b898950381faaa73d60891b6e8b"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "73a4dd0ef0206951a2616c39601ce388181a71d70d03cb9a1246237e7a8a8d6a"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "5d79265dcae8ed41cc6f58552f33054fef143cfc9eb4143dc4941ea4fc932167"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "9d7cc0c9072c7d8b37d550f4fdfb2aa824c9855c9e2bce1c16cf0fd3e98a4386"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "af83eb36ab89bec71f3bdf1814a098561e661dd1fe2f4d2212110295d34ccf5b"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "97cd10e8d857495e33f5dcdc34e816cfb9937eff5b74a6ee82a8e32fb43eeb32"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "f0398b099c3be7c77770baaaffc37de4cc2a251a35c7e3a96ffb6559f60273e0"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "d9752e6679db79ee557c620fd4d980c2a918dc34bd59ec6b3c035920b41069af"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "7726202b892bfe4d324a49aa07ccb64233f93a61fb81bcdcea034f3fdad722f8"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "2a570fb7dcd11d5d356891c827a35b0093413a395d287f2c079825d64e20d4a8"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "b370e88b178d06a23e66b17c32fe9624c74af62a59954746442fdcc5f23e158e"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "b00ded6e15a8824943d3d306ef3119b488cc6f25b84a8f0b558dff6855d7803d"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "da2eeee94f76bf25b024e07b409ca2d668197937bbaccd80708d0c65b8c8f4f5"
+        }
+      ]
+    },
+    {
+      "name": "職業安全衛生法",
+      "articles": [
+        {
+          "article": "第 1 條",
+          "sha256": "8f00bb509b66bff87653609dfaaa5f45ea38b4d92c64907fa74fc5c25d18b365"
+        },
+        {
+          "article": "第 10 條",
+          "sha256": "9f56a5b0d72a1d3a56522b99d8ff6db482d202fe4f0e47242433ca56595d7366"
+        },
+        {
+          "article": "第 11 條",
+          "sha256": "125c85401f8c80dfa05dac4d61849f6f84a7519129e7734a76d993920dc41aa6"
+        },
+        {
+          "article": "第 12 條",
+          "sha256": "87e8ccc82f0d5b58ab78adf145c53240399df924fe30c9fd4e2c38f0e4431587"
+        },
+        {
+          "article": "第 13 條",
+          "sha256": "b3b42bf4e665fe5c51f467d26393b654b4b04f9d22120ee2a3afedbe8c551caf"
+        },
+        {
+          "article": "第 14 條",
+          "sha256": "4f9d8dc7e44a3dffc122e1b7dc58986d22b625b5df1685f37e5a045a15c24425"
+        },
+        {
+          "article": "第 15 條",
+          "sha256": "194f94c316f928bffc42c7c96b48cbd85bc9e1ab16905a459abad4c21f6deef9"
+        },
+        {
+          "article": "第 15-1 條",
+          "sha256": "3d990e374d6bdc154ab789418d9f1571be5392ecb8203cf0c8f0553bb169fa80"
+        },
+        {
+          "article": "第 16 條",
+          "sha256": "b438b1f02a3ebd6c004992316befe923960fa2672ded8c41a377d8cfd5913394"
+        },
+        {
+          "article": "第 17 條",
+          "sha256": "b2645be0fda71120f36fda02b6bc4d2db819c86648783b18764d6c8e3fc95ecd"
+        },
+        {
+          "article": "第 18 條",
+          "sha256": "f3ace753dd2f19d293f4d7c822a1a4256d947c8b927a4a94ca865ae6a98d8c50"
+        },
+        {
+          "article": "第 19 條",
+          "sha256": "f66a980ad905cc61caec4af63d7286607177e73435e23a0c64409c178b2a584e"
+        },
+        {
+          "article": "第 2 條",
+          "sha256": "0825b2b7b577095022406983e3fca91a13e71374191b5e5194285a02c547a741"
+        },
+        {
+          "article": "第 20 條",
+          "sha256": "9a2106f6883f4c7e22f913f3ad4a3e9376021149c31b092219de6a3fb6945723"
+        },
+        {
+          "article": "第 21 條",
+          "sha256": "03db8bc76dd3a306ed3eb51fdf31c1792399f0074a56eb232e432a8c4ac59da8"
+        },
+        {
+          "article": "第 22 條",
+          "sha256": "6042a2c716e4637dad97f86dabe9541c4a9f1f43f611258a0776fc396ea7e30e"
+        },
+        {
+          "article": "第 22-1 條",
+          "sha256": "d2e2d70300d53f8af28fc11577a69dc3311806e5521e3962db6a2fc94f7788ef"
+        },
+        {
+          "article": "第 22-2 條",
+          "sha256": "1ddd842f6f703472b2055dc8f3bd45dbe88c66f4a7e5564ec205f9c64e518443"
+        },
+        {
+          "article": "第 22-3 條",
+          "sha256": "199064f25a328bd9bc5ffb9f26bdcc5bef089c93a8f8f9d95df5023b3fa48b01"
+        },
+        {
+          "article": "第 23 條",
+          "sha256": "7e644e6b40acca7fc76343ee133506b5595dd4c8d84fc28e6603bb0deae0bf2c"
+        },
+        {
+          "article": "第 24 條",
+          "sha256": "04043147e177e03447d17c0ff0f952d848a92059fd9d27f149d982ab21cbffa4"
+        },
+        {
+          "article": "第 25 條",
+          "sha256": "4308ee010a64a53ac15f9f45e7394110b0c742464c02e6fcd3260e8a4795b9fd"
+        },
+        {
+          "article": "第 26 條",
+          "sha256": "3b57fbe7bdec0b6c5b3a1a283dd18ecaa23cfa7e099cd954765c86cd833a8cc4"
+        },
+        {
+          "article": "第 27 條",
+          "sha256": "967a356bbe3ea7a274aaa521e2ef701c536745f5e883388de05e24aec34b539f"
+        },
+        {
+          "article": "第 27-1 條",
+          "sha256": "74f4d65b717ffbdabb75eec84da93a0acda172cdbe42e16fd452f6285c821ee4"
+        },
+        {
+          "article": "第 28 條",
+          "sha256": "8df6a2025ae0b0ddeddf18993873a6c85b08340e5a68d1efc7aa079375aafaaf"
+        },
+        {
+          "article": "第 29 條",
+          "sha256": "be2d730d82aa4d45ac11e6cfe5908faa8de64867a612b06c4e071a09907b8f56"
+        },
+        {
+          "article": "第 3 條",
+          "sha256": "6441d847800ffcd77814ec3d1f4c6af4bca478979ecc705995156cab3f82a8da"
+        },
+        {
+          "article": "第 30 條",
+          "sha256": "1b2ad12d41da8e05a27148ef1b181e426066f4b96e7e889b9e95b910cec480de"
+        },
+        {
+          "article": "第 31 條",
+          "sha256": "282180ccefc8a11225afc4a51595c02a67e234956ea6bf14b590d59a54233885"
+        },
+        {
+          "article": "第 32 條",
+          "sha256": "8a6a4649f2cf5b13f4b972b2dd4ce18a141899c038105e1bb5c35fec42270cae"
+        },
+        {
+          "article": "第 33 條",
+          "sha256": "0036a786fb8401dd00b7ee5afaf4c9b83b6d34f98ea02b23724a76b9393b5c6c"
+        },
+        {
+          "article": "第 34 條",
+          "sha256": "1e31620afe3da7cb798715efd08c54cbe8e65b1f56916746da6fa8b02237abb1"
+        },
+        {
+          "article": "第 35 條",
+          "sha256": "cc3282efe1d9a708531839541b2757e2cd20d0556cffbe91a95b340cbc2a71e6"
+        },
+        {
+          "article": "第 36 條",
+          "sha256": "22c5316654f8bfa2bd5f479eac229aa9e562c1376ae667624723f8076fe241b4"
+        },
+        {
+          "article": "第 37 條",
+          "sha256": "9b7a57d35a0b3af7ce9d418af4fd4bca06421737af5be6950b9a6a08ae50bba5"
+        },
+        {
+          "article": "第 38 條",
+          "sha256": "2561a8a1a08ca16c9de5c6b04113f6b2769b026aadb44ef18f7f20829f0ce604"
+        },
+        {
+          "article": "第 39 條",
+          "sha256": "2aa943a8fee63a2be19a9ce9ccdea170e57cb2bcf46e9bebc196b59f66ee3cf8"
+        },
+        {
+          "article": "第 4 條",
+          "sha256": "b59aad95e4d0a04b89e1f89b702c5e269ae4eff10e8bd0fe34d7f039964e0b9a"
+        },
+        {
+          "article": "第 40 條",
+          "sha256": "885f649b1514aae7e24fb0ced620cd0b43ad42a7ed6229801308b74d5f721a8d"
+        },
+        {
+          "article": "第 41 條",
+          "sha256": "8a0878caadf87d6679511f31fb03eaecf0e94179ac7cc45b94785d98cbddbdba"
+        },
+        {
+          "article": "第 42 條",
+          "sha256": "7f68ba8825087316d1f691f340effdab68a886651de1e6185b5722917ee8eea6"
+        },
+        {
+          "article": "第 43 條",
+          "sha256": "125e7dc5a21c009ee6cd89b176ccbdcb5d2f2ed31c561e73fe875b1ca2ec5a8b"
+        },
+        {
+          "article": "第 44 條",
+          "sha256": "f90f4ee0c897d2b39e0ef00a9d161cca9fc398830a0abb3e50ccd336f020b611"
+        },
+        {
+          "article": "第 45 條",
+          "sha256": "c062badc00d252eef121256818f08f87d4d9c49bd83cc4c3290cfa2abe49697e"
+        },
+        {
+          "article": "第 46 條",
+          "sha256": "e43a9c260794e52305b9ccd5178ddef5fb38403472db653379814e774817ac2a"
+        },
+        {
+          "article": "第 47 條",
+          "sha256": "32d92b15a24a45f95ca2dc86280415ed337ddc961d1153c21ff1c12459c159cf"
+        },
+        {
+          "article": "第 48 條",
+          "sha256": "314b3b844e0c7f449933da6f0de5e4a173899a08a5b6c0e411c5bcbd1412318c"
+        },
+        {
+          "article": "第 49 條",
+          "sha256": "ac4868cfe3b777561dc2277e179686d963a184f125b69b21ccaa7532d6899192"
+        },
+        {
+          "article": "第 5 條",
+          "sha256": "105e0331dba74b54b906c9b32623775a98631ed9cd1bf66337ebb08c435ae9e6"
+        },
+        {
+          "article": "第 50 條",
+          "sha256": "00980b6ed2759d3b2c3e4791c6f96946d4f2bef29bbfee98f9201abb76f6c497"
+        },
+        {
+          "article": "第 51 條",
+          "sha256": "77fcec0d92c93de4b3e8cd52ceb03c33db3bc9a3a3dad8f4ca2277825c16c1c0"
+        },
+        {
+          "article": "第 51-1 條",
+          "sha256": "e4858a776154ad9978fb285796506ad815e63cd5f400c11be4cf467e5c9e34be"
+        },
+        {
+          "article": "第 52 條",
+          "sha256": "6ce172cd5d6e5e140c9c4b4b0324887b13bd45844c881f39343e318a140633b4"
+        },
+        {
+          "article": "第 53 條",
+          "sha256": "c459db46f9fd6ecd6b5d269ba22d1f818105d078196c9669a3a02ce680ce5c67"
+        },
+        {
+          "article": "第 54 條",
+          "sha256": "532e07623c0187209a329a53236f66604ba6e799390d1d8a98a01e458b404191"
+        },
+        {
+          "article": "第 55 條",
+          "sha256": "fa88e28c5ecee08a93c6c1a807673cbaf6df23e72efcb0965a105038aeb53cf2"
+        },
+        {
+          "article": "第 6 條",
+          "sha256": "a1623894bea63db545eaf5140a45fb719acd18c3f1758ecfccc9685108068d98"
+        },
+        {
+          "article": "第 7 條",
+          "sha256": "f9c5c7f6f593f0abde89b5bcbe793c8a935324affd3ab931a7ebe30a7042aaf6"
+        },
+        {
+          "article": "第 8 條",
+          "sha256": "63b92c6a033d3bb502a8fcb85ff1b6a60ba8f144e913107334f9a37eb3a92893"
+        },
+        {
+          "article": "第 9 條",
+          "sha256": "05990538a3250eb68723987152b4c93312cc390285788b2fc3d4f1a44c28f539"
+        }
+      ]
+    }
+  ]
+}

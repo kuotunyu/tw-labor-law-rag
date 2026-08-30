@@ -10,7 +10,13 @@ from pathlib import Path
 
 import pytest
 
-from rag.corpus_audit import build_snapshot, compare_snapshots
+from rag.corpus_audit import (
+    build_article_snapshot,
+    build_snapshot,
+    compare_article_snapshots,
+    compare_snapshots,
+    summarize_changes,
+)
 from scripts import audit_corpus, download_corpus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -119,6 +125,77 @@ def test_compare_snapshots_reports_added_and_removed_laws():
     ]
 
 
+def test_change_summary_counts_laws_and_changed_fields():
+    changes = [
+        {"source": "acts", "kind": "added"},
+        {"law": "乙法", "kind": "removed"},
+        {"source": "regulations", "kind": "sha256", "old": "a" * 64, "new": "b" * 64},
+        {"law": "丙法", "kind": "last_amended", "old": "20260101", "new": "20260830"},
+        {"law": "丙法", "kind": "num_articles", "old": 10, "new": 11},
+        {"law": "丁法", "kind": "content_sha256", "old": "c" * 64, "new": "d" * 64},
+        {"law": "丁法", "kind": "effective_date", "old": "20260101", "new": "20260830"},
+    ]
+
+    assert summarize_changes(changes) == {
+        "total_changes": 7,
+        "subjects_changed": 4,
+        "added": 1,
+        "removed": 1,
+        "sha256": 1,
+        "last_amended": 1,
+        "effective_date": 1,
+        "num_articles": 1,
+        "content_sha256": 1,
+    }
+
+
+def test_article_comparison_reports_counts_without_content():
+    committed = {
+        "甲法": {"第 1 條": "a" * 64, "第 2 條": "b" * 64, "第 3 條": "c" * 64}
+    }
+    live = {
+        "甲法": {"第 1 條": "a" * 64, "第 2 條": "d" * 64, "第 4 條": "e" * 64}
+    }
+
+    report = compare_article_snapshots(committed, live)
+
+    assert report["summary"] == {
+        "added": 1,
+        "removed": 1,
+        "changed": 1,
+        "unchanged": 1,
+    }
+    assert report["changes"] == [
+        {
+            "law": "甲法",
+            "article": "第 2 條",
+            "kind": "changed",
+            "old": "b" * 64,
+            "new": "d" * 64,
+        },
+        {"law": "甲法", "article": "第 3 條", "kind": "removed", "old": "c" * 64},
+        {"law": "甲法", "article": "第 4 條", "kind": "added", "new": "e" * 64},
+    ]
+    assert "content" not in repr(report)
+
+
+def test_build_article_snapshot_is_content_free_and_rejects_duplicates():
+    snapshot = build_article_snapshot([_law("甲法")], snapshot_date="2026-08-29")
+
+    assert snapshot["law_count"] == 1
+    assert snapshot["article_count"] == 1
+    assert set(snapshot["laws"][0]) == {"name", "articles"}
+    assert set(snapshot["laws"][0]["articles"][0]) == {"article", "sha256"}
+    assert "第一條內容" not in json.dumps(snapshot, ensure_ascii=False)
+
+    duplicate = _law("甲法")
+    duplicate["articles"].append(
+        {"no": "第 1 條", "chapter": "", "content": "重複條文。"}
+    )
+    with pytest.raises(ValueError, match="duplicate article"):
+        build_article_snapshot([duplicate], snapshot_date="2026-08-29")
+
+
 @pytest.mark.parametrize(
     ("sources", "laws", "message"),
     [
@@ -169,6 +246,15 @@ def test_build_live_snapshot_requires_and_records_all_15_target_laws():
         name for _url, names in download_corpus.DUMPS.values() for name in names
     }
 
+    law_snapshot, article_snapshot = audit_corpus.build_live_snapshots(
+        snapshot_date="2026-08-29",
+        downloader=lambda url: archives[url],
+    )
+    assert law_snapshot == snapshot
+    assert article_snapshot["law_count"] == 15
+    assert article_snapshot["article_count"] == 15
+    assert "內容。" not in json.dumps(article_snapshot, ensure_ascii=False)
+
 
 def test_build_live_snapshot_fails_closed_when_target_law_is_missing():
     archives = {}
@@ -195,6 +281,152 @@ def test_audit_corpus_cli_is_directly_executable():
     stdout = process.stdout.decode("utf-8", errors="replace")
     assert process.returncode == 0, stderr
     assert "--snapshot-date" in stdout
+    assert "--article-check" in stdout
+
+
+def _write_json(path: Path, value: object) -> None:
+    path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+
+
+def _cli_snapshots(content: str = "第一條內容。") -> tuple[dict, dict]:
+    laws = [_law("測試法", content=content)]
+    return (
+        build_snapshot(
+            sources=[_source()], laws=laws, snapshot_date="2026-08-29"
+        ),
+        build_article_snapshot(laws, snapshot_date="2026-08-29"),
+    )
+
+
+def test_audit_corpus_cli_reports_combined_current_summary(
+    monkeypatch, tmp_path, capsys
+):
+    law_snapshot, article_snapshot = _cli_snapshots()
+    law_path = tmp_path / "laws.json"
+    article_path = tmp_path / "articles.json"
+    _write_json(law_path, law_snapshot)
+    _write_json(article_path, article_snapshot)
+    monkeypatch.setattr(
+        audit_corpus,
+        "build_live_snapshots",
+        lambda **_kwargs: (law_snapshot, article_snapshot),
+    )
+
+    assert audit_corpus.main(
+        ["--check", str(law_path), "--article-check", str(article_path)]
+    ) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {
+        "status": "current",
+        "changes": {"laws": [], "articles": []},
+        "summary": {
+            "laws": {
+                "total_changes": 0,
+                "subjects_changed": 0,
+                "added": 0,
+                "removed": 0,
+                "sha256": 0,
+                "last_amended": 0,
+                "effective_date": 0,
+                "num_articles": 0,
+                "content_sha256": 0,
+            },
+            "articles": {"added": 0, "removed": 0, "changed": 0, "unchanged": 1},
+        },
+    }
+    assert "第一條內容" not in repr(payload)
+
+
+def test_audit_corpus_cli_reports_named_law_and_article_changes(
+    monkeypatch, tmp_path, capsys
+):
+    committed_law, committed_articles = _cli_snapshots()
+    live_law, live_articles = _cli_snapshots("已修正條文。")
+    law_path = tmp_path / "laws.json"
+    article_path = tmp_path / "articles.json"
+    _write_json(law_path, committed_law)
+    _write_json(article_path, committed_articles)
+    monkeypatch.setattr(
+        audit_corpus,
+        "build_live_snapshots",
+        lambda **_kwargs: (live_law, live_articles),
+    )
+
+    assert audit_corpus.main(
+        ["--check", str(law_path), "--article-check", str(article_path)]
+    ) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "changed"
+    assert payload["changes"]["laws"][0]["law"] == "測試法"
+    assert payload["changes"]["articles"][0]["article"] == "第 1 條"
+    assert payload["summary"]["articles"]["changed"] == 1
+    assert "已修正條文" not in repr(payload)
+
+
+def test_audit_corpus_bootstrap_requires_current_law_snapshot(
+    monkeypatch, tmp_path, capsys
+):
+    committed_law, _committed_articles = _cli_snapshots()
+    live_law, live_articles = _cli_snapshots("已修正條文。")
+    law_path = tmp_path / "laws.json"
+    target = tmp_path / "article-baseline.json"
+    _write_json(law_path, committed_law)
+    monkeypatch.setattr(
+        audit_corpus,
+        "build_live_snapshots",
+        lambda **_kwargs: (live_law, live_articles),
+    )
+
+    assert audit_corpus.main(
+        ["--check", str(law_path), "--bootstrap-article-snapshot", str(target)]
+    ) == 1
+    assert not target.exists()
+    assert json.loads(capsys.readouterr().out)["status"] == "changed"
+
+
+def test_audit_corpus_bootstrap_writes_content_free_article_snapshot(
+    monkeypatch, tmp_path
+):
+    law_snapshot, article_snapshot = _cli_snapshots()
+    law_path = tmp_path / "laws.json"
+    target = tmp_path / "article-baseline.json"
+    _write_json(law_path, law_snapshot)
+    monkeypatch.setattr(
+        audit_corpus,
+        "build_live_snapshots",
+        lambda **_kwargs: (law_snapshot, article_snapshot),
+    )
+
+    assert audit_corpus.main(
+        ["--check", str(law_path), "--bootstrap-article-snapshot", str(target)]
+    ) == 0
+    assert json.loads(target.read_text(encoding="utf-8")) == article_snapshot
+    assert b"\r\n" not in target.read_bytes()
+    assert "第一條內容" not in target.read_text(encoding="utf-8")
+
+
+def test_audit_corpus_write_requires_and_updates_both_snapshots(
+    monkeypatch, tmp_path
+):
+    law_snapshot, article_snapshot = _cli_snapshots()
+    law_path = tmp_path / "laws.json"
+    article_path = tmp_path / "articles.json"
+    monkeypatch.setattr(
+        audit_corpus,
+        "build_live_snapshots",
+        lambda **_kwargs: (law_snapshot, article_snapshot),
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        audit_corpus.main(["--write", str(law_path)])
+    assert exc.value.code == 2
+    assert not law_path.exists()
+
+    assert audit_corpus.main(
+        ["--write", str(law_path), "--article-write", str(article_path)]
+    ) == 0
+    assert json.loads(law_path.read_text(encoding="utf-8")) == law_snapshot
+    assert json.loads(article_path.read_text(encoding="utf-8")) == article_snapshot
 
 
 def test_audit_corpus_cli_returns_two_for_invalid_source_without_leaking_detail(
@@ -204,7 +436,7 @@ def test_audit_corpus_cli_returns_two_for_invalid_source_without_leaking_detail(
     def fail_audit(**_kwargs):
         raise ValueError("private malformed source detail")
 
-    monkeypatch.setattr(audit_corpus, "build_live_snapshot", fail_audit)
+    monkeypatch.setattr(audit_corpus, "build_live_snapshots", fail_audit)
 
     assert audit_corpus.main(["--check", "release/corpus_snapshot.json"]) == 2
     captured = capsys.readouterr()
@@ -216,7 +448,7 @@ def test_audit_corpus_cli_sanitizes_unsafe_archive_failure(monkeypatch, capsys):
     def fail_audit(**_kwargs):
         raise download_corpus.CorpusArchiveError("private unsafe XML detail")
 
-    monkeypatch.setattr(audit_corpus, "build_live_snapshot", fail_audit)
+    monkeypatch.setattr(audit_corpus, "build_live_snapshots", fail_audit)
 
     assert audit_corpus.main(["--check", "release/corpus_snapshot.json"]) == 2
     captured = capsys.readouterr()

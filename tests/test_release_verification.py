@@ -984,6 +984,9 @@ def test_release_verifier_recomputes_committed_evidence():
         "full_snapshot_date": "2026-08-29",
         "full_snapshot_laws": 15,
         "full_snapshot_articles": 884,
+        "article_snapshot_date": "2026-08-30",
+        "article_snapshot_laws": 15,
+        "article_snapshot_articles": 884,
     }
     assert report["ci"] == {
         "action_pins": 2,
@@ -999,7 +1002,7 @@ def test_release_verifier_recomputes_committed_evidence():
         else "not_applicable_no_git_metadata"
     )
     assert report["publication"]["tracking"] == expected_tracking
-    assert report["publication"]["files"] == 163
+    assert report["publication"]["files"] == 164
     expected_history = len(
         {
             line
@@ -1196,6 +1199,59 @@ def test_full_corpus_snapshot_verifier_rejects_duplicate_law_names(tmp_path):
                 "articles": 884,
             },
         )
+
+
+def _article_snapshot_contract(path: Path) -> dict:
+    return {
+        "path": path.name,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "schema_version": "1.0",
+        "snapshot_date": "2026-08-30",
+        "laws": 15,
+        "articles": 884,
+    }
+
+
+def test_article_snapshot_verifier_proves_all_fingerprints_without_content():
+    path = PROJECT_ROOT / "release/corpus_article_snapshot.json"
+    contract = {
+        **_article_snapshot_contract(path),
+        "path": "release/corpus_article_snapshot.json",
+    }
+
+    assert release_module()._verify_article_snapshot(PROJECT_ROOT, contract) == {
+        "snapshot_date": "2026-08-30",
+        "laws": 15,
+        "articles": 884,
+    }
+
+
+@pytest.mark.parametrize("tamper", ["duplicate", "content", "count", "hash"])
+def test_article_snapshot_verifier_rejects_tampering(tmp_path, tamper):
+    snapshot = json.loads(
+        (PROJECT_ROOT / "release/corpus_article_snapshot.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if tamper == "duplicate":
+        snapshot["laws"][0]["articles"][1]["article"] = snapshot["laws"][0][
+            "articles"
+        ][0]["article"]
+    elif tamper == "content":
+        snapshot["laws"][0]["articles"][0]["content"] = "must not be public"
+    elif tamper == "count":
+        snapshot["article_count"] += 1
+    path = tmp_path / "article.json"
+    path.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
+    contract = _article_snapshot_contract(path)
+    if tamper == "hash":
+        contract["sha256"] = "0" * 64
+
+    with pytest.raises(
+        release_module().ReleaseVerificationError,
+        match="article snapshot",
+    ):
+        release_module()._verify_article_snapshot(tmp_path, contract)
 
 
 def test_design_does_not_expand_observed_corpus_scale():
