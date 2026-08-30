@@ -34,6 +34,7 @@ from rag.retrieval.pipeline import plan_retrieval_query
 from rag.severance_refusal_policy import (
     DECISION_CODE_PATHS,
     replay_official_artifact,
+    validate_decision_import_closure,
 )
 from rag.severance_refusal_policy import load_cases as load_severance_policy_cases
 
@@ -2350,6 +2351,14 @@ def _verify_severance_refusal_policy_artifact(
         raise ReleaseVerificationError(
             "severance refusal policy schema_version must equal 1.3"
         )
+    for field, relative_path in DECISION_CODE_PATHS.items():
+        _require_bound_file(root, relative_path, label=field)
+    try:
+        validate_decision_import_closure(root)
+    except ValueError as exc:
+        raise ReleaseVerificationError(
+            f"severance refusal policy import closure failed: {exc}"
+        ) from exc
     try:
         replayed = replay_official_artifact(artifact)
     except (RuntimeError, ValueError) as exc:

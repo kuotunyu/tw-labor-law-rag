@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import math
@@ -23,10 +24,12 @@ DECISION_CODE_PATHS = {
     "evaluation": "src/rag/evaluation.py",
     "factory": "src/rag/factory.py",
     "models": "src/rag/models.py",
+    "portfolio_demo_regression": "src/rag/portfolio_demo_regression.py",
     "reliability": "src/rag/reliability.py",
     "wage_arrears_regression": "src/rag/wage_arrears_regression.py",
     # Factory imports whose import-time behavior is part of provider isolation.
     "generation_answerer": "src/rag/generation/answerer.py",
+    "generation_package": "src/rag/generation/__init__.py",
     "generation_llm": "src/rag/generation/llm.py",
     "generation_prompts": "src/rag/generation/prompts.py",
     "generation_router": "src/rag/generation/router.py",
@@ -36,14 +39,18 @@ DECISION_CODE_PATHS = {
     "index_legal_terms": "src/rag/indexing/dict/legal_terms.txt",
     "index_tokenizer": "src/rag/indexing/tokenizer.py",
     "index_vector_store": "src/rag/indexing/vector_store.py",
+    "indexing_package": "src/rag/indexing/__init__.py",
     "ingestion_chunkers": "src/rag/ingestion/chunkers.py",
     "ingestion_cleaner": "src/rag/ingestion/cleaner.py",
     "ingestion_loader": "src/rag/ingestion/loader.py",
+    "ingestion_package": "src/rag/ingestion/__init__.py",
+    "rag_package": "src/rag/__init__.py",
     "retrieval_fusion": "src/rag/retrieval/fusion.py",
     "retrieval_pipeline": "src/rag/retrieval/pipeline.py",
     "retrieval_refusal_policy": "src/rag/retrieval/refusal_policy.py",
     "retrieval_reranker": "src/rag/retrieval/reranker.py",
     "retrieval_retriever": "src/rag/retrieval/retriever.py",
+    "retrieval_package": "src/rag/retrieval/__init__.py",
     # Evidence construction, replay, and release verification entry points.
     "severance_policy": "src/rag/severance_refusal_policy.py",
     "runner_bootstrap": "eval/_bootstrap.py",
@@ -59,6 +66,14 @@ DECISION_CODE_PATHS = {
     "project_configuration": "pyproject.toml",
     "runtime_lock": "uv.lock",
 }
+DECISION_IMPORT_ROOTS = (
+    "eval/run_severance_refusal_policy.py",
+    "src/rag/release_verification.py",
+    "scripts/verify_release.py",
+)
+# No dynamic local imports are required by the authoritative execution closure.
+# Any future exception must name the importing file and document its rationale.
+DYNAMIC_LOCAL_IMPORT_ALLOWLIST: dict[str, str] = {}
 EXPECTED_QIDS = tuple(
     f"severance-policy-{number:03d}" for number in range(1, 31)
 )
@@ -322,6 +337,153 @@ _FORMAL_ROUTES = {
     "eval-03": _SEVERANCE_ROUTE,
     "eval-10": _WAGE_ROUTE,
 }
+
+
+def _relative_project_path(project_root: Path, path: Path) -> str:
+    return path.relative_to(project_root).as_posix()
+
+
+def _module_name_for_path(project_root: Path, path: Path) -> tuple[str, ...]:
+    source_root = project_root / "src"
+    try:
+        relative = path.relative_to(source_root)
+    except ValueError:
+        relative = path.relative_to(project_root)
+    parts = list(relative.with_suffix("").parts)
+    if parts and parts[-1] == "__init__":
+        parts.pop()
+    return tuple(parts)
+
+
+def _resolve_local_module(
+    project_root: Path, importing_path: Path, module: str
+) -> Path | None:
+    if not module:
+        return None
+    parts = module.split(".")
+    candidates = []
+    if len(parts) == 1:
+        candidates.extend(
+            (
+                importing_path.parent / f"{module}.py",
+                importing_path.parent / module / "__init__.py",
+            )
+        )
+    for base in (project_root / "src", project_root):
+        module_path = base.joinpath(*parts)
+        candidates.extend((module_path.with_suffix(".py"), module_path / "__init__.py"))
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _package_initializers(project_root: Path, path: Path) -> tuple[Path, ...]:
+    source_root = project_root / "src"
+    try:
+        path.relative_to(source_root)
+        package_root = source_root
+    except ValueError:
+        package_root = project_root
+    initializers = []
+    parent = path.parent
+    while parent != package_root and package_root in parent.parents:
+        initializer = parent / "__init__.py"
+        if initializer.is_file():
+            initializers.append(initializer)
+        parent = parent.parent
+    return tuple(initializers)
+
+
+def _imported_local_paths(
+    project_root: Path, importing_path: Path, tree: ast.AST
+) -> set[Path]:
+    imported: set[Path] = set()
+    current_module = _module_name_for_path(project_root, importing_path)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            modules = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                package = (
+                    current_module
+                    if importing_path.name == "__init__.py"
+                    else current_module[:-1]
+                )
+                keep = len(package) - node.level + 1
+                prefix = package[: max(keep, 0)]
+                base = ".".join((*prefix, *(node.module or "").split(".")))
+            else:
+                base = node.module or ""
+            modules = [base]
+            modules.extend(
+                f"{base}.{alias.name}" if base else alias.name
+                for alias in node.names
+                if alias.name != "*"
+            )
+        else:
+            continue
+        for module in modules:
+            resolved = _resolve_local_module(project_root, importing_path, module)
+            if resolved is not None:
+                imported.add(resolved)
+    return imported
+
+
+def _uses_dynamic_import(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        function = node.func
+        if isinstance(function, ast.Name) and function.id in {
+            "__import__",
+            "import_module",
+        }:
+            return True
+        if (
+            isinstance(function, ast.Attribute)
+            and isinstance(function.value, ast.Name)
+            and function.value.id == "importlib"
+            and function.attr == "import_module"
+        ):
+            return True
+    return False
+
+
+def validate_decision_import_closure(
+    project_root: Path,
+    *,
+    roots: tuple[str, ...] = DECISION_IMPORT_ROOTS,
+    manifest: dict[str, str] = DECISION_CODE_PATHS,
+) -> frozenset[str]:
+    """Discover static local imports and reject manifest omissions."""
+
+    root = project_root.resolve()
+    pending = [root / relative for relative in roots]
+    discovered: set[str] = set()
+    while pending:
+        path = pending.pop()
+        if not path.is_file():
+            raise ValueError(f"decision import closure file is missing: {path}")
+        relative = _relative_project_path(root, path)
+        if relative in discovered:
+            continue
+        discovered.add(relative)
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+        if (
+            _uses_dynamic_import(tree)
+            and relative not in DYNAMIC_LOCAL_IMPORT_ALLOWLIST
+        ):
+            raise ValueError(f"unallowlisted dynamic import in {relative}")
+        pending.extend(_package_initializers(root, path))
+        pending.extend(_imported_local_paths(root, path, tree))
+    omissions = discovered - set(manifest.values())
+    if omissions:
+        raise ValueError(
+            "decision import closure is missing manifest entries: "
+            + ", ".join(sorted(omissions))
+        )
+    return frozenset(discovered)
 
 
 def _invalid(identity: object, message: str) -> ValueError:

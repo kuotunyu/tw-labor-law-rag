@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 from datetime import datetime
@@ -38,6 +39,7 @@ from rag.severance_refusal_policy import (  # noqa: E402
     build_official_artifact,
     evaluate_route_ablation_candidate,
     load_cases,
+    validate_decision_import_closure,
 )
 from rag.wage_arrears_regression import require_cached_models  # noqa: E402
 
@@ -85,13 +87,41 @@ def _resolved_project_path(path: Path) -> Path:
     return candidate.resolve()
 
 
+def _stat_indicates_alias(value: os.stat_result) -> bool:
+    """Identify symlinks and Windows reparse points through a portable seam."""
+
+    return stat.S_ISLNK(value.st_mode) or bool(
+        getattr(value, "st_file_attributes", 0) & 0x400
+    )
+
+
+def _reject_output_path_aliases(output: Path) -> None:
+    """Fail before resolving if the output or any parent is an alias."""
+
+    components = [output, *output.parents]
+    for current in reversed(components):
+        try:
+            path_stat = os.lstat(current)
+        except FileNotFoundError:
+            continue
+        if _stat_indicates_alias(path_stat):
+            raise ValueError(
+                "--diagnostics-output must not use a symlink or reparse point"
+            )
+
+
 def _validated_diagnostics_output(args: argparse.Namespace) -> Path:
-    approved = DIAGNOSTIC_RESULT.resolve()
-    output = _resolved_project_path(args.diagnostics_output)
-    if output != approved:
+    approved = DIAGNOSTIC_RESULT
+    output = (
+        args.diagnostics_output
+        if args.diagnostics_output.is_absolute()
+        else PROJECT_ROOT / args.diagnostics_output
+    )
+    if output.parts != approved.parts:
         raise ValueError(
-            "--diagnostics-output must resolve to the approved pivot diagnostic path"
+            "--diagnostics-output must be the approved lexical pivot path"
         )
+    _reject_output_path_aliases(output)
     source_paths = {
         _resolved_project_path(path)
         for path in (
@@ -106,16 +136,17 @@ def _validated_diagnostics_output(args: argparse.Namespace) -> Path:
         OFFICIAL_RESULT.resolve(),
         HISTORICAL_DIAGNOSTIC.resolve(),
     }
+    resolved_output = output.resolve()
     aliases_protected_file = output.exists() and any(
-        protected.exists() and output.samefile(protected)
+        protected.exists() and resolved_output.samefile(protected)
         for protected in protected_paths
     )
-    if output in protected_paths or aliases_protected_file:
+    if resolved_output in protected_paths or aliases_protected_file:
         raise ValueError(
             "diagnostics output must not collide with historical, source, or "
             "official artifacts"
         )
-    return approved
+    return output
 
 
 def _offline_preflight(args: argparse.Namespace) -> Settings:
@@ -438,6 +469,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         args.diagnostics_output = _validated_diagnostics_output(args)
+        validate_decision_import_closure(PROJECT_ROOT)
     except ValueError as exc:
         parser.error(str(exc))
     if not args.offline:

@@ -3,6 +3,7 @@ import json
 import math
 import os
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -31,44 +32,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATASET = PROJECT_ROOT / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl"
 RUNNER = PROJECT_ROOT / "eval/run_severance_refusal_policy.py"
 STRESS_DATASET = PROJECT_ROOT / "eval/dataset/reliability_stress_v0.3.1.jsonl"
-DECISION_RELEVANT_PATHS = {
-    "config": "src/rag/config.py",
-    "corpus_audit": "src/rag/corpus_audit.py",
-    "evaluation": "src/rag/evaluation.py",
-    "factory": "src/rag/factory.py",
-    "generation_answerer": "src/rag/generation/answerer.py",
-    "generation_llm": "src/rag/generation/llm.py",
-    "generation_prompts": "src/rag/generation/prompts.py",
-    "generation_router": "src/rag/generation/router.py",
-    "index_bm25": "src/rag/indexing/bm25_index.py",
-    "index_embedder": "src/rag/indexing/embedder.py",
-    "index_legal_terms": "src/rag/indexing/dict/legal_terms.txt",
-    "index_tokenizer": "src/rag/indexing/tokenizer.py",
-    "index_vector_store": "src/rag/indexing/vector_store.py",
-    "ingestion_chunkers": "src/rag/ingestion/chunkers.py",
-    "ingestion_cleaner": "src/rag/ingestion/cleaner.py",
-    "ingestion_loader": "src/rag/ingestion/loader.py",
-    "models": "src/rag/models.py",
-    "reliability": "src/rag/reliability.py",
-    "retrieval_fusion": "src/rag/retrieval/fusion.py",
-    "retrieval_pipeline": "src/rag/retrieval/pipeline.py",
-    "retrieval_refusal_policy": "src/rag/retrieval/refusal_policy.py",
-    "retrieval_reranker": "src/rag/retrieval/reranker.py",
-    "retrieval_retriever": "src/rag/retrieval/retriever.py",
-    "severance_policy": "src/rag/severance_refusal_policy.py",
-    "wage_arrears_regression": "src/rag/wage_arrears_regression.py",
-    "runner_bootstrap": "eval/_bootstrap.py",
-    "runner_lib": "eval/lib.py",
-    "runner_reliability": "eval/run_reliability_eval.py",
-    "runner_severance": "eval/run_severance_refusal_policy.py",
-    "script_audit_corpus": "scripts/audit_corpus.py",
-    "script_bootstrap": "scripts/_bootstrap.py",
-    "script_download_corpus": "scripts/download_corpus.py",
-    "release_verifier": "src/rag/release_verification.py",
-    "release_verifier_wrapper": "scripts/verify_release.py",
-    "project_configuration": "pyproject.toml",
-    "runtime_lock": "uv.lock",
-}
 EXPECTED_QIDS = (
     "severance-policy-001",
     "severance-policy-002",
@@ -319,6 +282,8 @@ def test_runner_rejects_non_cpu_device_before_model_preflight(monkeypatch) -> No
         "source",
         "relative_arbitrary",
         "traversal_collision",
+        "traversal_to_approved",
+        "case_alias",
         "absolute_arbitrary",
     ],
 )
@@ -334,6 +299,12 @@ def test_runner_rejects_nonapproved_diagnostics_output_before_models_or_writes(
         "traversal_collision": Path(
             "eval/diagnostics/../official/severance_refusal_policy_v0.3.6.json"
         ),
+        "traversal_to_approved": Path(
+            "eval/official/../diagnostics/"
+            "severance_retrieval_pivot_v0.3.6_no_go.json"
+        ),
+        "case_alias": PROJECT_ROOT
+        / "Eval/diagnostics/severance_retrieval_pivot_v0.3.6_no_go.json",
         "absolute_arbitrary": tmp_path / "arbitrary.json",
     }
     protected = outputs[unsafe_output]
@@ -415,6 +386,95 @@ def test_runner_rejects_hardlink_alias_collision_before_models(
         )
 
     assert source.read_text(encoding="utf-8") == "source evidence\n"
+
+
+@pytest.mark.parametrize("alias_component", ["output", "parent"])
+def test_runner_rejects_approved_path_through_symlink_before_models(
+    monkeypatch, tmp_path, alias_component
+) -> None:
+    repository = tmp_path / "repository"
+    eval_dir = repository / "eval"
+    eval_dir.mkdir(parents=True)
+    arbitrary_target = tmp_path / "arbitrary-target"
+    arbitrary_target.mkdir()
+    diagnostics = eval_dir / "diagnostics"
+    approved = diagnostics / "severance_retrieval_pivot_v0.3.6_no_go.json"
+    try:
+        if alias_component == "parent":
+            diagnostics.symlink_to(arbitrary_target, target_is_directory=True)
+            untouched = arbitrary_target
+        else:
+            diagnostics.mkdir()
+            target_file = arbitrary_target / "unrelated.json"
+            target_file.write_text("untouched\n", encoding="utf-8")
+            approved.symlink_to(target_file)
+            untouched = target_file
+    except OSError as exc:
+        pytest.skip(f"OS denied symlink creation: {exc}")
+    monkeypatch.setattr(runner, "PROJECT_ROOT", repository)
+    monkeypatch.setattr(runner, "DIAGNOSTIC_RESULT", approved)
+    monkeypatch.setattr(
+        runner,
+        "_offline_preflight",
+        lambda _args: pytest.fail("symlinked output must fail before models"),
+    )
+    before = (
+        tuple(arbitrary_target.iterdir())
+        if untouched.is_dir()
+        else untouched.read_bytes()
+    )
+
+    with pytest.raises(SystemExit):
+        runner.main(["--offline", "--diagnostics-output", str(approved)])
+
+    after = (
+        tuple(arbitrary_target.iterdir())
+        if untouched.is_dir()
+        else untouched.read_bytes()
+    )
+    assert after == before
+
+
+def test_runner_rejects_approved_path_through_windows_junction_before_models(
+    monkeypatch, tmp_path
+) -> None:
+    if sys.platform != "win32":
+        pytest.skip("Windows junctions are unavailable on this platform")
+    repository = tmp_path / "repository"
+    eval_dir = repository / "eval"
+    eval_dir.mkdir(parents=True)
+    arbitrary_target = tmp_path / "junction-target"
+    arbitrary_target.mkdir()
+    diagnostics = eval_dir / "diagnostics"
+    created = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(diagnostics), str(arbitrary_target)],
+        check=False,
+        capture_output=True,
+    )
+    if created.returncode != 0:
+        pytest.skip("OS denied junction creation")
+    approved = diagnostics / "severance_retrieval_pivot_v0.3.6_no_go.json"
+    monkeypatch.setattr(runner, "PROJECT_ROOT", repository)
+    monkeypatch.setattr(runner, "DIAGNOSTIC_RESULT", approved)
+    monkeypatch.setattr(
+        runner,
+        "_offline_preflight",
+        lambda _args: pytest.fail("junction output must fail before models"),
+    )
+
+    with pytest.raises(SystemExit):
+        runner.main(["--offline", "--diagnostics-output", str(approved)])
+
+    assert tuple(arbitrary_target.iterdir()) == ()
+
+
+def test_alias_stat_seam_recognizes_windows_reparse_points() -> None:
+    detector = getattr(runner, "_stat_indicates_alias", None)
+    assert callable(detector), "runner must expose the platform-independent alias seam"
+
+    assert detector(
+        SimpleNamespace(st_mode=stat.S_IFDIR, st_file_attributes=0x400)
+    ) is True
 
 
 def test_local_pipeline_forces_both_model_loaders_local_only_without_llm(
@@ -826,7 +886,7 @@ def test_runner_binds_exact_input_hashes_models_settings_and_zero_providers(
         },
         "decision_code_sha256": {
             name: hashlib.sha256((PROJECT_ROOT / path).read_bytes()).hexdigest()
-            for name, path in DECISION_RELEVANT_PATHS.items()
+            for name, path in policy.DECISION_CODE_PATHS.items()
         },
         "embedding_model": "BAAI/bge-m3",
         "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
@@ -1379,7 +1439,7 @@ def _provenance():
         },
         "decision_code_sha256": {
             name: f"{index % 16:x}" * 64
-            for index, name in enumerate(DECISION_RELEVANT_PATHS)
+            for index, name in enumerate(policy.DECISION_CODE_PATHS)
         },
         "embedding_model": "BAAI/bge-m3",
         "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
@@ -2431,6 +2491,59 @@ def test_official_replay_rejects_schema_provenance_gate_and_evidence_tampering(
         policy.replay_official_artifact(artifact)
 
 
+def test_static_local_import_closure_covers_authoritative_execution_roots() -> None:
+    validator = getattr(policy, "validate_decision_import_closure", None)
+    assert callable(validator), "policy must validate its static local import closure"
+
+    discovered = validator(PROJECT_ROOT)
+
+    assert {
+        "src/rag/portfolio_demo_regression.py",
+        "src/rag/__init__.py",
+        "src/rag/generation/__init__.py",
+        "src/rag/indexing/__init__.py",
+        "src/rag/ingestion/__init__.py",
+        "src/rag/retrieval/__init__.py",
+    } <= discovered
+
+
+def test_static_local_import_closure_rejects_new_omitted_dependency(tmp_path) -> None:
+    validator = getattr(policy, "validate_decision_import_closure", None)
+    assert callable(validator), "policy must validate its static local import closure"
+    runner_path = tmp_path / "runner.py"
+    package = tmp_path / "src/rag"
+    package.mkdir(parents=True)
+    runner_path.write_text("from rag import newly_imported\n", encoding="utf-8")
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "newly_imported.py").write_text("VALUE = 1\n", encoding="utf-8")
+    manifest = {
+        "runner": "runner.py",
+        "rag_package": "src/rag/__init__.py",
+    }
+
+    with pytest.raises(ValueError, match="src/rag/newly_imported.py"):
+        validator(tmp_path, roots=("runner.py",), manifest=manifest)
+
+
+def test_static_local_import_closure_rejects_unallowlisted_dynamic_import(
+    tmp_path,
+) -> None:
+    validator = getattr(policy, "validate_decision_import_closure", None)
+    assert callable(validator), "policy must validate its static local import closure"
+    runner_path = tmp_path / "runner.py"
+    runner_path.write_text(
+        "import importlib\nimportlib.import_module('rag.hidden')\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="dynamic import.*runner.py"):
+        validator(
+            tmp_path,
+            roots=("runner.py",),
+            manifest={"runner": "runner.py"},
+        )
+
+
 @pytest.mark.parametrize(
     "changed_dependency",
     [
@@ -2451,7 +2564,7 @@ def test_release_verifier_invalidates_representative_dependency_changes(
         "eval/dataset/reliability_stress_v0.3.1.jsonl",
         "eval/dataset/eval_set.jsonl",
         "release/corpus_snapshot.json",
-        *DECISION_RELEVANT_PATHS.values(),
+        *policy.DECISION_CODE_PATHS.values(),
     )
     for relative_path in source_paths:
         destination = repository / relative_path
@@ -2494,7 +2607,7 @@ def test_release_verifier_invalidates_representative_dependency_changes(
         },
         decision_code_sha256={
             name: hashlib.sha256((repository / path).read_bytes()).hexdigest()
-            for name, path in DECISION_RELEVANT_PATHS.items()
+            for name, path in policy.DECISION_CODE_PATHS.items()
         },
         code_revision=subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -2530,7 +2643,7 @@ def test_release_verifier_invalidates_representative_dependency_changes(
         "provider_requests": 0,
     }
 
-    changed_path = repository / DECISION_RELEVANT_PATHS[changed_dependency]
+    changed_path = repository / policy.DECISION_CODE_PATHS[changed_dependency]
     changed_path.write_bytes(changed_path.read_bytes() + b"\n")
     provenance["decision_code_sha256"][changed_dependency] = hashlib.sha256(
         changed_path.read_bytes()
@@ -2560,7 +2673,7 @@ def test_release_verifier_rejects_missing_or_untracked_relevant_files(
         "eval/dataset/reliability_stress_v0.3.1.jsonl",
         "eval/dataset/eval_set.jsonl",
         "release/corpus_snapshot.json",
-        *DECISION_RELEVANT_PATHS.values(),
+        *policy.DECISION_CODE_PATHS.values(),
     )
     for relative_path in source_paths:
         destination = repository / relative_path
@@ -2599,7 +2712,7 @@ def test_release_verifier_rejects_missing_or_untracked_relevant_files(
         },
         decision_code_sha256={
             name: hashlib.sha256((repository / relative).read_bytes()).hexdigest()
-            for name, relative in DECISION_RELEVANT_PATHS.items()
+            for name, relative in policy.DECISION_CODE_PATHS.items()
         },
         code_revision=subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -2617,9 +2730,14 @@ def test_release_verifier_rejects_missing_or_untracked_relevant_files(
     )
     artifact_path = repository / "severance-policy.json"
     runner._write_public_json(artifact_path, artifact)
-    relevant = repository / DECISION_RELEVANT_PATHS["release_verifier_wrapper"]
+    relevant = repository / policy.DECISION_CODE_PATHS["release_verifier_wrapper"]
     subprocess.run(
-        ["git", "rm", "--cached", DECISION_RELEVANT_PATHS["release_verifier_wrapper"]],
+        [
+            "git",
+            "rm",
+            "--cached",
+            policy.DECISION_CODE_PATHS["release_verifier_wrapper"],
+        ],
         cwd=repository,
         check=True,
         capture_output=True,
