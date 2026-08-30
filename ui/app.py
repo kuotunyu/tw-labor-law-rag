@@ -12,7 +12,14 @@ from urllib.parse import urlparse
 import httpx
 import streamlit as st
 
-from ui.api_client import (
+try:
+    from ui import _bootstrap as _ui_bootstrap
+except ModuleNotFoundError:  # Streamlit starts with ui/ as the import root.
+    import _bootstrap as _ui_bootstrap
+
+_ui_bootstrap.ensure_import_roots()
+
+from ui.api_client import (  # noqa: E402
     ApiRequestError,
     actual_generation_metadata,
     fetch_models,
@@ -20,8 +27,12 @@ from ui.api_client import (
     requested_provider_for_display,
     submit_query,
 )
-from ui.content import BYOK_PRIVACY_POINTS, EXAMPLE_QUESTIONS, KNOWLEDGE_BASE
-from ui.refusal_labels import refusal_stage_label
+from ui.content import (  # noqa: E402
+    BYOK_PRIVACY_POINTS,
+    EXAMPLE_QUESTIONS,
+    KNOWLEDGE_BASE,
+)
+from ui.refusal_labels import refusal_stage_label  # noqa: E402
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
 

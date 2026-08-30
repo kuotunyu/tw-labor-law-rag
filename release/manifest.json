@@ -186,11 +186,12 @@
       ],
       "legacy_public_paths": [],
       "reviewed_binary_sha256": [
-        "ee95af1a9a8b92d2e1b8521da48e0a56fcc7447982122193bcc251ef95b86ecb"
+        "ee95af1a9a8b92d2e1b8521da48e0a56fcc7447982122193bcc251ef95b86ecb",
+        "85d4edcfb6ebcedae57da2cb886c17dada6fa4f7fe58439364cd8ed03f962a25"
       ]
     },
     "reviewed_binaries": {
-      "docs/screenshot-demo.png": "ee95af1a9a8b92d2e1b8521da48e0a56fcc7447982122193bcc251ef95b86ecb"
+      "docs/screenshot-demo.png": "85d4edcfb6ebcedae57da2cb886c17dada6fa4f7fe58439364cd8ed03f962a25"
     },
     "excluded": [
       ".claude/",
