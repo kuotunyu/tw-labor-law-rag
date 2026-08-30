@@ -1171,6 +1171,145 @@ def _verify_article_snapshot(
     }
 
 
+def _verify_deployment_receipt(
+    project_root: Path,
+    receipt_contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    relative_path = receipt_contract["path"]
+    path = project_root / relative_path
+    _assert_equal(
+        f"deployment receipt exists {relative_path}",
+        path.is_file(),
+        True,
+    )
+    raw = path.read_bytes()
+    _assert_equal(
+        "deployment receipt SHA-256",
+        hashlib.sha256(raw).hexdigest(),
+        receipt_contract["sha256"],
+    )
+    text = raw.decode("utf-8")
+    begin = "<!-- receipt-json:start -->"
+    end = "<!-- receipt-json:end -->"
+    _assert_equal("deployment receipt begin marker", text.count(begin), 1)
+    _assert_equal("deployment receipt end marker", text.count(end), 1)
+    try:
+        payload_text = text.split(begin, 1)[1].split(end, 1)[0].strip()
+        payload = json.loads(payload_text)
+    except (IndexError, json.JSONDecodeError) as exc:
+        raise ReleaseVerificationError("deployment receipt JSON") from exc
+
+    expected_fields = {
+        "schema_version",
+        "date",
+        "candidate_source_sha",
+        "space_revision_sha",
+        "visibility",
+        "hardware",
+        "replicas",
+        "persistent_storage",
+        "collection_base",
+        "point_counts",
+        "space_policy_preflight",
+        "qdrant_runtime_evidence",
+        "byok_fallback_policy",
+        "no_provider_acceptance",
+    }
+    _assert_equal("deployment receipt fields", set(payload), expected_fields)
+    _assert_equal("deployment receipt schema", payload["schema_version"], "1.0")
+    _assert_equal("deployment receipt date", payload["date"], receipt_contract["date"])
+    try:
+        date.fromisoformat(payload["date"])
+    except (TypeError, ValueError) as exc:
+        raise ReleaseVerificationError("deployment receipt date") from exc
+
+    for key in ("candidate_source_sha", "space_revision_sha"):
+        value = payload[key]
+        if not re.fullmatch(r"[0-9a-f]{40}", str(value)):
+            raise ReleaseVerificationError(f"deployment receipt {key}")
+        _assert_equal(
+            f"deployment receipt {key}",
+            value,
+            receipt_contract[key],
+        )
+    _assert_equal("deployment receipt visibility", payload["visibility"], "private")
+    _assert_equal("deployment receipt hardware", payload["hardware"], "cpu-basic")
+    _assert_equal("deployment receipt replicas", payload["replicas"], 1)
+    _assert_equal(
+        "deployment receipt persistent storage",
+        payload["persistent_storage"],
+        False,
+    )
+    _assert_equal(
+        "deployment receipt collection base",
+        payload["collection_base"],
+        "labor_laws_20260830_3ec5ade",
+    )
+    _assert_equal(
+        "deployment receipt point counts",
+        payload["point_counts"],
+        {"fixed": 481, "structure": 884},
+    )
+    _assert_equal(
+        "deployment receipt Space preflight",
+        payload["space_policy_preflight"],
+        True,
+    )
+    _assert_equal(
+        "deployment receipt BYOK policy",
+        payload["byok_fallback_policy"],
+        True,
+    )
+    _assert_equal(
+        "deployment receipt Qdrant evidence",
+        payload["qdrant_runtime_evidence"],
+        {
+            "candidate_read_observed": True,
+            "legacy_scope_configured": True,
+            "local_live_probe": False,
+            "local_probe_reason": "runtime_credential_non_exportable_after_rotation",
+        },
+    )
+    _assert_equal(
+        "deployment receipt no-provider acceptance",
+        payload["no_provider_acceptance"],
+        {
+            "private_app_loaded": True,
+            "remote_inventory_exact": True,
+            "api_contract_tests": True,
+            "provider_requests": 0,
+        },
+    )
+    prohibited = (
+        "http://",
+        "https://",
+        "@",
+        "gemini_api_key",
+        "openai_api_key",
+        "endpoint",
+        "session_token",
+        "provider_payload",
+    )
+    lowered = text.casefold()
+    if any(token in lowered for token in prohibited):
+        raise ReleaseVerificationError("deployment receipt prohibited data")
+    return {
+        "candidate_source_sha": payload["candidate_source_sha"],
+        "space_revision_sha": payload["space_revision_sha"],
+        "visibility": payload["visibility"],
+        "hardware": payload["hardware"],
+        "collection_base": payload["collection_base"],
+        "fixed_points": payload["point_counts"]["fixed"],
+        "structure_points": payload["point_counts"]["structure"],
+        "provider_requests": payload["no_provider_acceptance"][
+            "provider_requests"
+        ],
+        "local_qdrant_probe": payload["qdrant_runtime_evidence"][
+            "local_live_probe"
+        ],
+    }
+
+
 def _verify_reliability_evidence(
     project_root: Path,
     contract: Mapping[str, Any],
@@ -2295,6 +2434,10 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         root,
         provider_crosscheck_contract,
     )
+    deployment_summary = _verify_deployment_receipt(
+        root,
+        manifest["deployment"]["receipt"],
+    )
 
     public_paths = _load_public_file_list(root / manifest["publication"]["allowlist"])
     history_config = manifest["publication"]["history"]
@@ -2400,6 +2543,7 @@ def verify_release(project_root: Path) -> dict[str, Any]:
             "avg_relevancy": e2e_metrics["avg_relevancy"],
         },
         "provider_crosscheck": provider_crosscheck_summary,
+        "deployment": deployment_summary,
         "privacy": {
             "official_trace_issues": len(trace_issues),
             "public_scan_issues": len(public_issues),
