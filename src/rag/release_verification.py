@@ -24,6 +24,7 @@ from typing import Any
 
 from rag.config import Settings
 from rag.evaluation import canonical_text_sha256, compute_e2e_metrics
+from rag.portfolio_demo_regression import build_result, load_cases, summarize_results
 from rag.reliability import (
     PUBLIC_TRACE_FIELDS,
     compute_reliability_metrics,
@@ -1394,6 +1395,199 @@ def _verify_wage_arrears_regression_evidence(
     return {"questions": 20, **summary}
 
 
+def _verify_portfolio_demo_evidence(
+    project_root: Path,
+    contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Recompute the content-free v0.3.5 retrieval-boundary evidence."""
+
+    _assert_public_equal(
+        "portfolio manifest fields",
+        set(contract),
+        {
+            "dataset",
+            "results_path",
+            "results_sha256",
+            "corpus_snapshot",
+            "code_revision",
+            "configuration",
+            "summary",
+        },
+    )
+    dataset_contract = contract["dataset"]
+    snapshot_contract = contract["corpus_snapshot"]
+    _assert_public_equal(
+        "portfolio dataset manifest fields",
+        set(dataset_contract),
+        {"path", "sha256", "questions", "answerable", "unanswerable"},
+    )
+    _assert_public_equal(
+        "portfolio snapshot manifest fields",
+        set(snapshot_contract),
+        {"path", "sha256"},
+    )
+
+    dataset_path = project_root / dataset_contract["path"]
+    snapshot_path = project_root / snapshot_contract["path"]
+    results_path = project_root / contract["results_path"]
+    for label, path in (
+        ("dataset", dataset_path),
+        ("snapshot", snapshot_path),
+        ("results", results_path),
+    ):
+        _assert_public_equal(f"portfolio {label} exists", path.is_file(), True)
+
+    dataset_sha = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
+    snapshot_sha = hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
+    results_sha = hashlib.sha256(results_path.read_bytes()).hexdigest()
+    _assert_public_equal(
+        "portfolio dataset SHA-256", dataset_sha, dataset_contract["sha256"]
+    )
+    _assert_public_equal(
+        "portfolio snapshot SHA-256", snapshot_sha, snapshot_contract["sha256"]
+    )
+    _assert_public_equal(
+        "portfolio results SHA-256", results_sha, contract["results_sha256"]
+    )
+
+    try:
+        cases = load_cases(dataset_path)
+    except (OSError, ValueError) as exc:
+        raise ReleaseVerificationError("portfolio dataset contract") from exc
+    answerable = sum(case.answerable for case in cases)
+    _assert_public_equal(
+        "portfolio dataset questions", len(cases), dataset_contract["questions"]
+    )
+    _assert_public_equal(
+        "portfolio dataset answerable", answerable, dataset_contract["answerable"]
+    )
+    _assert_public_equal(
+        "portfolio dataset unanswerable",
+        len(cases) - answerable,
+        dataset_contract["unanswerable"],
+    )
+
+    result = _read_json(results_path)
+    _assert_public_equal(
+        "portfolio result fields",
+        set(result),
+        {
+            "schema_version",
+            "dataset",
+            "corpus_snapshot",
+            "code_revision",
+            "configuration",
+            "summary",
+            "cases",
+        },
+    )
+    _assert_public_equal("portfolio result schema", result["schema_version"], "1.0")
+    _compare_public_tree(
+        "portfolio result dataset",
+        result["dataset"],
+        {
+            "path": dataset_contract["path"],
+            "sha256": dataset_sha,
+            "questions": len(cases),
+        },
+    )
+    snapshot = _read_json(snapshot_path)
+    _compare_public_tree(
+        "portfolio result corpus snapshot",
+        result["corpus_snapshot"],
+        {
+            "path": snapshot_contract["path"],
+            "sha256": snapshot_sha,
+            "snapshot_date": snapshot["snapshot_date"],
+            "laws": snapshot["law_count"],
+            "articles": snapshot["article_count"],
+        },
+    )
+    revision = result["code_revision"]
+    _assert_public_equal(
+        "portfolio code revision format",
+        isinstance(revision, str) and re.fullmatch(r"[0-9a-f]{40}", revision) is not None,
+        True,
+    )
+    _assert_public_equal(
+        "portfolio code revision", revision, contract["code_revision"]
+    )
+    _compare_public_tree(
+        "portfolio configuration", result["configuration"], contract["configuration"]
+    )
+
+    result_cases = result["cases"]
+    _assert_public_equal("portfolio cases type", isinstance(result_cases, list), True)
+    _assert_public_equal("portfolio case count", len(result_cases), len(cases))
+    case_fields = {
+        "qid",
+        "answerable",
+        "expected_source_count",
+        "source_ranks",
+        "required_source_hits_at_5",
+        "prohibited_source_hits_at_5",
+        "applied_routes",
+        "route_contract_passed",
+        "threshold_expected",
+        "threshold_refused",
+        "threshold_contract_passed",
+        "expected_refusal_stage",
+        "refusal_stage",
+        "generation_allowed",
+        "generation_called",
+        "top_score",
+        "passed",
+    }
+    recomputed: list[dict[str, Any]] = []
+    for case, observed in zip(cases, result_cases, strict=True):
+        _assert_public_equal(
+            f"portfolio {case.qid} case type", isinstance(observed, Mapping), True
+        )
+        _assert_public_equal(
+            f"portfolio {case.qid} case fields", set(observed), case_fields
+        )
+        _assert_public_equal(
+            f"portfolio {case.qid} qid", observed["qid"], case.qid
+        )
+        source_ranks = observed["source_ranks"]
+        _assert_public_equal(
+            f"portfolio {case.qid} source ranks type",
+            isinstance(source_ranks, Mapping),
+            True,
+        )
+        retrieved: list[tuple[str, str, int]] = []
+        for source, rank in source_ranks.items():
+            valid_source = (
+                isinstance(source, str)
+                and source.count("|") == 1
+                and all(part.strip() for part in source.split("|"))
+            )
+            _assert_public_equal(
+                f"portfolio {case.qid} source identity", valid_source, True
+            )
+            law, article = source.split("|", 1)
+            retrieved.append((law, article, rank))
+        try:
+            expected = build_result(
+                case,
+                retrieved=retrieved,
+                applied_routes=observed["applied_routes"],
+                threshold_refused=observed["threshold_refused"],
+                top_score=observed["top_score"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ReleaseVerificationError(
+                f"portfolio {case.qid} result contract"
+            ) from exc
+        _compare_public_tree(f"portfolio {case.qid} result", observed, expected)
+        recomputed.append(expected)
+
+    summary = summarize_results(recomputed)
+    _compare_public_tree("portfolio result summary", result["summary"], summary)
+    _compare_public_tree("portfolio manifest summary", contract["summary"], summary)
+    return summary
+
+
 def _verify_release_version_contract(
     project_root: Path,
     manifest: dict[str, Any],
@@ -1968,6 +2162,10 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         root,
         manifest["evidence"]["wage_arrears_regression"],
     )
+    portfolio_demo_summary = _verify_portfolio_demo_evidence(
+        root,
+        manifest["evidence"]["portfolio_demo_regression"],
+    )
     provider_crosscheck_contract = manifest["evidence"]["provider_crosscheck"]
     provider_crosscheck_summary = _verify_provider_crosscheck_contract(
         root,
@@ -2061,6 +2259,7 @@ def verify_release(project_root: Path) -> dict[str, Any]:
         },
         "reliability": reliability_summary,
         "wage_arrears_regression": wage_arrears_summary,
+        "portfolio_demo_regression": portfolio_demo_summary,
         "e2e": {
             "answered": e2e_metrics["n_answered"],
             "refused": sum(1 for row in e2e_rows if row["refused"]),

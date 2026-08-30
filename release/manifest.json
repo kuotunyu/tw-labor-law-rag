@@ -104,6 +104,45 @@
         "passed": true
       }
     },
+    "portfolio_demo_regression": {
+      "dataset": {
+        "path": "eval/dataset/portfolio_demo_v0.3.5.jsonl",
+        "sha256": "582096c94fd8a5dc1e8eec03b89e94cb324e27b328745e97ef21d9665d1d04bf",
+        "questions": 10,
+        "answerable": 6,
+        "unanswerable": 4
+      },
+      "results_path": "eval/official/portfolio_demo_v0.3.5.json",
+      "results_sha256": "e4af88a6e71bbf9e69f22cf239af97a57d633176723c9e82ae33e9722fe7a19f",
+      "corpus_snapshot": {
+        "path": "release/corpus_snapshot.json",
+        "sha256": "947af07298c559a0f64511c24be0582b5d3b96a53d67f228d23de62de70e61ce"
+      },
+      "code_revision": "f87b92273815f4ee85b26ad27286ebb57936ab8d",
+      "configuration": {
+        "chunking": "structure",
+        "retrieval": "hybrid",
+        "reranker": true,
+        "top_k_retrieve": 20,
+        "top_k_final": 5,
+        "rrf_k": 60,
+        "rerank_score_threshold": 0.03,
+        "embedding_model": "BAAI/bge-m3",
+        "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+        "reranker_model": "BAAI/bge-reranker-v2-m3",
+        "reranker_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+      },
+      "summary": {
+        "total": 10,
+        "answerable": 6,
+        "unanswerable": 4,
+        "source_recall_at_5": 1.0,
+        "answerable_pass_rate": 1.0,
+        "threshold_refusal_accuracy": 1.0,
+        "route_accuracy": 1.0,
+        "passed": true
+      }
+    },
     "provider_crosscheck": {
       "status": "complete",
       "authorized_cap_usd_per_provider": "5.00",
