@@ -1295,7 +1295,7 @@
   "official_export_allowed": false,
   "outcome": "no_go",
   "provenance": {
-    "code_revision": "192fb7081132d1de5eed52d5b29ad84737f951f2",
+    "code_revision": "356fe82c6ce0066422e77fa8f291d2aba1244dee",
     "corpus_snapshot_sha256": "947af07298c559a0f64511c24be0582b5d3b96a53d67f228d23de62de70e61ce",
     "dataset_sha256": "7114bb52299c21372e25e8b26813cf5a3fd7154343b2e55e8503003ed408b5c8",
     "embedding_model": "BAAI/bge-m3",

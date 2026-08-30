@@ -437,3 +437,164 @@ git diff --check
 All checks passed!
 git diff --check: exit 0, no output
 ```
+
+---
+
+## Review fix round 2/5 — final target-route provenance rerun
+
+### Strict TDD and mutation evidence
+
+The target-route disagreement test was added first. It independently planned
+the first target question, returned an observed empty route tuple, and required
+the runner to fail closed:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py::test_runner_rejects_target_route_disagreement_instead_of_recording_it -q -p no:cacheprovider
+```
+
+RED result before the production change:
+
+```text
+Failed: DID NOT RAISE RuntimeError
+1 failed in 1.07s
+```
+
+The minimal fix separately calls `plan_retrieval_query(case.question)` and
+requires exact tuple equality before recording the authoritative observed
+`retrieval.applied_routes`. Focused GREEN:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py::test_runner_rejects_target_route_disagreement_instead_of_recording_it tests/test_severance_refusal_policy.py::test_runner_retrieves_each_target_once_and_records_unrounded_observation -q -p no:cacheprovider
+```
+
+```text
+2 passed in 0.86s
+```
+
+A separate main-level NO-GO integration test now leaves the real
+`_build_local_pipeline` and real `factory.build_retrieval_pipeline` boundary in
+place. Only slow offline index/model internals and collected evidence are
+controlled doubles. Every LLM/provider adapter constructor, `build_llm`,
+`build_answerer`, and `RoutedLLM` is replaced by a fail-fast sentinel; the test
+also requires the one real `RetrievalPipeline` instance to cross target and both
+guard collection boundaries.
+
+The current retrieval-only implementation passed in `0.94s`. To prove the test
+detects the prohibited regression, the runner import was temporarily mutated
+with `apply_patch` from `build_retrieval_pipeline` to `build_answerer`. Exact
+mutation command/result:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py::test_runner_main_no_go_keeps_real_retrieval_factory_provider_free -q -p no:cacheprovider
+```
+
+```text
+Failed: LLM/provider construction is forbidden in calibration main
+1 failed in 1.24s
+```
+
+The mutation was then reverted with `apply_patch`. Combined GREEN:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py::test_runner_main_no_go_keeps_real_retrieval_factory_provider_free tests/test_severance_refusal_policy.py::test_runner_rejects_target_route_disagreement_instead_of_recording_it -q -p no:cacheprovider
+```
+
+```text
+2 passed in 1.06s
+```
+
+The report tables above now distinguish the committed formal gates—Hit@5 at
+least `0.9666666666666667` and MRR@10 at least
+`0.9055555555555554`—from the higher fresh achieved metrics `1.0` and
+`0.9388888888888888`.
+
+### Clean candidate and pre-run verification
+
+The implementation, tests, and baseline wording were committed before the
+fresh calibration:
+
+```text
+356fe82c6ce0066422e77fa8f291d2aba1244dee
+fix: validate target calibration routes
+```
+
+`git status --porcelain --untracked-files=all` returned no output immediately
+before the run. Pre-run commands/results:
+
+```powershell
+uv run pytest tests/test_severance_refusal_policy.py -q -p no:cacheprovider
+uv run pytest tests/test_embedding_cache.py tests/test_reliability.py tests/test_reliability_dataset.py tests/test_pipeline.py tests/test_refusal_policy.py tests/test_config.py tests/test_answerer.py tests/test_factory.py tests/test_official_artifacts.py -q -p no:cacheprovider
+uv run ruff check .
+git diff --check
+```
+
+```text
+91 passed in 3.92s
+196 passed in 3.50s
+All checks passed!
+git diff --check: exit 0, no output
+```
+
+### Fresh 130-query rerun
+
+Exact command:
+
+```powershell
+$env:TRANSFORMERS_OFFLINE = '1'
+$env:HF_HUB_OFFLINE = '1'
+uv run python eval/run_severance_refusal_policy.py --offline --device auto --export-official
+```
+
+Observed result:
+
+- exit code `1`, the deliberate conservative NO-GO;
+- structure index: `884 chunks, 884 points, 180.5s`;
+- fixed index: `481 chunks, 481 points, 107.6s`;
+- target `30/30`, stress `60/60`, and formal `40/40` completed fresh;
+- all target and guard observed route tuples exactly equaled their independently
+  planned tuples;
+- all seven candidates failed only `target`, with no selected threshold;
+- official artifact remained absent;
+- provider adapters/requests remained exactly `0/0`.
+
+The current diagnostic contains 30 target, 60 stress, and 40 formal rows plus
+seven candidates. Its provenance binds candidate SHA
+`356fe82c6ce0066422e77fa8f291d2aba1244dee`, exact device `cuda`, and `rrf_k=60`.
+The 40,358-byte file has SHA-256
+`ebed566b3778f6674ef55641564861ef3c17bb899197bb40e3ba7f81bb6e010c`.
+
+An exact JSON comparison against the prior diagnostic, excluding only
+provenance, proved that target observations, both guard sets, all candidate
+aggregates, and failed gates reproduced identically. Every candidate again
+achieved target `27/30`, stress false refusals `0/40`, stress direct coverage
+`17/20`, formal Hit@5 `1.0`, formal MRR@10 `0.9388888888888888`, and formal
+false refusals `0/30`. Cases 010, 014, and 027 and their exact scores are
+unchanged, so the retrieval-quality/target-contract diagnosis is unchanged.
+
+Replay and privacy verification:
+
+```powershell
+uv run python -c "import json; from pathlib import Path; from eval import _bootstrap; from rag.severance_refusal_policy import replay_no_go_evidence; p=Path('eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json'); e=json.loads(p.read_text(encoding='utf-8')); assert replay_no_go_evidence(e)==e; print('replay_ok=True rows=130 candidates=7')"
+uv run python -m json.tool eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json > $null
+rg -n '"(question|content|answer|endpoint|url|credential|secret|api_key)"|Users[/\\]|AI-Portfolio' eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json
+```
+
+```text
+replay_ok=True rows=130 candidates=7
+privacy scan: 0 matches
+diagnostic in release/public-files.txt: false
+official artifact present: false
+```
+
+Post-rerun verification repeated the focused and broader commands above:
+
+```text
+91 passed in 17.22s
+196 passed in 2.89s
+All checks passed!
+git diff --check: exit 0, no output
+```
+
+The two known Task 7 publication-set failures documented in round 1 are
+unchanged and outside this conservative Task 6 NO-GO fix; no release allowlist,
+dataset, gate, candidate, threshold, score, or accepted artifact was changed.
