@@ -28,8 +28,28 @@ distribution facts.
 The pivot diagnostic can be replayed with
 `rag.severance_refusal_policy.replay_no_go_evidence` without loading retrieval
 models or rerunning the 130 queries. A NO-GO diagnostic never authorizes an
-official artifact or any production-threshold change. Authoritative Task 7
-replay first passes the diagnostic to
-`scripts/v036_authoritative_bootstrap.py --mode verify-artifact` under the same
-explicit external environment; the verifier is read-only and rejects source,
-environment, artifact, or inventory drift before importing project code.
+official artifact or any production-threshold change. The bootstrap's public
+`verify-artifact` mode is reserved for an accepted official artifact; a pivot
+diagnostic is instead retained as model-free failure evidence and replayed by
+the policy function under the same verified source/environment bindings.
+
+## v0.3.6 pivot calibration result
+
+The one authorized CPU/FP32 calibration on candidate `19bda93` completed all
+30 target, 60 stress, and 40 formal observations and produced
+`severance_retrieval_pivot_v0.3.6_no_go.json`. It did not produce an official
+artifact.
+
+The retrieval pivot fixed the earlier positive-source misses: all 15 positive
+cases used the exact singleton route, retrieved both required authorities in
+Top 5, and remained generation-eligible. Stress and formal gates also passed:
+stress retained 17/20 direct unanswerable refusals with 0/40 answerable false
+refusals; formal reached Hit@5 `1.0`, MRR@10 `0.9388888888888888`, and 0/30
+answerable false refusals.
+
+The remaining target failure is `severance-policy-023`. Its dataset contract
+requires `no_hits`, while the fresh pipeline returned positive candidates and
+correctly stopped at the unchanged `0.03` threshold. The target result is
+therefore 29/30, every route-ablation candidate fails the target gate, and
+`highest_passing_candidate` remains `null`. This evidence does not authorize
+weakening the threshold or changing production behavior.

@@ -1,0 +1,4485 @@
+{
+  "evidence_class": "non_release_pivot_no_go",
+  "failed_gates": [
+    {
+      "candidate_threshold": 0.0,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.005,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.01,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.015,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.02,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.025,
+      "gates": [
+        "target"
+      ]
+    },
+    {
+      "candidate_threshold": 0.03,
+      "gates": [
+        "target",
+        "route_ablation"
+      ]
+    }
+  ],
+  "guard_evidence": {
+    "formal": [
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-01",
+        "rank": 3,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.10182107808098188
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-02",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9893325835580228
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "severance_comparison"
+        ],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-03",
+        "rank": 1,
+        "reranker_calls": 2,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20,
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9640940085107006
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-04",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9764557779042596
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-05",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9835260157890311
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-06",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9873176693590362
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-07",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9834014990682947
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-08",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.995345071118433
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-09",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9940632547813695
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "wage_arrears_termination"
+        ],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-10",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9786581338969552
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-11",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8697822380830122
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-12",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.06645467333556476
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-13",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.984392458339093
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-14",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8942841684461895
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-15",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9980757322383658
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-16",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.809948864333365
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-17",
+        "rank": 2,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.5815240329212585
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-18",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8681968766785635
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-19",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9918245109301389
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-20",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8994533766481185
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-21",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9827489463392263
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-22",
+        "rank": 3,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.6794911253519329
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-23",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9979085802890449
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-24",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9877349301588223
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-25",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.4859098743006603
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-26",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9600724112381199
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-27",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9807234901297391
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-28",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9609906766041587
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-29",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.25931725872949163
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-30",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8358170197330231
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-31",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.012345161099629296
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-32",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9797420351284549
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-33",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.026675388610957595
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-34",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.0042875035969689584
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-35",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.003923561447238313
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-36",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.0013128551532742285
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-37",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.0005159478409425499
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-38",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.001730829197048888
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-39",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.00857277480820343
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "eval-40",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.002657062180687677
+      }
+    ],
+    "stress": [
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-001",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.5146796171181058
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-002",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9284411052590755
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "severance_comparison"
+        ],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-003",
+        "rank": 1,
+        "reranker_calls": 2,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20,
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.43152927340760266
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-004",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8871607092580845
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-005",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.4645876970089796
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-006",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.7344712870140006
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-007",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.907505044528316
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-008",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9908570304026374
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-009",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9888986416335157
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "wage_arrears_termination"
+        ],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-010",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9808746930662803
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-011",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.09217067994569839
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-012",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.16234898927940786
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-013",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9778228355597097
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-014",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.614222898239446
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-015",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9716919661729471
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-016",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.5868233146181009
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-017",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.6450120593736078
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-018",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9883698899746026
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-019",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.3926795636245823
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-020",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8385013009076477
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-021",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9512163672120035
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-022",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9511213434120818
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-023",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8301258209942398
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-024",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9491157688669114
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-025",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9952221527689638
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-026",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9365992626421513
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-027",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9820959410668328
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-028",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9587500630820909
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-029",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9931506196647093
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-030",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8454080570646761
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-031",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.8414592162740947
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-032",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9771799321869913
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-033",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9926620099814819
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-034",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9616347733070063
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-035",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9931011294573545
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-036",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.039504786219746575
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "severance_comparison"
+        ],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-037",
+        "rank": 1,
+        "reranker_calls": 2,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20,
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.3114328420303067
+      },
+      {
+        "answerable": true,
+        "applied_routes": [
+          "wage_arrears_termination"
+        ],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-038",
+        "rank": 2,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.7572991473479809
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-039",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.3194806249666356
+      },
+      {
+        "answerable": true,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-040",
+        "rank": 1,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.9260097415751121
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-041",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.028268580747528225
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-042",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.40565901877729593
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-043",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.06990072210758998
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-044",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.01650730863211885
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-045",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.013405185279542478
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-046",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.05447658549024655
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-047",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.0018723728842200622
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-048",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.012281966646831805
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-049",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.006665451064692683
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-050",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.007548744972078728
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-051",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.0006332228758021202
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-052",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.006730590937129035
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-053",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.0053203547498841455
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-054",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.013893713523765552
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-055",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.01973718848006894
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-056",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.0062336926171969054
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-057",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.001724817792472787
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-058",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.0015258139789377902
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-059",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 2.8990482381608482e-05
+      },
+      {
+        "answerable": false,
+        "applied_routes": [],
+        "candidate_count": 20,
+        "first_stage_retrieval_calls": 1,
+        "has_hits": true,
+        "hit_count": 5,
+        "qid": "stress-060",
+        "rank": null,
+        "reranker_calls": 1,
+        "reranker_enabled": true,
+        "reranker_scored_pairs": [
+          20
+        ],
+        "route_plan_matched": true,
+        "top_score": 0.015111015464338205
+      }
+    ]
+  },
+  "official_export_allowed": false,
+  "outcome": "no_go",
+  "production_threshold": 0.03,
+  "provenance": {
+    "code_revision": "19bda937d4c440e6d349fd827f356c189c0809b9",
+    "corpus_snapshot_sha256": "947af07298c559a0f64511c24be0582b5d3b96a53d67f228d23de62de70e61ce",
+    "dataset_sha256": "cf9d5ae3a9ae05ccb944b22fb878118670f7272895d6a8d7c383928eaf19b40c",
+    "embedding_model": "BAAI/bge-m3",
+    "embedding_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "environment_binding": {
+      "format_version": "1",
+      "installed_distributions": [
+        {
+          "name": "accelerate",
+          "version": "1.14.0"
+        },
+        {
+          "name": "aiohappyeyeballs",
+          "version": "2.7.1"
+        },
+        {
+          "name": "aiohttp",
+          "version": "3.14.3"
+        },
+        {
+          "name": "aiosignal",
+          "version": "1.4.0"
+        },
+        {
+          "name": "altair",
+          "version": "6.2.2"
+        },
+        {
+          "name": "annotated-doc",
+          "version": "0.0.4"
+        },
+        {
+          "name": "annotated-types",
+          "version": "0.7.0"
+        },
+        {
+          "name": "anthropic",
+          "version": "0.116.0"
+        },
+        {
+          "name": "anyio",
+          "version": "4.14.1"
+        },
+        {
+          "name": "attrs",
+          "version": "26.1.0"
+        },
+        {
+          "name": "blinker",
+          "version": "1.9.0"
+        },
+        {
+          "name": "cachetools",
+          "version": "7.1.4"
+        },
+        {
+          "name": "certifi",
+          "version": "2026.6.17"
+        },
+        {
+          "name": "cffi",
+          "version": "2.0.0"
+        },
+        {
+          "name": "charset-normalizer",
+          "version": "3.4.7"
+        },
+        {
+          "name": "click",
+          "version": "8.4.2"
+        },
+        {
+          "name": "colorama",
+          "version": "0.4.6"
+        },
+        {
+          "name": "cryptography",
+          "version": "50.0.1"
+        },
+        {
+          "name": "datasets",
+          "version": "5.0.1"
+        },
+        {
+          "name": "defusedxml",
+          "version": "0.7.1"
+        },
+        {
+          "name": "dill",
+          "version": "0.4.1"
+        },
+        {
+          "name": "distro",
+          "version": "1.9.0"
+        },
+        {
+          "name": "docstring-parser",
+          "version": "0.18.0"
+        },
+        {
+          "name": "fastapi",
+          "version": "0.139.0"
+        },
+        {
+          "name": "filelock",
+          "version": "3.29.5"
+        },
+        {
+          "name": "flagembedding",
+          "version": "1.4.0"
+        },
+        {
+          "name": "frozenlist",
+          "version": "1.8.0"
+        },
+        {
+          "name": "fsspec",
+          "version": "2026.4.0"
+        },
+        {
+          "name": "gitdb",
+          "version": "4.0.12"
+        },
+        {
+          "name": "gitpython",
+          "version": "3.1.61"
+        },
+        {
+          "name": "google-auth",
+          "version": "2.55.1"
+        },
+        {
+          "name": "google-genai",
+          "version": "2.10.0"
+        },
+        {
+          "name": "grpcio",
+          "version": "1.81.1"
+        },
+        {
+          "name": "h11",
+          "version": "0.16.0"
+        },
+        {
+          "name": "h2",
+          "version": "4.4.1"
+        },
+        {
+          "name": "hf-xet",
+          "version": "1.6.0"
+        },
+        {
+          "name": "hpack",
+          "version": "4.2.0"
+        },
+        {
+          "name": "httpcore",
+          "version": "1.0.9"
+        },
+        {
+          "name": "httptools",
+          "version": "0.8.0"
+        },
+        {
+          "name": "httpx",
+          "version": "0.28.1"
+        },
+        {
+          "name": "huggingface-hub",
+          "version": "1.29.0"
+        },
+        {
+          "name": "hyperframe",
+          "version": "6.1.0"
+        },
+        {
+          "name": "idna",
+          "version": "3.18"
+        },
+        {
+          "name": "ir-datasets",
+          "version": "0.6.1"
+        },
+        {
+          "name": "itsdangerous",
+          "version": "2.2.0"
+        },
+        {
+          "name": "jieba",
+          "version": "0.42.1"
+        },
+        {
+          "name": "jinja2",
+          "version": "3.1.6"
+        },
+        {
+          "name": "jiter",
+          "version": "0.16.0"
+        },
+        {
+          "name": "joblib",
+          "version": "1.5.3"
+        },
+        {
+          "name": "jsonschema",
+          "version": "4.26.0"
+        },
+        {
+          "name": "jsonschema-specifications",
+          "version": "2025.9.1"
+        },
+        {
+          "name": "lxml",
+          "version": "6.1.1"
+        },
+        {
+          "name": "lz4",
+          "version": "4.4.5"
+        },
+        {
+          "name": "markdown-it-py",
+          "version": "4.2.0"
+        },
+        {
+          "name": "markupsafe",
+          "version": "3.0.3"
+        },
+        {
+          "name": "mdurl",
+          "version": "0.1.2"
+        },
+        {
+          "name": "mpmath",
+          "version": "1.3.0"
+        },
+        {
+          "name": "multidict",
+          "version": "6.7.1"
+        },
+        {
+          "name": "multiprocess",
+          "version": "0.70.19"
+        },
+        {
+          "name": "narwhals",
+          "version": "2.23.0"
+        },
+        {
+          "name": "networkx",
+          "version": "3.6.1"
+        },
+        {
+          "name": "numpy",
+          "version": "2.4.6"
+        },
+        {
+          "name": "openai",
+          "version": "2.44.0"
+        },
+        {
+          "name": "packaging",
+          "version": "26.2"
+        },
+        {
+          "name": "pandas",
+          "version": "3.0.3"
+        },
+        {
+          "name": "peft",
+          "version": "0.19.1"
+        },
+        {
+          "name": "pillow",
+          "version": "12.3.0"
+        },
+        {
+          "name": "portalocker",
+          "version": "3.2.0"
+        },
+        {
+          "name": "propcache",
+          "version": "0.5.2"
+        },
+        {
+          "name": "protobuf",
+          "version": "7.35.1"
+        },
+        {
+          "name": "psutil",
+          "version": "7.2.2"
+        },
+        {
+          "name": "pyarrow",
+          "version": "24.0.0"
+        },
+        {
+          "name": "pyasn1",
+          "version": "0.6.4"
+        },
+        {
+          "name": "pyasn1-modules",
+          "version": "0.4.2"
+        },
+        {
+          "name": "pycparser",
+          "version": "3.0"
+        },
+        {
+          "name": "pydantic",
+          "version": "2.13.4"
+        },
+        {
+          "name": "pydantic-core",
+          "version": "2.46.4"
+        },
+        {
+          "name": "pydantic-settings",
+          "version": "2.14.2"
+        },
+        {
+          "name": "pydeck",
+          "version": "0.9.3"
+        },
+        {
+          "name": "pygments",
+          "version": "2.20.0"
+        },
+        {
+          "name": "pypdf",
+          "version": "6.16.2"
+        },
+        {
+          "name": "python-dateutil",
+          "version": "2.9.0.post0"
+        },
+        {
+          "name": "python-dotenv",
+          "version": "1.2.2"
+        },
+        {
+          "name": "python-multipart",
+          "version": "0.0.32"
+        },
+        {
+          "name": "pywin32",
+          "version": "312"
+        },
+        {
+          "name": "pyyaml",
+          "version": "6.0.3"
+        },
+        {
+          "name": "qdrant-client",
+          "version": "1.18.0"
+        },
+        {
+          "name": "rank-bm25",
+          "version": "0.2.2"
+        },
+        {
+          "name": "referencing",
+          "version": "0.37.0"
+        },
+        {
+          "name": "regex",
+          "version": "2026.6.28"
+        },
+        {
+          "name": "requests",
+          "version": "2.34.2"
+        },
+        {
+          "name": "rich",
+          "version": "15.0.0"
+        },
+        {
+          "name": "rpds-py",
+          "version": "2026.6.3"
+        },
+        {
+          "name": "safetensors",
+          "version": "0.8.0"
+        },
+        {
+          "name": "scikit-learn",
+          "version": "1.9.0"
+        },
+        {
+          "name": "scipy",
+          "version": "1.17.1"
+        },
+        {
+          "name": "sentence-transformers",
+          "version": "5.6.0"
+        },
+        {
+          "name": "sentencepiece",
+          "version": "0.2.1"
+        },
+        {
+          "name": "setuptools",
+          "version": "83.0.0"
+        },
+        {
+          "name": "shellingham",
+          "version": "1.5.4"
+        },
+        {
+          "name": "six",
+          "version": "1.17.0"
+        },
+        {
+          "name": "smmap",
+          "version": "5.0.3"
+        },
+        {
+          "name": "sniffio",
+          "version": "1.3.1"
+        },
+        {
+          "name": "starlette",
+          "version": "1.3.1"
+        },
+        {
+          "name": "streamlit",
+          "version": "1.58.0"
+        },
+        {
+          "name": "sympy",
+          "version": "1.14.0"
+        },
+        {
+          "name": "tenacity",
+          "version": "9.1.4"
+        },
+        {
+          "name": "threadpoolctl",
+          "version": "3.6.0"
+        },
+        {
+          "name": "tokenizers",
+          "version": "0.23.1"
+        },
+        {
+          "name": "toml",
+          "version": "0.10.2"
+        },
+        {
+          "name": "torch",
+          "version": "2.10.0+cu128"
+        },
+        {
+          "name": "tqdm",
+          "version": "4.68.3"
+        },
+        {
+          "name": "transformers",
+          "version": "5.16.1"
+        },
+        {
+          "name": "typer",
+          "version": "0.27.2"
+        },
+        {
+          "name": "typing-extensions",
+          "version": "4.16.0"
+        },
+        {
+          "name": "typing-inspection",
+          "version": "0.4.2"
+        },
+        {
+          "name": "tzdata",
+          "version": "2026.2"
+        },
+        {
+          "name": "urllib3",
+          "version": "2.7.0"
+        },
+        {
+          "name": "uvicorn",
+          "version": "0.50.0"
+        },
+        {
+          "name": "watchdog",
+          "version": "6.0.0"
+        },
+        {
+          "name": "watchfiles",
+          "version": "1.2.0"
+        },
+        {
+          "name": "websockets",
+          "version": "16.0"
+        },
+        {
+          "name": "xxhash",
+          "version": "3.8.0"
+        },
+        {
+          "name": "yarl",
+          "version": "1.24.2"
+        }
+      ],
+      "interpreter": {
+        "abi": "cpython-311:",
+        "executable_layout": "Scripts/python.exe",
+        "full_version": "3.11.15",
+        "implementation": "cpython",
+        "os_name": "nt",
+        "platform_machine": "AMD64",
+        "platform_system": "Windows",
+        "sys_platform": "win32"
+      },
+      "lock_selection": {
+        "active_resolution_markers": [
+          "python_full_version < '3.12' and sys_platform == 'win32'"
+        ],
+        "excluded_dependency_groups": [
+          "dev"
+        ],
+        "frozen": true,
+        "lock_sha256": "a5a0e4b5efd483dea7f86f61559508ddd833b209737f6f7ef3853e92ce4d92a5",
+        "markers": {
+          "implementation_name": "cpython",
+          "os_name": "nt",
+          "platform_machine": "AMD64",
+          "platform_python_implementation": "CPython",
+          "platform_system": "Windows",
+          "python_full_version": "3.11.15",
+          "python_version": "3.11",
+          "sys_platform": "win32"
+        },
+        "no_dev": true,
+        "offline": true,
+        "selected_dependency_groups": [],
+        "selected_packages": [
+          {
+            "name": "accelerate",
+            "version": "1.14.0"
+          },
+          {
+            "name": "aiohappyeyeballs",
+            "version": "2.7.1"
+          },
+          {
+            "name": "aiohttp",
+            "version": "3.14.3"
+          },
+          {
+            "name": "aiosignal",
+            "version": "1.4.0"
+          },
+          {
+            "name": "altair",
+            "version": "6.2.2"
+          },
+          {
+            "name": "annotated-doc",
+            "version": "0.0.4"
+          },
+          {
+            "name": "annotated-types",
+            "version": "0.7.0"
+          },
+          {
+            "name": "anthropic",
+            "version": "0.116.0"
+          },
+          {
+            "name": "anyio",
+            "version": "4.14.1"
+          },
+          {
+            "name": "attrs",
+            "version": "26.1.0"
+          },
+          {
+            "name": "blinker",
+            "version": "1.9.0"
+          },
+          {
+            "name": "cachetools",
+            "version": "7.1.4"
+          },
+          {
+            "name": "certifi",
+            "version": "2026.6.17"
+          },
+          {
+            "name": "cffi",
+            "version": "2.0.0"
+          },
+          {
+            "name": "charset-normalizer",
+            "version": "3.4.7"
+          },
+          {
+            "name": "click",
+            "version": "8.4.2"
+          },
+          {
+            "name": "colorama",
+            "version": "0.4.6"
+          },
+          {
+            "name": "cryptography",
+            "version": "50.0.1"
+          },
+          {
+            "name": "datasets",
+            "version": "5.0.1"
+          },
+          {
+            "name": "defusedxml",
+            "version": "0.7.1"
+          },
+          {
+            "name": "dill",
+            "version": "0.4.1"
+          },
+          {
+            "name": "distro",
+            "version": "1.9.0"
+          },
+          {
+            "name": "docstring-parser",
+            "version": "0.18.0"
+          },
+          {
+            "name": "fastapi",
+            "version": "0.139.0"
+          },
+          {
+            "name": "filelock",
+            "version": "3.29.5"
+          },
+          {
+            "name": "flagembedding",
+            "version": "1.4.0"
+          },
+          {
+            "name": "frozenlist",
+            "version": "1.8.0"
+          },
+          {
+            "name": "fsspec",
+            "version": "2026.4.0"
+          },
+          {
+            "name": "gitdb",
+            "version": "4.0.12"
+          },
+          {
+            "name": "gitpython",
+            "version": "3.1.61"
+          },
+          {
+            "name": "google-auth",
+            "version": "2.55.1"
+          },
+          {
+            "name": "google-genai",
+            "version": "2.10.0"
+          },
+          {
+            "name": "grpcio",
+            "version": "1.81.1"
+          },
+          {
+            "name": "h11",
+            "version": "0.16.0"
+          },
+          {
+            "name": "h2",
+            "version": "4.4.1"
+          },
+          {
+            "name": "hf-xet",
+            "version": "1.6.0"
+          },
+          {
+            "name": "hpack",
+            "version": "4.2.0"
+          },
+          {
+            "name": "httpcore",
+            "version": "1.0.9"
+          },
+          {
+            "name": "httptools",
+            "version": "0.8.0"
+          },
+          {
+            "name": "httpx",
+            "version": "0.28.1"
+          },
+          {
+            "name": "huggingface-hub",
+            "version": "1.29.0"
+          },
+          {
+            "name": "hyperframe",
+            "version": "6.1.0"
+          },
+          {
+            "name": "idna",
+            "version": "3.18"
+          },
+          {
+            "name": "ir-datasets",
+            "version": "0.6.1"
+          },
+          {
+            "name": "itsdangerous",
+            "version": "2.2.0"
+          },
+          {
+            "name": "jieba",
+            "version": "0.42.1"
+          },
+          {
+            "name": "jinja2",
+            "version": "3.1.6"
+          },
+          {
+            "name": "jiter",
+            "version": "0.16.0"
+          },
+          {
+            "name": "joblib",
+            "version": "1.5.3"
+          },
+          {
+            "name": "jsonschema",
+            "version": "4.26.0"
+          },
+          {
+            "name": "jsonschema-specifications",
+            "version": "2025.9.1"
+          },
+          {
+            "name": "lxml",
+            "version": "6.1.1"
+          },
+          {
+            "name": "lz4",
+            "version": "4.4.5"
+          },
+          {
+            "name": "markdown-it-py",
+            "version": "4.2.0"
+          },
+          {
+            "name": "markupsafe",
+            "version": "3.0.3"
+          },
+          {
+            "name": "mdurl",
+            "version": "0.1.2"
+          },
+          {
+            "name": "mpmath",
+            "version": "1.3.0"
+          },
+          {
+            "name": "multidict",
+            "version": "6.7.1"
+          },
+          {
+            "name": "multiprocess",
+            "version": "0.70.19"
+          },
+          {
+            "name": "narwhals",
+            "version": "2.23.0"
+          },
+          {
+            "name": "networkx",
+            "version": "3.6.1"
+          },
+          {
+            "name": "numpy",
+            "version": "2.4.6"
+          },
+          {
+            "name": "openai",
+            "version": "2.44.0"
+          },
+          {
+            "name": "packaging",
+            "version": "26.2"
+          },
+          {
+            "name": "pandas",
+            "version": "3.0.3"
+          },
+          {
+            "name": "peft",
+            "version": "0.19.1"
+          },
+          {
+            "name": "pillow",
+            "version": "12.3.0"
+          },
+          {
+            "name": "portalocker",
+            "version": "3.2.0"
+          },
+          {
+            "name": "propcache",
+            "version": "0.5.2"
+          },
+          {
+            "name": "protobuf",
+            "version": "7.35.1"
+          },
+          {
+            "name": "psutil",
+            "version": "7.2.2"
+          },
+          {
+            "name": "pyarrow",
+            "version": "24.0.0"
+          },
+          {
+            "name": "pyasn1",
+            "version": "0.6.4"
+          },
+          {
+            "name": "pyasn1-modules",
+            "version": "0.4.2"
+          },
+          {
+            "name": "pycparser",
+            "version": "3.0"
+          },
+          {
+            "name": "pydantic",
+            "version": "2.13.4"
+          },
+          {
+            "name": "pydantic-core",
+            "version": "2.46.4"
+          },
+          {
+            "name": "pydantic-settings",
+            "version": "2.14.2"
+          },
+          {
+            "name": "pydeck",
+            "version": "0.9.3"
+          },
+          {
+            "name": "pygments",
+            "version": "2.20.0"
+          },
+          {
+            "name": "pypdf",
+            "version": "6.16.2"
+          },
+          {
+            "name": "python-dateutil",
+            "version": "2.9.0.post0"
+          },
+          {
+            "name": "python-dotenv",
+            "version": "1.2.2"
+          },
+          {
+            "name": "python-multipart",
+            "version": "0.0.32"
+          },
+          {
+            "name": "pywin32",
+            "version": "312"
+          },
+          {
+            "name": "pyyaml",
+            "version": "6.0.3"
+          },
+          {
+            "name": "qdrant-client",
+            "version": "1.18.0"
+          },
+          {
+            "name": "rank-bm25",
+            "version": "0.2.2"
+          },
+          {
+            "name": "referencing",
+            "version": "0.37.0"
+          },
+          {
+            "name": "regex",
+            "version": "2026.6.28"
+          },
+          {
+            "name": "requests",
+            "version": "2.34.2"
+          },
+          {
+            "name": "rich",
+            "version": "15.0.0"
+          },
+          {
+            "name": "rpds-py",
+            "version": "2026.6.3"
+          },
+          {
+            "name": "safetensors",
+            "version": "0.8.0"
+          },
+          {
+            "name": "scikit-learn",
+            "version": "1.9.0"
+          },
+          {
+            "name": "scipy",
+            "version": "1.17.1"
+          },
+          {
+            "name": "sentence-transformers",
+            "version": "5.6.0"
+          },
+          {
+            "name": "sentencepiece",
+            "version": "0.2.1"
+          },
+          {
+            "name": "setuptools",
+            "version": "83.0.0"
+          },
+          {
+            "name": "shellingham",
+            "version": "1.5.4"
+          },
+          {
+            "name": "six",
+            "version": "1.17.0"
+          },
+          {
+            "name": "smmap",
+            "version": "5.0.3"
+          },
+          {
+            "name": "sniffio",
+            "version": "1.3.1"
+          },
+          {
+            "name": "starlette",
+            "version": "1.3.1"
+          },
+          {
+            "name": "streamlit",
+            "version": "1.58.0"
+          },
+          {
+            "name": "sympy",
+            "version": "1.14.0"
+          },
+          {
+            "name": "tenacity",
+            "version": "9.1.4"
+          },
+          {
+            "name": "threadpoolctl",
+            "version": "3.6.0"
+          },
+          {
+            "name": "tokenizers",
+            "version": "0.23.1"
+          },
+          {
+            "name": "toml",
+            "version": "0.10.2"
+          },
+          {
+            "name": "torch",
+            "version": "2.10.0+cu128"
+          },
+          {
+            "name": "tqdm",
+            "version": "4.68.3"
+          },
+          {
+            "name": "transformers",
+            "version": "5.16.1"
+          },
+          {
+            "name": "typer",
+            "version": "0.27.2"
+          },
+          {
+            "name": "typing-extensions",
+            "version": "4.16.0"
+          },
+          {
+            "name": "typing-inspection",
+            "version": "0.4.2"
+          },
+          {
+            "name": "tzdata",
+            "version": "2026.2"
+          },
+          {
+            "name": "urllib3",
+            "version": "2.7.0"
+          },
+          {
+            "name": "uvicorn",
+            "version": "0.50.0"
+          },
+          {
+            "name": "watchdog",
+            "version": "6.0.0"
+          },
+          {
+            "name": "watchfiles",
+            "version": "1.2.0"
+          },
+          {
+            "name": "websockets",
+            "version": "16.0"
+          },
+          {
+            "name": "xxhash",
+            "version": "3.8.0"
+          },
+          {
+            "name": "yarl",
+            "version": "1.24.2"
+          }
+        ]
+      },
+      "pyvenv": {
+        "include_system_site_packages": false
+      },
+      "runtime_import_layout": [
+        "Lib/site-packages/win32",
+        "Lib/site-packages/win32/lib"
+      ],
+      "site_layout": [
+        "Lib/site-packages"
+      ]
+    },
+    "execution_device": "cpu",
+    "local_files_only": true,
+    "merge_policy_version": "primary_first_deduplicating_interleave_v1",
+    "precision_mode": "fp32",
+    "primary_score_semantics": "full_precision_primary_query_top_score",
+    "provider_adapters": 0,
+    "provider_requests": 0,
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "reranker_revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "retrieval_configuration": {
+      "chunking": "structure",
+      "reranker": true,
+      "retrieval": "hybrid",
+      "rrf_k": 60,
+      "top_k_final": 5,
+      "top_k_retrieve": 20
+    },
+    "revision_binding": {
+      "declared_inputs": [
+        {
+          "blob_oid": "173822b4cd889f336efcaa0d04f966f614e27976",
+          "label": "corpus_snapshot",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "release/corpus_snapshot.json",
+          "sha256": "947af07298c559a0f64511c24be0582b5d3b96a53d67f228d23de62de70e61ce"
+        },
+        {
+          "blob_oid": "8f58fbf00e3f452a1d64120baf46a8362383d86c",
+          "label": "formal_dataset",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/dataset/eval_set.jsonl",
+          "sha256": "760e33eaa0821001d37ff974bc037043d019fc670b8f3621b6e713030274ca07"
+        },
+        {
+          "blob_oid": "d706a1adbb18604beb566a8dab1bb1e731564c90",
+          "label": "stress_dataset",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/dataset/reliability_stress_v0.3.1.jsonl",
+          "sha256": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f"
+        },
+        {
+          "blob_oid": "0114fbe466aefdc487b90ea8ed06c0d7bafa1254",
+          "label": "target_dataset",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
+          "sha256": "cf9d5ae3a9ae05ccb944b22fb878118670f7272895d6a8d7c383928eaf19b40c"
+        }
+      ],
+      "format_version": "1",
+      "revision": "19bda937d4c440e6d349fd827f356c189c0809b9",
+      "tracked_files": [
+        {
+          "blob_oid": "2c0733315e415bfb5e5b353f9996ecd964d395b2",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": ".python-version",
+          "sha256": "49a506dd32096b010d75205acf3430c9ae6c40351888129499e5a5e487126c93"
+        },
+        {
+          "blob_oid": "e7f9a61a0652a2b13237cc9090f163daddbeae98",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "Dockerfile",
+          "sha256": "413c6a4efaa490511efcde71d7020616167a6639dc8e58178861ae9aea377f40"
+        },
+        {
+          "blob_oid": "efb5ca671316d59bfb66ebbf9c3c083ff4bb3603",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/_bootstrap.py",
+          "sha256": "d4cd9a6ea9006b61d755fe5fe0ee2b470f6b494b078fad86f378002061d23c90"
+        },
+        {
+          "blob_oid": "ef35f883b9a0614aa03b7a2aab7046552fb2a437",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/ablation.py",
+          "sha256": "2aed41f7b34b5cd3b55424e36f8143abfdf5a244e8a6cced9136ec228ee08009"
+        },
+        {
+          "blob_oid": "3c98f1b55fa0cf6535745daf127ad74c6d4616f1",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/export_official.py",
+          "sha256": "316608d76c9a20164975b89bd8d4329af89216a3dc9169530ca90a30568101a1"
+        },
+        {
+          "blob_oid": "d09407ca1f19ef9c0ca66b20162b1653709ea57e",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/judge.py",
+          "sha256": "c1f12bdfa84a068ee0e88c103046f359d18970c9856fad5f6d15d2e6db3b8650"
+        },
+        {
+          "blob_oid": "08f7f6dd99a52e0fac7c5e25df4c58def6244e84",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/lib.py",
+          "sha256": "5866b44b114b7cb19ac5a48035e9100112809727b2f2678eabeeea5930dc9968"
+        },
+        {
+          "blob_oid": "8a4acc856037d12fb178dccd8db7f63d554fda8a",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/run_e2e_eval.py",
+          "sha256": "7876e82919e3f0811c368dd0eb3f475c54263f631f31d6ee4ade017218981a3a"
+        },
+        {
+          "blob_oid": "d72c30d7073754820826f23462c0b8621d172140",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/run_portfolio_demo_regression.py",
+          "sha256": "ee9fb8a02c415a5ab9fac679fdc97fc414ac39a27164f42fc8e119342da47ec1"
+        },
+        {
+          "blob_oid": "598da12eb3e076d8af4cb1f730acf920482da6cb",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/run_provider_crosscheck.py",
+          "sha256": "148769278153e0be080c1e00aca81a83a1ac93badb5de40a10e2350248cb40a6"
+        },
+        {
+          "blob_oid": "8425704f6da4f29b1d033a3b599b64af203f381d",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/run_reliability_eval.py",
+          "sha256": "f11a7a36f3590441c220b6db6c6bc21009a42d454c593ecbcbba82700fbd0669"
+        },
+        {
+          "blob_oid": "b7b64fa90aaba5cc8dd7cf3273c8692d0eef5f82",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/run_retrieval_eval.py",
+          "sha256": "3f4ba9aac255e3077b6e92858a44e6c821e829eb7890df060c29c6a97a8be026"
+        },
+        {
+          "blob_oid": "c049cede739f7fb2273f964bcad8eea701fb5560",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/run_severance_refusal_policy.py",
+          "sha256": "6730ac21261572fb0c3bfd3076480d2fc1863d19e0289fd66b0ef9db965c9237"
+        },
+        {
+          "blob_oid": "7d16138a98dd5a0d7695836a0a469a5c3dcb0f23",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "eval/run_wage_arrears_regression.py",
+          "sha256": "f6bf367158a939d45a857e7e62c643a8c046c814915a6497b2da69e63c601c21"
+        },
+        {
+          "blob_oid": "e684efc4703f99c23ab564a4000b9d7a2d67ec7c",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "pyproject.toml",
+          "sha256": "aaa72e360228e2c404e268bf2c87b85915eeb8e924fc0cc505914643abeb1726"
+        },
+        {
+          "blob_oid": "af44a013fa3d7f651825ef76720c6de6abdca331",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/_bootstrap.py",
+          "sha256": "70fc20ad67fc84bf9e6badda237b34c6b0ddce7256b285f0d1250b19ec9a91d7"
+        },
+        {
+          "blob_oid": "eeef842006525cd7f8c659b03bf1fc617bbcdd26",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/ask.py",
+          "sha256": "776027412f21b2a2245f7d406889bca61a580a91797ecdf85845a54d4d17f157"
+        },
+        {
+          "blob_oid": "ab9ec43922d7822e031984b131d76826f3c1341b",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/audit_corpus.py",
+          "sha256": "48d66bdfb14dd8f476ebd490c4e678f6186cc5ab5ea7d56f052295af2c1ff6f2"
+        },
+        {
+          "blob_oid": "9decd94e1f6306071c99496b423d24f83298d38c",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/build_index.py",
+          "sha256": "3fd0a6b1e040b850436a0b517d5c7856a3fab3a1944e70a3cf6201b4d7c7d76f"
+        },
+        {
+          "blob_oid": "852467626dece3b52cac1fff85cb08217b336d5e",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/download_corpus.py",
+          "sha256": "b7bef0334f6c8836e8480c6e64e836b7c1bc0cab049675e932d0643bffd966dd"
+        },
+        {
+          "blob_oid": "094b0b8450c860090e2d1597af35fa6500271566",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/rebuild_qdrant_blue_green.py",
+          "sha256": "d3596d521de57ce6e63dee6f40fc8445642ae7506fb713ce75b68627ac24e932"
+        },
+        {
+          "blob_oid": "83f25caecd27e4ac3ea155b14a2e816c66c7f978",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/run_api.py",
+          "sha256": "057290994fcf7d04e30969991ffc4506ae49e8890a79a8a53c69b854767af1ae"
+        },
+        {
+          "blob_oid": "75be4c1cc28832c93d43e83f8204add1ee59cd4d",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/run_space.py",
+          "sha256": "d6d898751b520df0b3885a5b00ad1ab801f4ff38864d3fcb81bf19bc95278ff7"
+        },
+        {
+          "blob_oid": "e1dcd0ef0a0a3c7eaee899d5770bf8a0fdd1d841",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/run_ui_fixture_api.py",
+          "sha256": "217848953fdd8489820c5d4ab31d6fa2f390baa060d753f725290df16021ba70"
+        },
+        {
+          "blob_oid": "fcbc371d9205f99cd1c366aeb87150373ba7a5fc",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/v036_authoritative_bootstrap.py",
+          "sha256": "6ee60f0d8c74eaba1bec898e4f89bc5290fc5c201dfbbf1cc8403540c0bf4490"
+        },
+        {
+          "blob_oid": "4c679782f42ab9c1286bb61ebc42bbcc7f01ab27",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/verify_private_space.py",
+          "sha256": "68981191b83e33948b918c80d08199edf0783f17701233cfb9932ebead87104d"
+        },
+        {
+          "blob_oid": "ad32bb7b5dd91944e16fbd91e17ad73832c298fb",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/verify_qdrant_reader.py",
+          "sha256": "83f46daa00ebf1eebacd810a325f7098755a7fea6d1b76055433c9296152d20c"
+        },
+        {
+          "blob_oid": "2f78f4d01e03d4a425ed68aa9d7900f9a2178db0",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "scripts/verify_release.py",
+          "sha256": "d5a23bf298fd35db71f2c590efda5e161d079dde31b614c9ffc32853e4582d50"
+        },
+        {
+          "blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/api/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "blob_oid": "42295ac432273cafb1f1f184971ab92054af4c50",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/api/byok.py",
+          "sha256": "657fc0972254b7ef079416c7b4a9b5244231787c169c723c9120f9bec542cbde"
+        },
+        {
+          "blob_oid": "8707f02327caaf99f7b3e6ddda420201577a1369",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/api/main.py",
+          "sha256": "9664632e74dde5bfd7fdad4ce39442e0a9efd85f8f13b725db96ca0c0f16b123"
+        },
+        {
+          "blob_oid": "7d3c3ee9f6dc9b72e4004261ad370e4d5b431dac",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/config.py",
+          "sha256": "9bebc2c705a523d9a95b510d8d0ba97c5c6fecfc90633d1b384b6e6bad85eafb"
+        },
+        {
+          "blob_oid": "05c3f8f4030f6472150df7f5af909c1f4bceba66",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/corpus_audit.py",
+          "sha256": "f54227eae401662643afa09eec258be2103525432f69900114be6f6324dcf1e8"
+        },
+        {
+          "blob_oid": "5ab6dfa9ebf917b39dc4fe2afda8e8a4772701a0",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/evaluation.py",
+          "sha256": "66c994203a45cdc0ede60ac13b416d96c84f649e1afb409148b7681ccb2cefdc"
+        },
+        {
+          "blob_oid": "aae4b1dbd516dd9b20b3ff068948707a08b6c8a5",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/factory.py",
+          "sha256": "db4738b179d4de69235772c4c399020f237c23024b3d9e504b420d3008af4384"
+        },
+        {
+          "blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/generation/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "blob_oid": "868bf65c6eea9baec5b5a9996181b57aad934f22",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/generation/answerer.py",
+          "sha256": "dd2eb1526dc0004ec1f92b9ec0c10a380d2fcadee7ce6b766a5503b66aca5f66"
+        },
+        {
+          "blob_oid": "81327673b9b9d1152dadcf41d67d61ee067bcc21",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/generation/llm.py",
+          "sha256": "981744cf0d024b86d5bbc276ca749bc72d960d96bf42c6507f4f12801a11d588"
+        },
+        {
+          "blob_oid": "4c19d81227e18c9ec57161a9edd485b3a47b0214",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/generation/prompts.py",
+          "sha256": "436fe0427040d4555155de881fe6da10cb654fe89e9da1ffb034bda737124e9b"
+        },
+        {
+          "blob_oid": "24970a3876f78d852cb70eec51d220d6b9890607",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/generation/router.py",
+          "sha256": "569c96359d740aca0f26e04ed05fae8795f1b7a5150d787845e33f9a1b2e930d"
+        },
+        {
+          "blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/indexing/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "blob_oid": "e7e92b41ca3fce7f0f58acfb6a1430dc8edb6adf",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/indexing/bm25_index.py",
+          "sha256": "4b9aa20c3d4bcd1d05a0eccb458b68a798e476b8660b0bd608e81fdcbe797113"
+        },
+        {
+          "blob_oid": "c3be66c0514087fc74a7b939e159b03d6f006138",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/indexing/dict/legal_terms.txt",
+          "sha256": "958f735e71ca63c21175d0ccadfe36722166d06438aa36e19999652684eb37a0"
+        },
+        {
+          "blob_oid": "cf24a59a31c9c32ef27a727f03cd608faa95c9ce",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/indexing/embedder.py",
+          "sha256": "69acb49c30cd0a39d271b6004d77ad5ef201cc452b810571d22d7d8256acf9af"
+        },
+        {
+          "blob_oid": "c83486493a43d2f1f5a6e78d5ff4d2f2d688d197",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/indexing/tokenizer.py",
+          "sha256": "80d97fbd3ae9ad3ab358607b5c75043e642a5d5af03430b39b24ae4bba7b9ccc"
+        },
+        {
+          "blob_oid": "5022da53318839d683b08c2c1a50421705d939f3",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/indexing/vector_store.py",
+          "sha256": "ab911efaee5ea73425c4b9a4aef1c36f028327925027affd8a6b8b32040b535c"
+        },
+        {
+          "blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/ingestion/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "blob_oid": "de54a003ebcb6e83270fd4020bf30820cb09003e",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/ingestion/chunkers.py",
+          "sha256": "1544d35c4db5ca2308458a0afae3e608c367f1e1caa427849554d031cf550600"
+        },
+        {
+          "blob_oid": "8c22ceb142074a1b4dd6bada283570b3e2c5aa02",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/ingestion/cleaner.py",
+          "sha256": "baf63f73e07e4198c4486338b7c5493d5281205b9b1d2e292e87e8c26e3e6456"
+        },
+        {
+          "blob_oid": "7b460c652d8f7b0c3a3afd3eda853b1c6721cfe0",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/ingestion/loader.py",
+          "sha256": "152f32c0db07a7ea85e2cf69c8f0fe77b0cbfa5c23cf12f31616cf125c9cd390"
+        },
+        {
+          "blob_oid": "9976d8602a5f4fd98ff53cee5e576523165a1f55",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/models.py",
+          "sha256": "8089fb81ee88c2c18adb7aaf21dc05aae6d9be51b2cf82741e05dfc32bbc3237"
+        },
+        {
+          "blob_oid": "c563a0df415c68671bfebc0c7823872675036428",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/portfolio_demo_regression.py",
+          "sha256": "8fe6ce2c433d9878e1f61d3c441c758c3d79ef017e0d2f0f379c68958aa2bd67"
+        },
+        {
+          "blob_oid": "7c4ae9eed1cd52cde1ccb675fcc4dbf495f8326d",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/provider_budget.py",
+          "sha256": "632200cb2df1562c7e476afca766cf4e6735be8e3914ea8b49e7d106f4ada970"
+        },
+        {
+          "blob_oid": "f6c8f6a85da3e8dcbc04e8b7cf8b5d7af5f69547",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/provider_crosscheck.py",
+          "sha256": "3407d4b63a48f885e1bab58ca9737b630d1838b82e4ce7fa41ee72e974bd9b61"
+        },
+        {
+          "blob_oid": "c99555f96a385d1b9e3af55241f165f65da2061c",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/qdrant_blue_green.py",
+          "sha256": "83b28f140c16cb663d3482c67a1678e9ac87a2a8dda1265b484754ef452c2660"
+        },
+        {
+          "blob_oid": "8d98f38c8b802642091987060032e193892c0ce2",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/qdrant_maintenance.py",
+          "sha256": "06042ca20cc65c6f395451705c4425fdd2e17eeae6f2045f7d47993dc81e1416"
+        },
+        {
+          "blob_oid": "2f74bb46f481b583ea718d92b5f435ec4d4bce47",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/release_verification.py",
+          "sha256": "6238295696cbf5ac9ef295eaa551c2d1ebe7c46b23a77be38f3c8c9ec9f7c89f"
+        },
+        {
+          "blob_oid": "2cf93a76183eef56a589f8d27ac850dfc981ec65",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/reliability.py",
+          "sha256": "f3ce5293ae74078ea14f8c224af2f856d84fe44bf0dfefd5aab8c3fb1c87a529"
+        },
+        {
+          "blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/retrieval/__init__.py",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "blob_oid": "cc2214156026e3ccd05ba65394daf672a188ebc7",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/retrieval/fusion.py",
+          "sha256": "b17756aea8f2a8caa8afbcef800f836b492d5ca02c41f9998e682364bd2e3b2a"
+        },
+        {
+          "blob_oid": "653b99f3c7ad96bbaf02b37e54181c1bca4ace89",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/retrieval/pipeline.py",
+          "sha256": "ad51145f0ccef73ea93e651785d412d2f06987d92867683df452f0b9d830819a"
+        },
+        {
+          "blob_oid": "9df6b27da14753e1c36704a616723129a0ae9d6f",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/retrieval/refusal_policy.py",
+          "sha256": "620411ff84ec0e2ab1b58bde916d3d06bc20483ba2b901e26ed632c5f89a4d64"
+        },
+        {
+          "blob_oid": "dc198fa64bf7b52aab2eb94200c9a1b9fe2eef4f",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/retrieval/reranker.py",
+          "sha256": "4d0508b01c4f8cc6ad637c36148acb993835138b2d41de87794b5604a34f5d22"
+        },
+        {
+          "blob_oid": "dabaea4b75c42f23319c65147356d422e6d307b4",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/retrieval/retriever.py",
+          "sha256": "57f4d14cb6c795ad8e56c346a19ab441847866bb757e16c0e1de2bcaaba538be"
+        },
+        {
+          "blob_oid": "50f172fb279fa7e5330ae5703b4745ecbfdae045",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/severance_refusal_policy.py",
+          "sha256": "df9141614fa1277cf95fed9691ee50fa757be9b3d87dec2f13d05bdbf68e832a"
+        },
+        {
+          "blob_oid": "58fd411be1858ed2473360757e4a21a8f6508421",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "src/rag/wage_arrears_regression.py",
+          "sha256": "4e11179e1885b140818fed617039ed910d88dcbbaa0f74ee2d1b7f28e119d521"
+        },
+        {
+          "blob_oid": "a196e0d52a56ae595629cd56206b17acc3744476",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_answerer.py",
+          "sha256": "4308ad9f4f26ed5964539a2df9bce876de3f2cb0a5766ac651fbb62ccd4f0def"
+        },
+        {
+          "blob_oid": "21de384691ae159c651f65b82650fefdf3dd7c7a",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_api_response.py",
+          "sha256": "1defe378dff1ba23550389468db6269a2bbc7042ee51d9104ecabcbf14df1d9b"
+        },
+        {
+          "blob_oid": "fd244c7cde19b7875c393aed00b0aa0fbb0a4270",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_bm25_index.py",
+          "sha256": "e7e05d2fd851cadf0a7771f15a5d7fdf663eed58f104a64979d94892626985d8"
+        },
+        {
+          "blob_oid": "f0da034010d4416235ece0dddf8fc5a1f385c07d",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_byok_policy.py",
+          "sha256": "2bc9d0a78462413f801826c5699f5af1b0228f1eb5069414e9ef52643772744b"
+        },
+        {
+          "blob_oid": "2f4043f81df435991d6b423f85df33010d865d49",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_chunkers.py",
+          "sha256": "76674b683543917bb4d86881bc18616043a20d87220c62461a45f1fe894b1204"
+        },
+        {
+          "blob_oid": "faa4d227fecf6ddc73bd8796ac9b67af5d1a870f",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_cleaner.py",
+          "sha256": "0d2b7a768a030abea3e3ff40c743bc59ca9314286a5e20c7cd6ac2ae302c77f5"
+        },
+        {
+          "blob_oid": "fa3b3852c50ecd3ace4ac0f0891b74072e5dfb5a",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_config.py",
+          "sha256": "42871df8e8af3df958cc4101824b1147d846722b68350028ce897e046dcd88d6"
+        },
+        {
+          "blob_oid": "78f0bac886089c8cd896ca5f9410762ad80877b6",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_corpus_audit.py",
+          "sha256": "58fd7256aacb657d3cc29a732caff35dc0b4632ba565937eb087803784dd313d"
+        },
+        {
+          "blob_oid": "34e6baa48f3b8bb75451a128968cbaa19c170d00",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_embedding_cache.py",
+          "sha256": "ea3a4aa0244b468fd58ff56105e71aa4f61675b40a50c34a5a439ea1d182a1e9"
+        },
+        {
+          "blob_oid": "2c04ab8d392cc22f6b135d84317530a07ccf8850",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_eval_dataset.py",
+          "sha256": "7a93d42164dfd4c93eac50e8a6d266f925f8ccbea6f8110af939bded1c074baf"
+        },
+        {
+          "blob_oid": "5864e805ff69e1ffc86c31b1fc2cf1f4a272db08",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_evaluation.py",
+          "sha256": "8587d081dc02ad940f02ed68903ab7230f4a8cb566400891bceaf3b04a0cb470"
+        },
+        {
+          "blob_oid": "fec031f18aac06b46490d3069bfd30da0919d88b",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_factory.py",
+          "sha256": "69f75244200717210dda928b4f8975808e1fc2e88820161f023b3a614e09ae8e"
+        },
+        {
+          "blob_oid": "fe1da2b40678ab0bb98cd3a7b9d9ce602134ce3c",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_fusion.py",
+          "sha256": "33bde88f4914b22ed262cf02fb9a890ba9899f3b4ee2831fd11520333ae2d71e"
+        },
+        {
+          "blob_oid": "cded4ed7a78ee439726384f10d5f0732ebfd3531",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_judge.py",
+          "sha256": "4234851c055c2b254ef15fd1006799253d97927b398c335ad0cdcf439feb8562"
+        },
+        {
+          "blob_oid": "c05ddc9e1188bb1e99a1d926124f5b349d0dce4a",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_llm.py",
+          "sha256": "c0eece1e7a59ef59803dc8a3251725724c29cdcb34e4b07da154b10e0fcb38b0"
+        },
+        {
+          "blob_oid": "8f3b20be48b2ea3fb20d2367947d9bc1ce251512",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_llm_router.py",
+          "sha256": "aeab74d1fcd3e828abc02f1f8493e3c6ed9406490d42d2d3294d22161c507f89"
+        },
+        {
+          "blob_oid": "68a2ef4acc407498021cd673a269d1db8b5ef304",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_loader.py",
+          "sha256": "62354bb7c80a76503a99b835450401ba5e45ebd5f0aea8b2d0a1ee19247da5c8"
+        },
+        {
+          "blob_oid": "64213a0c616547b0dd68240336d38f4dbae1a86e",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_official_artifacts.py",
+          "sha256": "8829dee6e3ba784f5b6ac5273ba31ae0bf677fd1e376812ab1ed11407242f57b"
+        },
+        {
+          "blob_oid": "1e4e03e9bd87a10048a68dfce359484dd9d5257d",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_packaging.py",
+          "sha256": "4ebce324f74a6fb3da7c856df9c23d72e1086b2e04f2076990138583a2f94e4a"
+        },
+        {
+          "blob_oid": "52bb1f0ee6cba0d6037aa450f9f4e98839da2c15",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_pipeline.py",
+          "sha256": "65061c8c5dbe0e7cb6af0dfeb0b77de0a43c21987930ee405f3b2f6269600170"
+        },
+        {
+          "blob_oid": "87cdf9d4e73dc111d230bfeb30ec3fd3ec956624",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_portfolio_demo_regression.py",
+          "sha256": "26deb423afd8e8c332dde41388b812ea7ce14d002713c32aebde4f300db68fd0"
+        },
+        {
+          "blob_oid": "d68ab260052c59f66824b0cb20b95a433dc3b143",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_private_space_verification.py",
+          "sha256": "3927d5a191bd3cc8c4d2b4a191a2f92fb35da308132abc276fd9f6822464366f"
+        },
+        {
+          "blob_oid": "434532bb6a722ba25c70b63690bdedd672a92a30",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_provider_budget.py",
+          "sha256": "080ee939af40bb3e09eafb5548f0ef8d16b16173b7c0c9f469a8723bd7e442af"
+        },
+        {
+          "blob_oid": "1972c50b41afec5e7d5da67bcf0d558074c46251",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_provider_crosscheck.py",
+          "sha256": "7a843b05711179ae475d636adecf247ab2dc240c388f7421b4497257fca3c622"
+        },
+        {
+          "blob_oid": "929973ffb565fefdec82e7cd12f9977e9bbc83fc",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_qdrant_blue_green.py",
+          "sha256": "6b85f45495bcc7d5de42eac256a050c60a2c414763ecf88215b8738377984d4b"
+        },
+        {
+          "blob_oid": "64686bd5ea7861f563e526b0c34be89d1101622e",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_qdrant_blue_green_cli.py",
+          "sha256": "7149404e9f6883725da34dfd4400c9ccaf3518adb7e73e5e7fc1ca80a20c11a3"
+        },
+        {
+          "blob_oid": "28210586a564eb15eec79ba5d83f4466f5ab54ad",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_qdrant_maintenance.py",
+          "sha256": "d6f6645de98f98158b5b5906cde6cc0bd72fe8ef6675f9cd1a56997b521a204e"
+        },
+        {
+          "blob_oid": "77e3e0c550289eb871394494f618afebcfa52f21",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_qdrant_reader_verification.py",
+          "sha256": "adb190739fb4a5514735d1e7ea0750ba681aafa019bda5d3a5f9ba700ea81f16"
+        },
+        {
+          "blob_oid": "4695cb16921e225618640872aa32a118ae73eafc",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_refusal_labels.py",
+          "sha256": "40ac5f87507255ea8d7a629814988776be75c5f6f764dfe4c4bbfbb22941568c"
+        },
+        {
+          "blob_oid": "7d6f50d768b4b2385112a6da3d8ceab553f998a4",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_refusal_policy.py",
+          "sha256": "27f59265a3631805a54b0e4f7f3d942a44baf0e5c2b19e0cb0e32386c8feeb08"
+        },
+        {
+          "blob_oid": "18e67ff7ef5174b1ca495baf1cca362c86addac6",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_release_verification.py",
+          "sha256": "242d592746976dbd1a2c35b40c3928262b96806f032aaa6ad7fc9f151bfd1d3d"
+        },
+        {
+          "blob_oid": "29634f4af347c135fa216be61d011ca1e41b350f",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_reliability.py",
+          "sha256": "14646374c2dfc4bbfcfcc4c2bb00974aaec4d980e9c7ce7bfc31c2d5638dea16"
+        },
+        {
+          "blob_oid": "a287336e09ae1bd516eb7c9d4c490ff503f97eb3",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_reliability_dataset.py",
+          "sha256": "1805b61cfba62a48ba41225bb9a0f993457c778553bff551c40d0681e1a10a67"
+        },
+        {
+          "blob_oid": "68a3a85303d0a6941d1e7daa3c2ac0f4036d019f",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_retriever.py",
+          "sha256": "81534b2de934997dd5c95d79e7151ea4b5cb40939038fdfd9c5cb51efa3be75d"
+        },
+        {
+          "blob_oid": "94e5c4d87d0c405b6dd8d52ed2f5c2a4ad208243",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_severance_refusal_policy.py",
+          "sha256": "89d1d86e2d858bf0d43d0d2a738be908c78affa063eee17dc6850c19ded48534"
+        },
+        {
+          "blob_oid": "08d1a2070f77548414d5ce01058513d8efff7551",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_space_runner.py",
+          "sha256": "331ab697c8279665e3aa23ff207b723508db2e6b6529a1e57bb966b6b4a003c3"
+        },
+        {
+          "blob_oid": "e46cf30bf1b963af475076063b2729727c865d7b",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_tokenizer.py",
+          "sha256": "bf41c27385234bb7f0ad186231a94aedca8d9dc4691c7154c88859e13d099bca"
+        },
+        {
+          "blob_oid": "18a3421f31d1a3d35598ae03ed9e16cdd467a5d0",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_ui_api_client.py",
+          "sha256": "3f823038b355996c8228be1761b05170dbe8829d129207166e2ea21502255dc2"
+        },
+        {
+          "blob_oid": "753c955e1d5985bc310fd4a4140ea3d6c5c9f439",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_ui_bootstrap.py",
+          "sha256": "8ceb9811d92d05f23d1248ce2463cb0c412538096234b8eab28a2df661d32e93"
+        },
+        {
+          "blob_oid": "bef59311552ac1ecc3c9941e8eb1c05108b9c7e5",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_ui_byok_app.py",
+          "sha256": "5d453154e9237d1ee5e0b511f171e59c9576cccff5ea53b89ab4d041e44f96fc"
+        },
+        {
+          "blob_oid": "5f1dc3237b453d5b35d650fb18fc655f42e8167d",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_ui_content.py",
+          "sha256": "e40a76ecb85b85fa1572d3ba1fe57d5ae0d92bba4687f9d6667a69e91418c8bc"
+        },
+        {
+          "blob_oid": "1e341d66adbd139d3bb39c67ca9ba01d27674f13",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_ui_fixture_api.py",
+          "sha256": "c15ac093366ce9b671a41b5d463dbf87bee9cfc7f742c38ef64e2eb55fe2a594"
+        },
+        {
+          "blob_oid": "0f50f3e7f474180fe184c09808bb01689eb74633",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_v036_authoritative_bootstrap.py",
+          "sha256": "b45cd78afbc54ca3d851da8853b893ef03969a7ab882f2088cdaa1e1d4a888a7"
+        },
+        {
+          "blob_oid": "3ac7fd549fec4ddf5e6ec3b7ef093e68371bc4ac",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_vector_store.py",
+          "sha256": "cfb71e47b18a6def8781fd67277b7b3d30baad8c17438cee3587fc301e473734"
+        },
+        {
+          "blob_oid": "13a8267d49948f0dd22680a0f04451c2083e95bc",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "tests/test_wage_arrears_regression.py",
+          "sha256": "35a38f8608e3c6af603b33acb1320db5ab8e775a6ab3b881f4b7e51ff4864851"
+        },
+        {
+          "blob_oid": "8f651b4c95e512a9502f9680f666185ee78dd61c",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "ui/_bootstrap.py",
+          "sha256": "ceee5c5a0605cb5381ee89fba65ed1997220cb7c052fa5e6678f70b1a6ad6080"
+        },
+        {
+          "blob_oid": "5c1ea493a892ecaa11621a80d7dc4835996a93d8",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "ui/api_client.py",
+          "sha256": "55bbb9c93f55615d83b9d820a307c2c382fefb1165d128aa611be53dad347834"
+        },
+        {
+          "blob_oid": "368abee91ba5cc81969e1923c390f04b569bf2ab",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "ui/app.py",
+          "sha256": "31edd69e6da338aa717806cfcc6b142a1353ed4b4096f80580d7c3c5ee288693"
+        },
+        {
+          "blob_oid": "0536af201c773862a600464d82acf631ee832c7c",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "ui/content.py",
+          "sha256": "dc66c83ff5a31a3e7712f95cbbe2d122f614befc12571211432cce6f722cdb2e"
+        },
+        {
+          "blob_oid": "1cf6e10ad29c7231e9def0ee3ca60bf830d8d4ec",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "ui/refusal_labels.py",
+          "sha256": "0b3374ac89663196772b85878f901287b45668c9951bce3aa878cbfa2439755e"
+        },
+        {
+          "blob_oid": "2a2d874c0b9b700c244d3774300afdd310cfd45e",
+          "mode": "100644",
+          "object_type": "blob",
+          "path": "uv.lock",
+          "sha256": "a5a0e4b5efd483dea7f86f61559508ddd833b209737f6f7ef3853e92ce4d92a5"
+        }
+      ]
+    },
+    "run_origin": "fresh_offline_retrieval",
+    "semantic_view_sha256": "3faf051810ad233ee2da982155c4c4d8127f00d2aea56351fa19f87bee0d49a6",
+    "source_artifact_sha256": {
+      "formal_dataset": "760e33eaa0821001d37ff974bc037043d019fc670b8f3621b6e713030274ca07",
+      "stress_dataset": "7641d78e8434d8832319a70af019c1e0d860079a23fca161b488497e1c6b1b7f"
+    },
+    "source_tree_clean": true
+  },
+  "route_ablation": {
+    "candidate_thresholds": [
+      0.0,
+      0.005,
+      0.01,
+      0.015,
+      0.02,
+      0.025,
+      0.03
+    ],
+    "candidates": [
+      {
+        "candidate_threshold": 0.0,
+        "formal": {
+          "answerable": 30,
+          "direct_false_refusals": 0,
+          "hit_at_5": 1.0,
+          "mrr_at_10": 0.9388888888888888,
+          "passed": true,
+          "questions": 40,
+          "unanswerable": 10
+        },
+        "passed": false,
+        "stress": {
+          "answerable": 40,
+          "direct_false_refusals": 0,
+          "direct_unanswerable_coverage": 0.85,
+          "direct_unanswerable_refusals": 17,
+          "passed": true,
+          "questions": 60,
+          "unanswerable": 20
+        },
+        "target": {
+          "collision_contracts": 14,
+          "passed": false,
+          "passed_cases": 29,
+          "positive_generation_allowed": 15,
+          "positive_routes": 15,
+          "positive_sources_at_5": 15,
+          "total": 30
+        }
+      },
+      {
+        "candidate_threshold": 0.005,
+        "formal": {
+          "answerable": 30,
+          "direct_false_refusals": 0,
+          "hit_at_5": 1.0,
+          "mrr_at_10": 0.9388888888888888,
+          "passed": true,
+          "questions": 40,
+          "unanswerable": 10
+        },
+        "passed": false,
+        "stress": {
+          "answerable": 40,
+          "direct_false_refusals": 0,
+          "direct_unanswerable_coverage": 0.85,
+          "direct_unanswerable_refusals": 17,
+          "passed": true,
+          "questions": 60,
+          "unanswerable": 20
+        },
+        "target": {
+          "collision_contracts": 14,
+          "passed": false,
+          "passed_cases": 29,
+          "positive_generation_allowed": 15,
+          "positive_routes": 15,
+          "positive_sources_at_5": 15,
+          "total": 30
+        }
+      },
+      {
+        "candidate_threshold": 0.01,
+        "formal": {
+          "answerable": 30,
+          "direct_false_refusals": 0,
+          "hit_at_5": 1.0,
+          "mrr_at_10": 0.9388888888888888,
+          "passed": true,
+          "questions": 40,
+          "unanswerable": 10
+        },
+        "passed": false,
+        "stress": {
+          "answerable": 40,
+          "direct_false_refusals": 0,
+          "direct_unanswerable_coverage": 0.85,
+          "direct_unanswerable_refusals": 17,
+          "passed": true,
+          "questions": 60,
+          "unanswerable": 20
+        },
+        "target": {
+          "collision_contracts": 14,
+          "passed": false,
+          "passed_cases": 29,
+          "positive_generation_allowed": 15,
+          "positive_routes": 15,
+          "positive_sources_at_5": 15,
+          "total": 30
+        }
+      },
+      {
+        "candidate_threshold": 0.015,
+        "formal": {
+          "answerable": 30,
+          "direct_false_refusals": 0,
+          "hit_at_5": 1.0,
+          "mrr_at_10": 0.9388888888888888,
+          "passed": true,
+          "questions": 40,
+          "unanswerable": 10
+        },
+        "passed": false,
+        "stress": {
+          "answerable": 40,
+          "direct_false_refusals": 0,
+          "direct_unanswerable_coverage": 0.85,
+          "direct_unanswerable_refusals": 17,
+          "passed": true,
+          "questions": 60,
+          "unanswerable": 20
+        },
+        "target": {
+          "collision_contracts": 14,
+          "passed": false,
+          "passed_cases": 29,
+          "positive_generation_allowed": 15,
+          "positive_routes": 15,
+          "positive_sources_at_5": 15,
+          "total": 30
+        }
+      },
+      {
+        "candidate_threshold": 0.02,
+        "formal": {
+          "answerable": 30,
+          "direct_false_refusals": 0,
+          "hit_at_5": 1.0,
+          "mrr_at_10": 0.9388888888888888,
+          "passed": true,
+          "questions": 40,
+          "unanswerable": 10
+        },
+        "passed": false,
+        "stress": {
+          "answerable": 40,
+          "direct_false_refusals": 0,
+          "direct_unanswerable_coverage": 0.85,
+          "direct_unanswerable_refusals": 17,
+          "passed": true,
+          "questions": 60,
+          "unanswerable": 20
+        },
+        "target": {
+          "collision_contracts": 14,
+          "passed": false,
+          "passed_cases": 29,
+          "positive_generation_allowed": 15,
+          "positive_routes": 15,
+          "positive_sources_at_5": 15,
+          "total": 30
+        }
+      },
+      {
+        "candidate_threshold": 0.025,
+        "formal": {
+          "answerable": 30,
+          "direct_false_refusals": 0,
+          "hit_at_5": 1.0,
+          "mrr_at_10": 0.9388888888888888,
+          "passed": true,
+          "questions": 40,
+          "unanswerable": 10
+        },
+        "passed": false,
+        "stress": {
+          "answerable": 40,
+          "direct_false_refusals": 0,
+          "direct_unanswerable_coverage": 0.85,
+          "direct_unanswerable_refusals": 17,
+          "passed": true,
+          "questions": 60,
+          "unanswerable": 20
+        },
+        "target": {
+          "collision_contracts": 14,
+          "passed": false,
+          "passed_cases": 29,
+          "positive_generation_allowed": 15,
+          "positive_routes": 15,
+          "positive_sources_at_5": 15,
+          "total": 30
+        }
+      },
+      {
+        "candidate_threshold": 0.03,
+        "formal": {
+          "answerable": 30,
+          "direct_false_refusals": 0,
+          "hit_at_5": 1.0,
+          "mrr_at_10": 0.9388888888888888,
+          "passed": true,
+          "questions": 40,
+          "unanswerable": 10
+        },
+        "passed": false,
+        "stress": {
+          "answerable": 40,
+          "direct_false_refusals": 0,
+          "direct_unanswerable_coverage": 0.85,
+          "direct_unanswerable_refusals": 17,
+          "passed": true,
+          "questions": 60,
+          "unanswerable": 20
+        },
+        "target": {
+          "collision_contracts": 14,
+          "passed": false,
+          "passed_cases": 29,
+          "positive_generation_allowed": 15,
+          "positive_routes": 15,
+          "positive_sources_at_5": 15,
+          "total": 30
+        }
+      }
+    ],
+    "highest_passing_candidate": null
+  },
+  "schema_version": "1.3",
+  "target_observations": [
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-001",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9722665150003212
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-002",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9424714411356884
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-003",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.6029028950527233
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-004",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.33801697064804453
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-005",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.7357313501569505
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-006",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.8077019816935518
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-007",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.8996919655465466
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-008",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9025392010662799
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-009",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.7362541908721122
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-010",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.5016379521308775
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-011",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.8703077546345467
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-012",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9324261237629998
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-013",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.5516096736947242
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-014",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.9620967591291953
+    },
+    {
+      "applied_routes": [
+        "severance_comparison"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-015",
+      "reranker_calls": 2,
+      "reranker_scored_pairs": [
+        20,
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 2,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.4647809720512859
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-016",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.8782303344319318
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-017",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 1
+      },
+      "top_score": 0.9440363774311056
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-018",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 11 條": 2
+      },
+      "top_score": 0.9915364848373228
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-019",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 16 條": 1
+      },
+      "top_score": 0.6836232823331811
+    },
+    {
+      "applied_routes": [
+        "wage_arrears_termination"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-020",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 14 條": 1
+      },
+      "top_score": 0.9836556253611399
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-021",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞工退休金條例|第 24 條": 1
+      },
+      "top_score": 0.981470418310729
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-022",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 54 條": 1
+      },
+      "top_score": 0.9935971465004394
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-023",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {},
+      "top_score": 0.00012959869651029318
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-024",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {},
+      "top_score": 0.06776439598790669
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-025",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞工退休金條例|第 12 條": 2
+      },
+      "top_score": 0.1411331382957852
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-026",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 3
+      },
+      "top_score": 0.6988175559468096
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-027",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {},
+      "top_score": 0.023453257824200966
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-028",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 16 條": 1
+      },
+      "top_score": 0.11276453620778279
+    },
+    {
+      "applied_routes": [],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-029",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 30 條": 1
+      },
+      "top_score": 0.5328667008864233
+    },
+    {
+      "applied_routes": [
+        "severance_comparison",
+        "wage_arrears_termination"
+      ],
+      "candidate_count": 20,
+      "first_stage_retrieval_calls": 1,
+      "hit_count": 5,
+      "qid": "severance-policy-030",
+      "reranker_calls": 1,
+      "reranker_scored_pairs": [
+        20
+      ],
+      "route_plan_matched": true,
+      "source_ranks": {
+        "勞動基準法|第 17 條": 3,
+        "勞工退休金條例|第 12 條": 1
+      },
+      "top_score": 0.7714394269278578
+    }
+  ]
+}
