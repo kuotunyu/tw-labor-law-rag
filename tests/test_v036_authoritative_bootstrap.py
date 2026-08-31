@@ -708,7 +708,7 @@ def _run_private_lock_smoke(
     )
 
 
-def test_private_lock_smoke_child_receives_only_minimum_offline_environment(
+def test_private_lock_smoke_child_distinguishes_runtime_locale_from_sanitized_parent(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -730,12 +730,16 @@ def test_private_lock_smoke_child_receives_only_minimum_offline_environment(
     )
     for name in sentinels:
         monkeypatch.setenv(name, "must-not-reach-child")
+    for name in ("LANG", "LC_ALL", "LC_CTYPE"):
+        monkeypatch.setenv(name, "must-not-reach-child")
     expected_safe_names = sorted(
         name for name in safe_windows_names if name in os.environ
     )
     child_probe = r"""
 import json
 import os
+
+os.environ.setdefault("LC_CTYPE", "C.UTF-8")
 
 safe_windows_names = {"PROCESSOR_ARCHITECTURE", "SYSTEMROOT", "WINDIR"}
 offline_names = {
@@ -753,16 +757,20 @@ sentinels = {
     "QDRANT_API_KEY",
     "V036_UNRELATED_AMBIENT_SENTINEL",
 }
-allowed_names = safe_windows_names | offline_names
+runtime_locale_names = {"LC_CTYPE"}
+allowed_names = safe_windows_names | offline_names | runtime_locale_names
 print(
     json.dumps(
         {
             "offline_controls": {
                 name: os.environ.get(name) for name in sorted(offline_names)
             },
+            "runtime_locale": {
+                name: os.environ.get(name) for name in sorted(runtime_locale_names)
+            },
             "safe_windows_names": sorted(safe_windows_names & set(os.environ)),
             "sentinel_present": bool(sentinels & set(os.environ)),
-            "unexpected_name_count": len(set(os.environ) - allowed_names),
+            "unexpected_names": sorted(set(os.environ) - allowed_names),
         },
         sort_keys=True,
     )
@@ -786,9 +794,10 @@ print(
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout) == {
         "offline_controls": offline_controls,
+        "runtime_locale": {"LC_CTYPE": "C.UTF-8"},
         "safe_windows_names": expected_safe_names,
         "sentinel_present": False,
-        "unexpected_name_count": 0,
+        "unexpected_names": [],
     }
 
 
