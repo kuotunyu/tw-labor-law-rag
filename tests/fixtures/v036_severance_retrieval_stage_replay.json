@@ -7,10 +7,29 @@
     "source_artifact": "eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json",
     "source_artifact_sha256": "ebed566b3778f6674ef55641564861ef3c17bb899197bb40e3ba7f81bb6e010c",
     "current_dataset": "eval/dataset/severance_refusal_policy_v0.3.6.jsonl",
-    "current_dataset_sha256": "cf9d5ae3a9ae05ccb944b22fb878118670f7272895d6a8d7c383928eaf19b40c",
+    "current_dataset_sha256": "053d78fd523c7e023f7e9646a17f4b4a08ddea3e5774465e9b760995ba6b3174",
     "corpus_snapshot_sha256": "947af07298c559a0f64511c24be0582b5d3b96a53d67f228d23de62de70e61ce",
     "embedding_model": "BAAI/bge-m3@5617a9f61b028005a4858fdac845db406aefb181",
     "reranker_model": "BAAI/bge-reranker-v2-m3@953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+  },
+  "policy_observations": {
+    "severance-policy-023": {
+      "source_revision": "19bda937d4c440e6d349fd827f356c189c0809b9",
+      "source_artifact": "eval/diagnostics/severance_retrieval_pivot_v0.3.6_no_go.json",
+      "source_artifact_sha256": "5a982a143f99643ff8c3b3f63bf64932ff5c9ee96eb70ae5a5c888a29f1c00ab",
+      "observation": {
+        "qid": "severance-policy-023",
+        "source_ranks": {},
+        "applied_routes": [],
+        "hit_count": 5,
+        "top_score": 0.00012959869651029318,
+        "candidate_count": 20,
+        "route_plan_matched": true,
+        "first_stage_retrieval_calls": 1,
+        "reranker_calls": 1,
+        "reranker_scored_pairs": [20]
+      }
+    }
   },
   "cases": [
     {

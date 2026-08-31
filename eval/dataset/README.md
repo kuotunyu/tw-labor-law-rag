@@ -33,7 +33,7 @@
 
 `severance_refusal_policy_v0.3.6.jsonl` 每行只有 `qid`、`question`、`case_type`、`answerable`、`sources`、`required_routes`、`prohibited_routes`、`expected_outcome` 與 `style_tags`。`expected_outcome` 是精確列舉：`generation`、`no_hits` 或 `threshold`，不再以布林值近似決策階段。資料集固定為 `severance-policy-001`～`030`，前 15 題必須是可答正例，並同時以《勞工退休金條例》第 12 條與《勞動基準法》第 17 條為來源；後 15 題是單一制度、一般終止、預告、欠薪、退休、無關新舊用語、部分 cue 與多路由碰撞。
 
-正例的路由必須精確等於單一 `severance_comparison`，並覆蓋法律中文、口語中文、中英混合、標點、長敘事、新舊制反轉次序、公式、上限與混合年資。碰撞負例仍採「所有 `required_routes` 都存在，且所有 `prohibited_routes` 都不存在」；額外的非禁止路由可以保留。共用拒答政策固定使用全域 `0.03`；路由保留作為檢索證據，絕不選擇較低的准入門檻。`severance-policy-023` 明確要求 `no_hits`；`024` 保持 `generation`；`027` 明確要求空路由、正命中、低於全域 `0.03` 的分數與 `threshold`，因此 `no_hits` 不通過其契約。載入器對欄位、順序、列舉值、來源、路由、樣式覆蓋與重複值全部 fail closed。
+正例的路由必須精確等於單一 `severance_comparison`，並覆蓋法律中文、口語中文、中英混合、標點、長敘事、新舊制反轉次序、公式、上限與混合年資。碰撞負例仍採「所有 `required_routes` 都存在，且所有 `prohibited_routes` 都不存在」；額外的非禁止路由可以保留。共用拒答政策固定使用全域 `0.03`；路由保留作為檢索證據，絕不選擇較低的准入門檻。`severance-policy-023` 與 `027` 都明確要求空路由、正命中、低於全域 `0.03` 的分數與 `threshold`，因此 `no_hits` 不通過其契約；`024` 保持 `generation`。載入器對欄位、順序、列舉值、來源、路由、樣式覆蓋與重複值全部 fail closed。
 
 校準觀測列只接受 `qid`、正規來源名次、allowlist 路由、`hit_count` 與未捨入 `top_score`；來源、路由、可答性與精確 outcome 都由每個 qid 的內建正規契約重新計算，不接受呼叫者預先計算的 pass/fail 布林值。Stress 與 formal guard 的 fresh-run 輸入列只接受正規 `qid`、可答性、名次、`hit_count`、正規路由與保留輸入精度的 `top_score`；不接受呼叫者提供 `has_hits` 或 `reranker_enabled`。`hit_count` 必須介於 0 與固定 `top_k_final=5` 之間；零命中必須同時是零分與 null 名次，正命中必須有大於零且位於 reranker 分數範圍的分數，正名次不得大於命中數。評分器由 `hit_count > 0` 推導 `has_hits`，並由固定 retrieval configuration 推導 `reranker_enabled=true`；兩個推導值連同 `hit_count` 都會公開，供 Task 7 重播。任一 guard 組的全部分數若都與小數四位相容即 fail closed，因此不能直接使用 v0.3.1 的捨入 public trace；Task 6 必須從新鮮的離線檢索 pipeline 產生這些列。正式產物 schema 版本為 `1.2`。
 

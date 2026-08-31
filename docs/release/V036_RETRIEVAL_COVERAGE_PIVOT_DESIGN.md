@@ -21,9 +21,11 @@ the production refusal threshold.
   primary-first, deduplicating interleave.
 - The primary query's original top score remains the only score used by the
   refusal gate. Secondary-view scores never change admission.
-- Collision case `severance-policy-027` is expected to stop at the retrieval
-  threshold. It remains unanswerable, route-negative, and a strict collision
-  canary; only its over-specified generation-layer expectation changes.
+- Collision cases `severance-policy-023` and `severance-policy-027` are
+  expected to stop at the retrieval threshold. Both remain unanswerable and
+  route-negative. `027` corrects the former generation-layer expectation;
+  `023` refines the former no-generation expectation from `no_hits` to the
+  actually measured `threshold` stage without changing production behavior.
 - The release must be calibrated again from a clean committed revision on the
   deployment-equivalent CPU/FP32 path. Production remains fixed at `0.03`;
   the seven historical candidates are an evaluation-only ablation. If its
@@ -126,17 +128,17 @@ selection.
 
 ## Dataset contract correction
 
-`severance-policy-027` remains:
+`severance-policy-023` and `severance-policy-027` remain:
 
 - `case_type=collision_negative`;
 - `answerable=false`;
 - no required source or route;
 - `severance_comparison` prohibited.
 
-Its dataset contract changes from a generation boolean to an exact outcome
-enum. `027` requires `expected_outcome="threshold"`, empty routes, positive hit
-count, primary score below global `0.03`, refusal stage `threshold`, and no
-generation. A `no_hits` decision does not pass. The related `024` case requires
+Their dataset contracts use an exact outcome enum. Both require
+`expected_outcome="threshold"`, empty routes, positive hit count, primary
+score below global `0.03`, refusal stage `threshold`, and no generation. A
+`no_hits` decision does not pass. The related `024` case requires
 `expected_outcome="generation"` and remains the high-scoring admission
 collision canary. Every other row is migrated from its existing boolean to an
 equivalent exact outcome without changing meaning.

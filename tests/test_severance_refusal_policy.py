@@ -31,6 +31,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATASET = PROJECT_ROOT / "eval/dataset/severance_refusal_policy_v0.3.6.jsonl"
 RUNNER = PROJECT_ROOT / "eval/run_severance_refusal_policy.py"
 STRESS_DATASET = PROJECT_ROOT / "eval/dataset/reliability_stress_v0.3.1.jsonl"
+STAGE_REPLAY_FIXTURE = (
+    PROJECT_ROOT / "tests/fixtures/v036_severance_retrieval_stage_replay.json"
+)
+POLICY_OBSERVATION_FIXTURES = json.loads(
+    STAGE_REPLAY_FIXTURE.read_text(encoding="utf-8")
+)["policy_observations"]
+LEGACY_DIAGNOSTIC = (
+    PROJECT_ROOT / "eval/diagnostics/severance_refusal_policy_v0.3.6_no_go.json"
+)
+PIVOT_DIAGNOSTIC = (
+    PROJECT_ROOT
+    / "eval/diagnostics/severance_retrieval_pivot_v0.3.6_no_go.json"
+)
 EXPECTED_QIDS = (
     "severance-policy-001",
     "severance-policy-002",
@@ -1334,10 +1347,12 @@ def _observations(cases):
     observations = []
     for index, case in enumerate(cases):
         score = 0.0300004 if index == 0 else 0.5
-        if case.qid == "severance-policy-023":
-            score = 0.0
-        elif case.qid == "severance-policy-027":
+        if case.qid == "severance-policy-027":
             score = 0.029
+        fixture = POLICY_OBSERVATION_FIXTURES.get(case.qid, {}).get("observation")
+        if fixture is not None:
+            observations.append(dict(fixture))
+            continue
         observations.append(
             build_case_observation(
                 case,
@@ -1347,22 +1362,18 @@ def _observations(cases):
                 },
                 applied_routes=plan_retrieval_query(case.question).routes,
                 top_score=score,
-                hit_count=0 if case.qid == "severance-policy-023" else 5,
-                candidate_count=0 if case.qid == "severance-policy-023" else 20,
+                hit_count=5,
+                candidate_count=20,
                 route_plan_matched=True,
                 first_stage_retrieval_calls=1,
                 reranker_calls=(
-                    0
-                    if case.qid == "severance-policy-023"
-                    else 2
+                    2
                     if plan_retrieval_query(case.question).routes
                     == ("severance_comparison",)
                     else 1
                 ),
                 reranker_scored_pairs=(
-                    ()
-                    if case.qid == "severance-policy-023"
-                    else (20, 20)
+                    (20, 20)
                     if plan_retrieval_query(case.question).routes
                     == ("severance_comparison",)
                     else (20,)
@@ -1812,11 +1823,14 @@ def test_reviewed_dataset_has_exact_order_contracts_and_style_coverage(cases):
     assert all(len(case.question) >= 12 and case.question[-1] in "？?" for case in cases)
 
 
-def test_reviewed_dataset_uses_exact_outcomes_with_only_027_reclassified(cases):
+def test_reviewed_dataset_uses_exact_outcomes_for_both_measured_refusals(cases):
     outcomes = {case.qid: case.expected_outcome for case in cases}
 
-    assert set(outcomes.values()) == {"generation", "no_hits", "threshold"}
-    assert outcomes["severance-policy-023"] == "no_hits"
+    assert set(outcomes.values()) == {"generation", "threshold"}
+    assert list(outcomes.values()).count("generation") == 28
+    assert list(outcomes.values()).count("threshold") == 2
+    assert list(outcomes.values()).count("no_hits") == 0
+    assert outcomes["severance-policy-023"] == "threshold"
     assert outcomes["severance-policy-024"] == "generation"
     assert outcomes["severance-policy-027"] == "threshold"
     assert all(
@@ -1824,6 +1838,58 @@ def test_reviewed_dataset_uses_exact_outcomes_with_only_027_reclassified(cases):
         for qid, outcome in outcomes.items()
         if qid not in {"severance-policy-023", "severance-policy-027"}
     )
+
+
+@pytest.mark.parametrize("diagnostic", [LEGACY_DIAGNOSTIC, PIVOT_DIAGNOSTIC])
+def test_023_measured_diagnostics_replay_as_threshold_refusals(diagnostic):
+    envelope = json.loads(diagnostic.read_text(encoding="utf-8"))
+    observation = next(
+        row
+        for row in envelope["target_observations"]
+        if row["qid"] == "severance-policy-023"
+    )
+
+    decision = policy.decide_retrieval_refusal(
+        has_hits=observation["hit_count"] > 0,
+        reranker_enabled=True,
+        applied_routes=tuple(observation["applied_routes"]),
+        top_score=observation["top_score"],
+        global_threshold=0.03,
+    )
+
+    assert decision.refused is True
+    assert decision.refusal_stage == "threshold"
+    assert decision.effective_threshold == 0.03
+
+
+def test_023_fixture_matches_measured_threshold_contract(cases):
+    observation = _observations(cases)[22]
+
+    result = evaluate_candidate(
+        _observations(cases),
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    collision = result["cases"][22]
+    assert observation == POLICY_OBSERVATION_FIXTURES["severance-policy-023"][
+        "observation"
+    ]
+    assert collision["refusal_stage"] == "threshold"
+    assert collision["expected_outcome"] == "threshold"
+    assert collision["outcome_contract_passed"] is True
+    assert collision["passed"] is True
+
+
+def test_all_route_candidates_pass_target_with_023_measured_observation(cases):
+    results = _candidate_results(_observations(cases))
+
+    assert [result["target"]["passed_cases"] for result in results] == [30] * 7
+    assert [result["stress"]["passed"] for result in results] == [True] * 7
+    assert [result["formal"]["passed"] for result in results] == [True] * 7
+    assert select_highest_passing_threshold(results) == 0.03
 
 
 def test_reviewed_questions_match_committed_route_semantics(cases):

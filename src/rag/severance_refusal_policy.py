@@ -272,7 +272,7 @@ _CASE_CONTRACTS = {
     "severance-policy-021": _collision((_PENSION_24,)),
     "severance-policy-022": _collision((_LABOR_54,)),
     "severance-policy-023": _collision(
-        (), answerable=False, expected_outcome="no_hits"
+        (), answerable=False, expected_outcome="threshold"
     ),
     "severance-policy-024": _collision((), answerable=False),
     "severance-policy-025": _collision((_PENSION_12,)),

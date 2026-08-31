@@ -17,15 +17,17 @@ Files:
 Work:
 
 1. Replace the generation boolean with an exact `expected_outcome` enum for all
-   thirty rows, preserving the meaning of twenty-nine rows.
-2. Add failing contract/scorer tests proving `027` is route-negative,
-   unanswerable, has positive hits, and stops specifically at `threshold`;
-   `no_hits` must fail.
+   thirty rows, preserving the meaning of twenty-eight rows.
+2. Add failing contract/scorer tests proving `023` and `027` are route-negative,
+   unanswerable, have positive hits, and stop specifically at `threshold`;
+   `no_hits` must fail for either case.
 3. Require all fifteen positives to have routes exactly equal to the singleton
    severance route. Preserve non-exact behavior for every collision row.
-4. Change only `027`'s outcome meaning; keep `024` as explicit generation.
+4. Correct `027` from generation to threshold and refine `023` from the former
+   no-generation meaning to its measured threshold stage; keep `024` as
+   explicit generation.
 5. Add explicit supersession notes to the original design and plan.
-6. Prove all other 29 dataset rows and coverage counts are unchanged.
+6. Prove all other 28 dataset rows and coverage counts are unchanged.
 
 ## Task 2: Add deterministic multi-view planning and merge primitives
 
