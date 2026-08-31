@@ -1883,6 +1883,31 @@ def test_023_fixture_matches_measured_threshold_contract(cases):
     assert collision["passed"] is True
 
 
+def test_023_fixture_is_bound_to_its_tracked_diagnostic_row():
+    binding = POLICY_OBSERVATION_FIXTURES["severance-policy-023"]
+    source_path = PROJECT_ROOT / binding["source_artifact"]
+    source_ref = f"{binding['source_revision']}:{binding['source_artifact']}"
+    completed = subprocess.run(
+        ["git", "show", source_ref],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr.decode(errors="replace")
+    assert source_path.read_bytes() == completed.stdout
+    assert hashlib.sha256(completed.stdout).hexdigest() == binding[
+        "source_artifact_sha256"
+    ]
+    source = json.loads(completed.stdout)
+    source_rows = [
+        row
+        for row in source["target_observations"]
+        if row["qid"] == "severance-policy-023"
+    ]
+    assert source_rows == [binding["observation"]]
+
+
 def test_all_route_candidates_pass_target_with_023_measured_observation(cases):
     results = _candidate_results(_observations(cases))
 
@@ -2142,6 +2167,14 @@ def test_collision_route_contract_rejects_any_prohibited_route(cases):
     assert collision["passed"] is False
 
 
+def test_case_contract_empty_route_flag_is_strict_and_defaults_false():
+    contract = policy._collision(())
+
+    assert contract.requires_empty_routes is False
+    with pytest.raises(ValueError, match="requires_empty_routes"):
+        policy._collision((), requires_empty_routes=1)
+
+
 def test_027_requires_a_positive_hit_threshold_refusal_without_generation(cases):
     observations = _observations(cases)
     observations[26] = build_case_observation(
@@ -2206,13 +2239,14 @@ def test_027_uses_the_strict_production_threshold_boundary(cases):
     assert collision["passed"] is False
 
 
-def test_027_rejects_a_nonempty_route_tuple(cases):
+@pytest.mark.parametrize("index", [22, 26], ids=["023", "027"])
+def test_threshold_refusal_contracts_reject_any_nonempty_route(cases, index):
     observations = _observations(cases)
-    observations[26] = build_case_observation(
-        cases[26],
+    observations[index] = build_case_observation(
+        cases[index],
         source_ranks={},
         applied_routes=("off_hours_employer_message",),
-        top_score=0.029,
+        top_score=observations[index]["top_score"],
         hit_count=5,
         candidate_count=20,
         route_plan_matched=True,
@@ -2229,8 +2263,37 @@ def test_027_rejects_a_nonempty_route_tuple(cases):
         formal_rows=_formal_rows(),
     )
 
-    collision = result["cases"][26]
+    collision = result["cases"][index]
     assert collision["route_contract_passed"] is False
+    assert collision["passed"] is False
+
+
+def test_023_rejects_no_hits_instead_of_its_required_threshold_refusal(cases):
+    observations = _observations(cases)
+    observations[22] = build_case_observation(
+        cases[22],
+        source_ranks={},
+        applied_routes=(),
+        top_score=0.0,
+        hit_count=0,
+        candidate_count=0,
+        route_plan_matched=True,
+        first_stage_retrieval_calls=1,
+        reranker_calls=0,
+        reranker_scored_pairs=(),
+    )
+
+    result = evaluate_candidate(
+        observations,
+        candidate_threshold=0.015,
+        global_threshold=0.03,
+        stress_rows=_stress_rows(),
+        formal_rows=_formal_rows(),
+    )
+
+    collision = result["cases"][22]
+    assert collision["refusal_stage"] == "no_hits"
+    assert collision["outcome_contract_passed"] is False
     assert collision["passed"] is False
 
 

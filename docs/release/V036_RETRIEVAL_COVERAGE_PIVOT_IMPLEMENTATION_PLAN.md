@@ -22,12 +22,17 @@ Work:
    unanswerable, have positive hits, and stop specifically at `threshold`;
    `no_hits` must fail for either case.
 3. Require all fifteen positives to have routes exactly equal to the singleton
-   severance route. Preserve non-exact behavior for every collision row.
+   severance route. Encode a strict typed exact-empty route requirement for
+   `023` and `027`; preserve required/prohibited set behavior for the other
+   thirteen collision rows.
 4. Correct `027` from generation to threshold and refine `023` from the former
    no-generation meaning to its measured threshold stage; keep `024` as
    explicit generation.
 5. Add explicit supersession notes to the original design and plan.
 6. Prove all other 28 dataset rows and coverage counts are unchanged.
+7. Bind the offline `023` observation to the tracked pivot diagnostic's commit,
+   repository path, byte SHA-256, and exact canonical row; do not accept a
+   fixture that only agrees with its own metadata.
 
 ## Task 2: Add deterministic multi-view planning and merge primitives
 

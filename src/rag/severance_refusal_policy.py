@@ -232,6 +232,11 @@ class _CaseContract:
     required_routes: tuple[str, ...]
     prohibited_routes: tuple[str, ...]
     expected_outcome: Literal["generation", "no_hits", "threshold"]
+    requires_empty_routes: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.requires_empty_routes) is not bool:
+            raise ValueError("requires_empty_routes must be boolean")
 
 
 def _collision(
@@ -241,6 +246,7 @@ def _collision(
     required_routes: tuple[str, ...] = (),
     prohibited_routes: tuple[str, ...] = _SEVERANCE_ROUTE,
     expected_outcome: Literal["generation", "no_hits", "threshold"] = "generation",
+    requires_empty_routes: bool = False,
 ) -> _CaseContract:
     return _CaseContract(
         case_type="collision_negative",
@@ -249,6 +255,7 @@ def _collision(
         required_routes=required_routes,
         prohibited_routes=prohibited_routes,
         expected_outcome=expected_outcome,
+        requires_empty_routes=requires_empty_routes,
     )
 
 
@@ -272,13 +279,19 @@ _CASE_CONTRACTS = {
     "severance-policy-021": _collision((_PENSION_24,)),
     "severance-policy-022": _collision((_LABOR_54,)),
     "severance-policy-023": _collision(
-        (), answerable=False, expected_outcome="threshold"
+        (),
+        answerable=False,
+        expected_outcome="threshold",
+        requires_empty_routes=True,
     ),
     "severance-policy-024": _collision((), answerable=False),
     "severance-policy-025": _collision((_PENSION_12,)),
     "severance-policy-026": _collision((_LABOR_17,)),
     "severance-policy-027": _collision(
-        (), answerable=False, expected_outcome="threshold"
+        (),
+        answerable=False,
+        expected_outcome="threshold",
+        requires_empty_routes=True,
     ),
     "severance-policy-028": _collision((_LABOR_16,)),
     "severance-policy-029": _collision((_LABOR_30,)),
@@ -835,10 +848,10 @@ def _evaluate_target(
             for source in contract.source_keys
         )
         applied_routes = set(row["applied_routes"])
-        if contract.case_type == "positive":
+        if contract.requires_empty_routes:
+            route_contract = not row["applied_routes"]
+        elif contract.case_type == "positive":
             route_contract = tuple(row["applied_routes"]) == _SEVERANCE_ROUTE
-        elif row["qid"] == "severance-policy-027":
-            route_contract = tuple(row["applied_routes"]) == ()
         else:
             route_contract = set(contract.required_routes) <= applied_routes and not (
                 set(contract.prohibited_routes) & applied_routes

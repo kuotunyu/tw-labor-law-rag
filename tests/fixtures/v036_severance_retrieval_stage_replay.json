@@ -14,7 +14,7 @@
   },
   "policy_observations": {
     "severance-policy-023": {
-      "source_revision": "19bda937d4c440e6d349fd827f356c189c0809b9",
+      "source_revision": "e357eca2780b2eb21599ea1a8ccaf65af26056a8",
       "source_artifact": "eval/diagnostics/severance_retrieval_pivot_v0.3.6_no_go.json",
       "source_artifact_sha256": "5a982a143f99643ff8c3b3f63bf64932ff5c9ee96eb70ae5a5c888a29f1c00ab",
       "observation": {

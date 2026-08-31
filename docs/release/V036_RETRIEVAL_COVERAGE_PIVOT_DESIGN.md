@@ -23,7 +23,9 @@ the production refusal threshold.
   refusal gate. Secondary-view scores never change admission.
 - Collision cases `severance-policy-023` and `severance-policy-027` are
   expected to stop at the retrieval threshold. Both remain unanswerable and
-  route-negative. `027` corrects the former generation-layer expectation;
+  route-negative, with a typed evaluator contract that requires the applied
+  route tuple to be exactly empty. `027` corrects the former generation-layer
+  expectation;
   `023` refines the former no-generation expectation from `no_hits` to the
   actually measured `threshold` stage without changing production behavior.
 - The release must be calibrated again from a clean committed revision on the
@@ -142,6 +144,13 @@ score below global `0.03`, refusal stage `threshold`, and no generation. A
 `expected_outcome="generation"` and remains the high-scoring admission
 collision canary. Every other row is migrated from its existing boolean to an
 equivalent exact outcome without changing meaning.
+
+The evaluator represents the exact-empty route requirement as a strict boolean
+field on the typed case contract. It is enabled only for `023` and `027`; all
+other collision contracts retain their required/prohibited set semantics. The
+offline `023` replay is canonically bound to the tracked pivot diagnostic by
+the diagnostic's commit revision, repository path, byte SHA-256, and exact
+`target_observations` row. Fixture-local metadata alone is not evidence.
 
 ## Acceptance gates
 
