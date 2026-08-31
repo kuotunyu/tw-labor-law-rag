@@ -657,6 +657,8 @@ print(
 _PRIVATE_SMOKE_WINDOWS_PROCESS_VARIABLES = (
     "PROCESSOR_ARCHITECTURE",
     "SYSTEMROOT",
+    "USERNAME",
+    "USERPROFILE",
     "WINDIR",
 )
 _PRIVATE_SMOKE_OFFLINE_CONTROLS = {
@@ -712,7 +714,17 @@ def test_private_lock_smoke_child_distinguishes_runtime_locale_from_sanitized_pa
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    safe_windows_names = ("PROCESSOR_ARCHITECTURE", "SYSTEMROOT", "WINDIR")
+    expected_username = "v036-authoritative-user"
+    expected_userprofile = str(tmp_path / "v036-authoritative-profile")
+    monkeypatch.setenv("USERNAME", expected_username)
+    monkeypatch.setenv("USERPROFILE", expected_userprofile)
+    safe_windows_names = (
+        "PROCESSOR_ARCHITECTURE",
+        "SYSTEMROOT",
+        "USERNAME",
+        "USERPROFILE",
+        "WINDIR",
+    )
     offline_controls = {
         "HF_HUB_OFFLINE": "1",
         "PIP_NO_INDEX": "1",
@@ -732,16 +744,23 @@ def test_private_lock_smoke_child_distinguishes_runtime_locale_from_sanitized_pa
         monkeypatch.setenv(name, "must-not-reach-child")
     for name in ("LANG", "LC_ALL", "LC_CTYPE"):
         monkeypatch.setenv(name, "must-not-reach-child")
-    expected_safe_names = sorted(
-        name for name in safe_windows_names if name in os.environ
-    )
+    expected_safe_variables = {
+        name: os.environ[name] for name in safe_windows_names if name in os.environ
+    }
     child_probe = r"""
+import getpass
 import json
 import os
 
 os.environ.setdefault("LC_CTYPE", "C.UTF-8")
 
-safe_windows_names = {"PROCESSOR_ARCHITECTURE", "SYSTEMROOT", "WINDIR"}
+safe_windows_names = {
+    "PROCESSOR_ARCHITECTURE",
+    "SYSTEMROOT",
+    "USERNAME",
+    "USERPROFILE",
+    "WINDIR",
+}
 offline_names = {
     "HF_HUB_OFFLINE",
     "PIP_NO_INDEX",
@@ -759,6 +778,10 @@ sentinels = {
 }
 runtime_locale_names = {"LC_CTYPE"}
 allowed_names = safe_windows_names | offline_names | runtime_locale_names
+try:
+    resolved_username = getpass.getuser()
+except ModuleNotFoundError as error:
+    resolved_username = f"{type(error).__name__}:{error.name}"
 print(
     json.dumps(
         {
@@ -768,7 +791,11 @@ print(
             "runtime_locale": {
                 name: os.environ.get(name) for name in sorted(runtime_locale_names)
             },
-            "safe_windows_names": sorted(safe_windows_names & set(os.environ)),
+            "resolved_username": resolved_username,
+            "safe_windows_variables": {
+                name: os.environ.get(name)
+                for name in sorted(safe_windows_names & set(os.environ))
+            },
             "sentinel_present": bool(sentinels & set(os.environ)),
             "unexpected_names": sorted(set(os.environ) - allowed_names),
         },
@@ -794,8 +821,9 @@ print(
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout) == {
         "offline_controls": offline_controls,
+        "resolved_username": expected_username,
         "runtime_locale": {"LC_CTYPE": "C.UTF-8"},
-        "safe_windows_names": expected_safe_names,
+        "safe_windows_variables": expected_safe_variables,
         "sentinel_present": False,
         "unexpected_names": [],
     }
