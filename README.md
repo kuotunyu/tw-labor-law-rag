@@ -3,75 +3,44 @@ title: Taiwan Labor Law RAG
 sdk: docker
 app_port: 7860
 ---
-# 繁體中文 Hybrid RAG 知識問答系統
+# 繁體中文 Hybrid RAG 知識問答系統 — 台灣勞動法規
 
 [English](README.en.md) ｜ [繁體中文](README.md)
 
 [![CI](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml)
 
-> **3 分鐘看懂專案：** [技術審閱導覽](docs/release/V035_REVIEWER_TOUR.md) ｜ [面試展示腳本](docs/release/V035_INTERVIEW_DEMO.md) ｜ [架構](DESIGN.md) ｜ [證據重算](docs/release/REVIEWER_GUIDE.md) ｜ [限制](#scope)
+用白話問台灣勞動法規的問題（加班費怎麼算、特休有幾天、被資遣能拿多少），系統會從 15 部勞動法規、884 條條文裡找出相關條文，回答時附上法規名稱、條號與官方來源連結；條文裡找不到依據時直接拒答，不硬湊答案。給想快速查到條文依據的勞工、人資與求職者。
 
-| 稽核快照 | 知識庫 | 正式集 Hit@5 | 正式集 MRR@10 |
-|---|---:|---:|---:|
-| **2026-08-29** | **15 部／884 條** | **0.967** | **0.906** |
+> **TL;DR** — Hybrid RAG over 15 Taiwanese labour statutes (884 articles): BM25 + BGE-M3 dense retrieval fused with RRF, reranked by bge-reranker-v2-m3. Answers cite the exact article; the system refuses when the law does not support an answer. FastAPI + Streamlit, Docker.
 
-以台灣 15 部勞動法規（13 部法律、2 部命令）為目標知識庫的檢索增強生成(RAG)問答系統:BM25 + BGE-M3 向量檢索以 RRF 融合,經 bge-reranker-v2-m3 重排序後生成附條文引用的答案,回答附上法規、條號、法規來源連結與修正／生效日期,查無依據時誠實拒答而非瞎掰。設計決策由 40 題正式評估、8 組消融實驗與 60 題可靠性壓力集檢驗——見 [EVAL_REPORT.md](EVAL_REPORT.md)。
+![Streamlit UI 問答示範:婚假問題,附引用來源與檢索 debug 面板](docs/screenshot-demo.png)
 
-## 正式評估摘要
+## 結果
 
-`structure-aware + Hybrid + reranker` 在 40 題評估集中的 30 題可答子集,檢索 `Hit@5` 為 **0.967**、`MRR@10` 為 **0.906**。10 題不可答題最終全數拒答,其中 **9/10** 由 threshold 直接擋下且不呼叫 LLM,另 1 題由 LLM 判定條文不足;同時有 **1/30** 可答題在 LLM 層被誤拒(threshold 層誤拒為 0/30)。上述 retrieval、answerability 與 refusal 算術可從 committed privacy-reduced traces 完整離線重算。
+| 指標 | 結果 | 怎麼讀 |
+|---|---:|---|
+| 檢索 Hit@5 | **0.967**（29/30） | 30 題可答題中，正確條文出現在前 5 筆的比例 |
+| 檢索 MRR@10 | **0.906** | 正確條文排得多前面（1.0 表示永遠排第一） |
+| 不可答題拒答 | **10/10** | 其中 9 題在檢索階段就擋下，不呼叫 LLM |
+| 可答題被誤拒 | **1/30** | 發生在 LLM 階段；檢索門檻誤拒 0/30 |
+| Faithfulness／Relevancy | **4.90／5.00**（滿分 5） | 實際作答的 29 題，由 LLM 評審打分 |
+| 知識庫 | **15 部／884 條** | 13 部法律、2 部命令；2026-08-29 稽核的快照 |
 
-實際作答的 29 題平均 faithfulness **4.90/5**、relevancy **5.00/5** 則屬 **archived provider evidence**:repository 可離線重新聚合已提交的 judge 數字,但不含完整生成答案、judge 理由或 provider response,因此不能從公開 evidence 重新產生或獨立複判這些評分。完整方法與限制見 [EVAL_REPORT.md](EVAL_REPORT.md),去識別化逐題 trace 見 [`eval/official/`](eval/official/README.md),claim 到 evidence 的映射見 [claim matrix](docs/release/CLAIM_MATRIX.md)。
+以上數字來自本專案自編的 40 題正式評估集：30 題可答（涵蓋全部 15 部法規）加 10 題刻意設計成不可答，題目與標準答案皆人工對照條文查證；主設定為「按條文切塊＋Hybrid＋reranker」。
 
-`v0.3.1 reliability stress evidence` 另以 40 題可答、20 題不可答的長句／中英夾雜壓力集，對 2026-08-29 稽核的 **15 部／884 條** snapshot 重建隔離索引。主設定 Hit@5 **0.950**、MRR@10 **0.908**；0.03 門檻直接誤拒 **1/40**、直接攔下不可答 **17/20**。既有 40 題正式集 guard 同時重現 Hit@5 **0.967**、MRR@10 **0.906**、門檻誤拒 **0/30** 與直接攔截 **9/10**。門檻掃描沒有 Pareto-better 候選，因此保留 0.03，不以新壓力集改寫 `v0.1.0` 正式模型品質指標。
+**連結：** [評估報告](EVAL_REPORT.md) ｜ [設計取捨](DESIGN.md) ｜ [逐題評估紀錄](eval/official/README.md) ｜ [English](README.en.md)。線上 Demo 部署在 Hugging Face 的 private Space（邀請制，網址不公開）；沒有邀請也能在本機跑：
 
-Gemini `gemini-3.5-flash-lite`／OpenAI `gpt-5.6-luna` 的 US$5 硬上限 safety cross-check 已完成並 fail closed：兩家各五筆請求；Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 evidence 僅含去識別化、嚴格 content-free 的十筆 trace、可重算的 metrics 與每家 US$5 預算 ledger；trace 不含 question/answer text、provider payload、憑證或原始 run artifacts。這是 safety cross-check，不取代 `v0.1.0` formal evidence baseline 的正式模型品質指標。
+```bash
+uv sync                                    # Python 3.11 + uv；有 NVIDIA GPU 較快，純 CPU 也能跑
+cp .env.example .env                       # 填入 Gemini 或 OpenAI 的 API key
+uv run python scripts/download_corpus.py   # 下載官方開放資料（約 30MB）
+uv run python scripts/build_index.py       # 建向量 + BM25 索引
+uv run python scripts/ask.py "加班費怎麼算?"
+```
 
-### Release evidence boundary
+啟動 API／前端與 Docker 的方式見 [docs/reproduce.md](docs/reproduce.md)。
 
-`uv run python scripts/verify_release.py` 不載入模型、不呼叫 provider、不啟動 Qdrant/Docker，會核對 40 題正式集、60 題壓力集、10 題 portfolio regression、8×40 ablation grid、Hit@5/MRR、0.03 threshold sweep、15 部／884 條 law/source 與逐條文 content-free snapshots、設定一致性、OGDL samples、official trace schema、provider complete contract、完整 publication inventory、secret/privacy scan、人工審閱 binary hashes 與 GitHub Action pins。Git 歷史稽核涵蓋 heads、tags、remotes 的所有可公開 commits；GitHub Actions 暫時產生、不可發布的 `refs/remotes/pull/*` 合成 merge refs 除外，本機 `refs/archive/*` recovery evidence 也會保留在 publication graph 之外。0.03 reranker threshold 不是通用 answerability classifier；壓力集已量測到 1/40 直接誤拒，因此只保留現值而不宣稱問題已消失。
-
-## v0.3.5 Portfolio readiness
-
-本版把私有 BYOK 展示整理成 reviewer-first 體驗：首頁先說明可驗證能力與費用邊界，再引導受邀者選擇 Gemini／OpenAI、於遮罩欄位輸入自己的專用 Key，並以逐步狀態、引用來源與可展開 debug 證據呈現結果。Space 保持 private、免費 `cpu-basic`，不持有站長的 LLM Key，也不做跨 provider fallback。
-
-新增 10 題完全離線、content-free 的示範回歸：6/6 可答題來源契約通過，10/10 路由與檢索階段決策契約通過，provider calls 為 0。另以法務部官方來源建立 15 部／884 條逐條文 SHA-256 baseline；人工 audit 會同時報告 law/source 欄位與新增、移除、變更條號，不建立排程或自動 writer。這些證據不取代既有 40 題 formal baseline、60 題 reliability suite 或 archived provider judgments。
-
-## v0.3.4 欠薪／立即離職檢索強化
-
-只有同時命中「欠薪」與「勞工立即離職」兩組已審閱 cue 的問題，檢索管線才會補上《勞動基準法》第 14 條的固定法規詞。BM25、向量檢索與 reranker 看到擴充查詢；生成模型仍收到使用者原始問題。
-
-本版沒有新增 provider 呼叫、調整 0.03 門檻、重建 Qdrant 或改寫歷史指標。`v0.1.0` formal baseline 與 `v0.3.1` reliability evidence 保持原證據版本；v0.3.4 的公開主張只涵蓋可由單元測試驗證的決定論式路由契約。
-
-## v0.3.3 新舊制資遣費檢索強化
-
-這是 `v0.3.3` source-only runtime and deployment release。當問題同時包含資遣、新制、舊制與計算／比較語意時，檢索管線會以決定論式 query expansion 補上「勞工退休金條例、勞動基準法、工作年資、平均工資、六個月」等法規檢索詞。擴充內容只送往 BM25、向量檢索與 reranker；生成模型仍收到使用者的原始問題，避免檢索輔助詞改寫使用者意圖。
-
-這項擴充必須同時命中四組 cue 才會啟用，因此一般資遣、退休或單純制度差異問題不會被廣泛改寫。`v0.1.0` 正式模型品質基準、`v0.3.1` reliability evidence 與 `v0.3.2` provider safety cross-check 仍維持原來的證據版本；本版沒有用新的 provider 呼叫改寫歷史指標。
-
-## v0.3.2 provider safety cross-check：可靠性、來源與雙模型 runtime
-
-這是 `v0.3.2` source-only runtime and deployment release。公開 API/UI 預設使用 Gemini `gemini-3.5-flash-lite`，若伺服器同時設定 OpenAI，使用者可逐次請求選擇 `gpt-5.6-luna`。這些型號可分別由 server-side `GEMINI_GENERATION_MODEL` 與 `OPENAI_GENERATION_MODEL` 覆寫；對應 key 已設定時，`LLM_PROVIDER=gemini` 決定省略請求選擇時的預設 provider，否則 API 會改用另一個已設定的公開 provider；`LLM_FALLBACK_ENABLED=true` 才允許備援。`GEMINI_API_KEY` 與 `OPENAI_API_KEY` 只存在 API 伺服器環境，前端不接收、保存或顯示 key。
-
-備援邊界是固定的：只有主 provider 發生連線、限流、5xx 服務或空回應等 operational failure 時，才會最多嘗試另一個已設定的公開 provider 一次。檢索階段拒答不會呼叫生成模型；模型依據條文拒答、provider 安全擋下或政策拒絕也不會 fallback。正式評估路徑仍直接固定單一 generator/judge provider，不使用 runtime fallback，避免路由變動改寫評估設定。
-
-Streamlit 側邊欄的「回答模型」只顯示 API `/models` 回傳的已設定 Gemini/OpenAI；送出問題時會將選擇的 provider 一併傳給 `/query`。回應中 `requested_provider` 保留指定 provider，`provider` 與 `model` 是實際生成結果的 metadata，`fallback_used`/`fallback_from` 說明是否改走備援，`generation_called=false` 表示在檢索層已拒答。UI 會分開顯示指定與實際作答模型，並在改走備援時警示。Live provider smoke test 需要伺服器端本機 secrets，不屬公開 offline CI。
-
-`v0.1.0` 的正式模型品質指標仍是歷史結果，由 `release/manifest.json` 所列 generator 與 judge 模型產生；本版沒有取代或重新審計這些數值。本版已在不呼叫 provider 的情況下，以 60 題壓力集與既有 40 題正式集 guard 重跑 retrieval 與 threshold 行為。
-
-### 私有 BYOK Docker Space（邀請制）
-
-**Demo 狀態：** private Space 正常運行；僅限擁有者與受邀審閱者，不公開列出入口。
-
-私有展示模式採 BYOK（Bring Your Own Key）：受邀者選擇 Gemini `gemini-3.5-flash-lite` 或 OpenAI `gpt-5.6-luna`，並在遮罩欄位輸入自己的專用 API Key。Key 只存在目前 Streamlit 工作階段、送往同容器 loopback FastAPI 的單次內部 header，以及該次請求建立的 provider client；不寫入檔案、聊天紀錄、共用設定或跨請求快取。Space 不設定站長的 `GEMINI_API_KEY`／`OPENAI_API_KEY`，也不做跨 provider fallback，因此受邀者不會消耗站長的模型 token 額度。
-
-Space 只持有 Qdrant 兩個法規 collections 的唯讀 Key；建索引使用的短期 write/manage Key 於本機完成後立即撤銷。啟動時只讀 scroll payload，在記憶體重建 structure/fixed 兩份 BM25，不把私有 `data/raw/` 或 `storage/bm25_*.json` 放入 image。預設每個展示工作階段 20 題、全域同時 2 題、單題 timeout 60 秒，最多保留 1,000 個未過期的匿名工作階段。Key 隔離、唯讀權限與免費 `cpu-basic` 已完成驗收；完整操作與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)。
-
-### 人工更新 Qdrant 法規索引
-
-雲端法規索引只接受有人值守的 blue-green 更新。先用 `scripts/rebuild_qdrant_blue_green.py` dry-run 驗證本機 official archives、normalized corpus 與 committed snapshot 完全一致；execute mode 另要求 temporary writer key 與重複 candidate 名稱，且只建立新 pair，不覆寫、重建或刪除正式 collections。完整指令、private cutover 與 rollback 見 [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md)；安全邊界與失敗模型見 [blue-green Qdrant maintenance design](docs/release/BLUE_GREEN_QDRANT_MAINTENANCE_DESIGN.md)。
-
-## 架構
+## 運作方式
 
 ```mermaid
 flowchart TB
@@ -108,57 +77,52 @@ flowchart TB
     Answer & Refuse1 & Refuse2 --> API["FastAPI /query"] --> UI["Streamlit 聊天介面"]
 ```
 
-## Quickstart
+- **檢索：** 法規按條文切塊；BGE-M3 向量檢索與 jieba＋BM25 關鍵字檢索各取前 20 筆，用 RRF 融合，再由 bge-reranker-v2-m3 重排取前 5 筆。
+- **回答：** LLM 只根據這 5 筆條文作答，答案附 [1][2] 引用；每筆引用帶法規名稱、條號、來源連結與修正／生效日期。
+- **兩層拒答：** reranker 最高分低於 0.03 就直接拒答、不呼叫 LLM；通過門檻後，LLM 判斷條文不足以回答時也會拒答。
+- **3 條手寫的領域查詢擴充規則**（[`src/rag/retrieval/pipeline.py`](src/rag/retrieval/pipeline.py)）：問題同時出現特定口語線索時，在「檢索用」的查詢字串後面補上固定的法規用語——(1) 雇主＋休息時間＋傳訊息 → 補「休息日、例假、工作時間、延長工作時間」等詞；(2) 資遣＋新制＋舊制＋計算 → 補「勞工退休金條例、勞動基準法、工作年資、平均工資、六個月」等詞；(3) 欠薪＋立即離職 → 補《勞動基準法》第 14 條用語。擴充後的字串只給 BM25、向量檢索與 reranker，LLM 收到的仍是使用者原句。以目前的程式碼對評估題目做字串比對，會觸發規則的題數是：40 題正式集 2 題、60 題壓力集 4 題、10 題示範回歸集 2 題。
 
-需求:Python 3.11、[uv](https://docs.astral.sh/uv/)。有 NVIDIA GPU 可大幅加速 embedding/rerank,純 CPU 也能跑(較慢)。
+## 結果細節
+
+**每一段檢索管線的貢獻**（8 組消融實驗 × 40 題；下表為按條文切塊的 4 組）：
+
+| 檢索設定 | Hit@5 | MRR@10 |
+|---|---:|---:|
+| 只用 BM25 | 0.833 | 0.672 |
+| 只用向量 | 0.900 | 0.850 |
+| Hybrid（RRF 融合） | 0.933 | 0.822 |
+| **Hybrid＋reranker（主設定）** | **0.967** | **0.906** |
+
+融合提高了命中率但排序變差，reranker 把排序救回來。固定長度切塊＋Hybrid＋reranker 的 Hit@5 較高（1.000）、MRR@10 較低（0.847）；主設定選按條文切塊，因為正確條文排得更前面、引用可以精確到單一條文。完整 8 組與 7 個失敗案例分析見 [EVAL_REPORT.md](EVAL_REPORT.md)。
+
+**拒答：** 10 題不可答題全數拒答，9 題由 0.03 門檻直接擋下、1 題由 LLM 判定條文不足。唯一誤拒的可答題（1/30）也發生在 LLM 階段：檢索沒有把正確條文排進前 5 筆，LLM 選擇拒答而不是硬答。
+
+**壓力測試：** 另一組 60 題（40 可答＋20 不可答）的長句、中英夾雜、錯字問法，在 2026-08-29 稽核的 15 部／884 條快照上重建索引後測得 Hit@5 **0.950**、MRR@10 **0.908**；0.03 門檻直接誤拒 **1/40**、直接擋下不可答 **17/20**。同一次執行也重現了正式集的 0.967／0.906、0/30 與 9/10。掃描 8 個門檻值後沒有任何一個在兩組題目上都更好，所以維持 0.03。
+
+**雙模型安全抽查**（`v0.3.2 provider safety cross-check`）：Gemini `gemini-3.5-flash-lite` 與 OpenAI `gpt-5.6-luna` 各送五筆請求，每家費用上限 US$5、超過就中止。Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。每家只有五筆，這是 safety cross-check，不是模型品質評估，也不取代 `v0.1.0` 的正式評估數字；公開的逐筆紀錄嚴格不含 question/answer text、provider payload 或憑證。
+
+**離線示範回歸與條文新鮮度：** 10 題完全離線的示範回歸（不呼叫任何 LLM）：6/6 可答題找到必要條文、10/10 檢索階段的決策符合預期。另保存 15 部／884 條逐條文的 SHA-256 指紋，可人工比對官方來源是否有條文新增、移除或變更；沒有自動排程。
+
+<a id="scope"></a>
+
+## 適用範圍與限制
+
+- **評估集小、且由專案自編：** 正式集 40 題（30 題可答）、壓力集 60 題。數字代表系統在這些題目上的表現，不足以估計真實使用情境的發生率。
+- **正式評估數字沿用 `v0.1.0` 那次評估的結果**，之後的版本沒有改寫。目前版本是 `v0.3.5` source-only runtime and deployment release：只發佈原始碼與部署設定；完整語料、模型權重、私有索引與 LLM 服務的原始輸出不在 repo 內。
+- **Faithfulness／Relevancy 是存檔的 LLM 評審分數：** repo 可以重新加總已提交的分數，但不含完整生成答案與評審理由，無法只靠公開檔案重新評分。檢索與拒答的數字則可以離線重算。
+- **0.03 門檻不是通用的「可不可答」分類器：** 壓力集已量測到 1/40 直接誤拒；實際使用測試中也觀察到同一個法律問題換成長篇口語、中英夾雜的問法就被門檻誤拒（[EVAL_REPORT.md](EVAL_REPORT.md) 案例 7）。
+- **知識庫只涵蓋這 15 部法規（2026-08-29 稽核的快照）**，不是一般性的法律資料庫；法規修訂後要人工重新稽核快照並重建索引。
+- 這是技術作品，不是法律意見，也不是正式上線的法律服務。
+
+## 重現與測試
 
 ```bash
-# 1. 安裝依賴
-uv sync
-
-# 2. 設定環境變數（公開 API/UI 至少在伺服器端填 Gemini / OpenAI 一組 key）
-cp .env.example .env
-# 編輯 .env，填入對應 API key；不要將 .env 提交到 Git
-
-# 3. 下載語料(全國法規資料庫官方開放資料,約 30MB,首次執行)
-uv run python scripts/download_corpus.py
-
-# 4. 建索引(向量 + BM25,兩種 chunking 策略各一份;有 GPU 約 1 分鐘)
-uv run python scripts/build_index.py
-
-# 5. 命令列問答(開發用,免啟動伺服器)
-uv run python scripts/ask.py "加班費怎麼算?"
-
-# 6. 或啟動 API + 前端
-uv run python scripts/run_api.py &          # http://localhost:8000/docs
-uv run streamlit run ui/app.py              # http://localhost:8501
+uv run python scripts/verify_release.py   # 離線重算已提交的評估數字
+uv run ruff check .
+uv run pytest
 ```
 
-### 用 Docker(Qdrant server mode)
-
-```bash
-docker compose up -d qdrant
-# 將 .env 的 QDRANT_MODE 改為 server,QDRANT_URL 保持 http://localhost:6333
-uv run python scripts/build_index.py --strategy all      # 對 Qdrant 服務建兩種索引
-docker compose up --build api ui
-```
-
-### 跑測試與評估
-
-測試與 release verifier 不依賴 GPU、模型權重、Qdrant 或真實 LLM API;heavy components 皆延遲載入,unit tests 使用純邏輯、fixture、cache 或明確的 test double。[GitHub Actions](.github/workflows/ci.yml) 會在 `main` push、`v*` tag push 與所有 pull request 執行。
-
-```bash
-uv run python scripts/verify_release.py          # committed evidence 離線重算與公開邊界稽核
-uv run ruff check .                             # locked lint gate
-uv run pytest                                    # 單元、正式產物、privacy 與 package 測試
-uv build                                         # sdist + wheel;驗證 runtime dictionary 有打包
-```
-
-重新執行 `eval/ablation.py` 需要既有索引與本機模型;`eval/run_e2e_eval.py` 還需要 provider,不屬於公開離線 reviewer path。可公開、去識別化的正式指標與逐題 trace 已收錄在 [`eval/official/`](eval/official/README.md);`eval/runs/` 保留原始本機執行結果,不進版控。完整 clean reviewer 步驟見 [REVIEWER_GUIDE.md](docs/release/REVIEWER_GUIDE.md)。
-
-### Demo 截圖
-
-![Streamlit UI 問答示範:婚假問題,附引用來源與檢索 debug 面板](docs/screenshot-demo.png)
+`verify_release.py` 不需要模型、API key、Qdrant 或 Docker：它用 repo 內已提交的逐題紀錄重算上面的檢索與拒答數字，並檢查公開檔案清單與隱私／金鑰掃描。完整檢查項目與測試說明見 [docs/reproduce.md](docs/reproduce.md)。
 
 ## 技術棧
 
@@ -173,25 +137,21 @@ uv build                                         # sdist + wheel;驗證 runtime 
 | API / 前端 | FastAPI / Streamlit |
 | 評估 | 自建 LLM-as-judge(faithfulness + relevancy)+ retrieval 指標(hit rate、MRR) |
 
-每個選擇的理由與 tradeoff 見 [DESIGN.md](DESIGN.md)。
+## 資料來源與授權
 
-## 專案文件
+完整知識庫語料為 15 部台灣勞動法規,來自法務部資訊處在政府資料開放平臺發布的「中文法規_法律資料檔下載」與「中文法規_命令資料檔下載」,由 `scripts/download_corpus.py` 於執行時下載;完整 dump 不隨 repository 散布(見 `.gitignore`)。
+
+Repository 只散布兩份小型樣本供 loader/chunking 測試:`data/sample/勞工請假規則.json` 與 `data/sample/勞動基準法施行細則.json`,來源為法務部資訊處「[中文法規_命令資料檔下載](https://data.gov.tw/dataset/18290)」,依[政府資料開放授權條款第 1 版](https://data.gov.tw/license)(OGDL)可重製、散布與改作,前提是保留顯名聲明。
+
+本 repository 的原創程式碼以 [MIT License](LICENSE) 釋出。兩份樣本與執行時下載的法規語料仍適用其原始 OGDL 條款,不因本專案採 MIT 而重新授權；Python 套件與模型等第三方元件亦各自適用其原始授權。
+
+## 延伸閱讀
 
 - [DESIGN.md](DESIGN.md) — 技術選型理由與 tradeoff
 - [EVAL_REPORT.md](EVAL_REPORT.md) — 評估數據、消融實驗、失敗案例分析
 - [eval/official/README.md](eval/official/README.md) — 可公開的正式評估產物與重現方式
 - [eval/dataset/README.md](eval/dataset/README.md) — 評估集 schema 與出題原則
-- [README.en.md](README.en.md) — calibrated English portfolio summary
-- [docs/release/](docs/release/REVIEWER_GUIDE.md) — claim matrix、OGDL attribution、publication/privacy boundary 與 reviewer path
-
-## 資料來源與授權
-
-完整知識庫語料為 15 部台灣勞動法規,來自法務部資訊處在政府資料開放平臺發布的「中文法規_法律資料檔下載」與「中文法規_命令資料檔下載」,由 `scripts/download_corpus.py` 於執行時下載;完整 dump 與其餘 13 部 normalized corpus 不隨 repository 散布(見 `.gitignore`)。
-
-Repository **有散布兩份小型 OGDL 命令樣本**供 loader/chunking smoke test:`data/sample/勞工請假規則.json` 與 `data/sample/勞動基準法施行細則.json`。兩者來源為法務部資訊處「[中文法規_命令資料檔下載](https://data.gov.tw/dataset/18290)」,依[政府資料開放授權條款第 1 版](https://data.gov.tw/license)可重製、散布與改作,前提是保留顯名聲明。完整 attribution、snapshot hashes 與再散布結論見 [OGDL_ATTRIBUTION.md](docs/release/OGDL_ATTRIBUTION.md)。
-
-本 repository 的原創程式碼以 [MIT License](LICENSE) 釋出。兩份 samples 與執行時下載的法規語料仍適用其原始 OGDL 條款,不因本專案採 MIT 而重新授權；Python 套件與模型等第三方元件亦各自適用其原始授權。
-
-## 公開範圍
-
-這是 `v0.3.5` source-only runtime and deployment release。正式模型品質指標沿用未變更的 `v0.1.0` formal evidence baseline；本版新增 reviewer-first 私有 BYOK 介面、10 題離線 portfolio regression 與 15 部／884 條 content-free 逐條文 freshness baseline，但不把示範回歸寫成新的模型品質基準。v0.3.2 Gemini／OpenAI safety cross-check 仍是 archived provider evidence，兩家各五筆請求均在 US$5 硬上限內：Gemini refusal accuracy `0.8`、citation success `1.0`、estimated cost `US$0.0022620`；OpenAI refusal accuracy `1.0`、citation success `1.0`、estimated cost `US$0.0026414`。公開 trace 嚴格不含 question/answer text、provider payload 或憑證；此 cross-check 不取代正式模型品質基準。它是 evidence-backed software portfolio artifact，不是法律意見，也不是 production legal service。完整 corpus、模型權重、私有索引與 provider raw artifacts 仍不在本次 source release 範圍。
+- [docs/changelog.md](docs/changelog.md) — v0.3.2–v0.3.5 各版本變更
+- [docs/reproduce.md](docs/reproduce.md) — 本機執行、Docker、測試與 `verify_release.py` 的完整檢查項目
+- [docs/private-demo.md](docs/private-demo.md) — 私有 Demo 的金鑰處理方式與雲端索引的人工更新流程
+- [docs/release/](docs/release/REVIEWER_GUIDE.md) — 發佈與稽核文件：[三分鐘導覽](docs/release/V035_REVIEWER_TOUR.md)、[展示腳本](docs/release/V035_INTERVIEW_DEMO.md)、[數據對照表](docs/release/CLAIM_MATRIX.md)、[OGDL 顯名聲明與檔案雜湊](docs/release/OGDL_ATTRIBUTION.md)、[公開範圍說明](docs/release/PUBLICATION_BOUNDARY.md)

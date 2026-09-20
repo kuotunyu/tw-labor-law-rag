@@ -9,73 +9,38 @@ app_port: 7860
 
 [![CI](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kuotunyu/tw-labor-law-rag/actions/workflows/ci.yml)
 
-> **Three-minute review:** [technical tour](docs/release/V035_REVIEWER_TOUR.md) | [interview demo](docs/release/V035_INTERVIEW_DEMO.md) | [architecture](DESIGN.md) | [evidence reproduction](docs/release/REVIEWER_GUIDE.md) | [limitations](#scope)
+Ask a plain-language question about Taiwanese labour law (how overtime pay is calculated, how many days of annual leave, what severance is owed) and the system finds the relevant articles among 15 labour statutes (884 articles), answers with the statute name, article number, and official source link, and refuses when the law does not support an answer. It is aimed at workers, HR staff, and job seekers who need the legal basis quickly.
 
-| Audited snapshot | Knowledge base | Formal Hit@5 | Formal MRR@10 |
-|---|---:|---:|---:|
-| **2026-08-29** | **15 instruments / 884 articles** | **0.967** | **0.906** |
+> **TL;DR** — Hybrid RAG: BM25 + BGE-M3 dense retrieval fused with RRF, reranked by `bge-reranker-v2-m3`, article-level citations, two-stage refusal. FastAPI + Streamlit, Docker.
 
-An evidence-oriented retrieval-augmented generation system targeting 15 Taiwan labor-law instruments (13 acts and 2 regulations). It combines BM25 and BGE-M3 dense retrieval with Reciprocal Rank Fusion, reranks candidates with `bge-reranker-v2-m3`, and generates answers with article-level citations. A two-stage refusal policy rejects low-scoring retrievals before generation and asks the generator to refuse when the retrieved law is insufficient.
+![Streamlit UI demo: a marriage-leave question answered with cited sources and the retrieval debug panel](docs/screenshot-demo.png)
 
-## Verified portfolio results
+## Results
 
-The primary `structure-aware / hybrid + reranker` configuration was evaluated on a committed 40-question set: 30 answerable questions covering all 15 target instruments and 10 unanswerable questions.
-
-| Claim | Result | Public evidence status |
+| Metric | Result | How to read it |
 |---|---:|---|
-| Retrieval Hit@5 | 0.967 (29/30) | Fully recomputable offline from committed trace |
-| Retrieval MRR@10 | 0.906 | Fully recomputable offline from committed trace |
-| Final unanswerable refusal accuracy | 10/10 | Fully recomputable offline from committed trace |
-| Direct threshold refusals | 9/10 unanswerable; 0/30 answerable | Fully recomputable offline from committed trace |
-| Generator-layer refusals | 2 (`eval-32` correct, `eval-10` false refusal) | Fully recomputable as recorded outcomes |
-| Faithfulness | 4.90/5 across 29 judged answers | Re-aggregated archived provider evidence |
-| Answer relevancy | 5.00/5 across 29 judged answers | Re-aggregated archived provider evidence |
+| Retrieval Hit@5 | **0.967** (29/30) | Share of the 30 answerable questions whose correct article is in the top 5 |
+| Retrieval MRR@10 | **0.906** | How high the correct article ranks (1.0 = always first) |
+| Refusal of unanswerable questions | **10/10** | 9 stopped at retrieval, without calling the LLM |
+| False refusals of answerable questions | **1/30** | At the LLM stage; 0/30 at the retrieval threshold |
+| Faithfulness / answer relevancy | **4.90 / 5.00** (out of 5) | 29 answered questions, scored by an LLM judge |
+| Knowledge base | **15 instruments / 884 articles** | 13 acts and 2 regulations; snapshot audited 2026-08-29 |
 
-The retrieval, answerability, refusal, citation, configuration, and ablation arithmetic is recomputed by `scripts/verify_release.py`. Faithfulness and relevancy are different: their committed numeric verdicts can be re-aggregated, but the public evidence intentionally excludes complete generated answers, judge reasons, and provider responses. The underlying provider judgments therefore cannot be regenerated or independently re-judged from this repository.
+These numbers come from a 40-question evaluation set written for this project: 30 answerable questions covering all 15 instruments plus 10 deliberately unanswerable ones, each checked by hand against the statute text. The primary configuration is `structure-aware / hybrid + reranker`.
 
-The separate `v0.3.1 reliability stress evidence` uses 40 answerable and 20 unanswerable long-form/code-switched questions against an isolated rebuild of the audited 2026-08-29 **15-instrument / 884-article** snapshot. It measured Hit@5 **0.950**, MRR@10 **0.908**, one direct false refusal among 40 answerable questions, and direct rejection of 17/20 unanswerable questions. The unchanged formal-set guard simultaneously reproduced Hit@5 **0.967**, MRR@10 **0.906**, zero direct false refusals among 30 answerable questions, and direct rejection of 9/10 unanswerable questions. No threshold candidate was Pareto-better across both sets, so 0.03 was retained.
+**Links:** [evaluation report](EVAL_REPORT.md) | [design trade-offs](DESIGN.md) | [per-question evaluation records](eval/official/README.md) | [繁體中文](README.md). The hosted demo is a private Space on Hugging Face (invitation only, URL not listed); it can also be run locally:
 
-A fail-closed US$5-per-provider safety cross-check is complete for Gemini `gemini-3.5-flash-lite` and OpenAI `gpt-5.6-luna`, with five requests per provider. Gemini observed refusal accuracy `0.8`, citation success `1.0`, and estimated cost `US$0.0022620`; OpenAI observed refusal accuracy `1.0`, citation success `1.0`, and estimated cost `US$0.0026414`. The public evidence contains only ten de-identified, strict content-free trace rows, recomputable metrics, and each provider's US$5 budget ledger; the trace excludes question/answer text, provider payloads, credentials, and raw run artifacts. This is a safety cross-check, not a replacement for the `v0.1.0` formal evidence baseline or a formal model-quality evaluation.
+```bash
+uv sync                                    # Python 3.11 + uv
+cp .env.example .env                       # add a Gemini or OpenAI API key
+uv run python scripts/download_corpus.py   # official open data
+uv run python scripts/build_index.py       # vector + BM25 indexes
+uv run python scripts/ask.py "加班費怎麼算?"
+```
 
-The 0.03 reranker gate is calibrated only against this formal 30-answerable/10-unanswerable set. It is not a universal answerability classifier. A real-use question outside the formal set, written as a long colloquial narrative with the English word “deadline,” scored 0.0146 and was directly false-refused even though the correct article remained in the candidates. This demonstrates a query-style boundary; the available evidence does not estimate its prevalence.
+See [docs/reproduce.en.md](docs/reproduce.en.md) for the API and the offline reviewer path.
 
-## v0.3.5 portfolio readiness
-
-This release turns the private BYOK demo into a reviewer-first journey: the landing view explains the verifiable capabilities and cost boundary before an invited reviewer selects Gemini or OpenAI, enters a dedicated key in a masked field, and inspects staged progress, citations, and expandable debug evidence. The Space stays private on free `cpu-basic`, holds no owner LLM key, and performs no cross-provider fallback.
-
-It adds a ten-case, fully offline, content-free demonstration regression: all six answerable source contracts pass, all ten routing/retrieval-stage decision contracts pass, and provider calls remain zero. It also binds a 15-instrument/884-article content-free SHA-256 baseline to a manual official-source audit that reports law/source fields plus added, removed, or changed article labels. These compact proofs do not replace the 40-question formal baseline, 60-case reliability suite, or archived provider judgments.
-
-## v0.3.4 wage-arrears/immediate-exit retrieval hardening
-
-Only questions matching both reviewed wage-nonpayment and worker immediate-exit cue groups receive fixed Labor Standards Act Article 14 retrieval terms. BM25, dense retrieval, and the reranker see the expanded query; generation still receives the visitor's original question.
-
-This release adds no provider call, 0.03 threshold change, Qdrant rebuild, or historical metric rewrite. The `v0.1.0` formal baseline and `v0.3.1` reliability evidence keep their original evidence versions; the v0.3.4 public claim is limited to the unit-testable deterministic routing contract.
-
-## v0.3.3 new/old-regime severance retrieval hardening
-
-This is the `v0.3.3` source-only runtime and deployment release. When a question contains severance, new-regime, old-regime, and calculation/comparison cues together, the retrieval pipeline deterministically appends legal search terms for the Labor Pension Act, Labor Standards Act, service years, average wage, and the six-month cap. The expansion is used only by BM25, dense retrieval, and the reranker; the generator still receives the visitor's original question so retrieval assistance cannot rewrite the user's intent.
-
-All four cue groups are required, so ordinary severance, retirement, or single-regime questions are not broadly rewritten. The `v0.1.0` formal model-quality baseline, `v0.3.1` reliability evidence, and `v0.3.2` provider safety cross-check retain their original evidence versions; this release did not use new provider calls to rewrite historical metrics.
-
-## Private BYOK Docker Space (invitation only)
-
-**Demo status:** the private Space is running for the owner and invited reviewers; its entry point is not listed publicly.
-
-The private Space uses BYOK (Bring Your Own Key). An invited reviewer selects Gemini `gemini-3.5-flash-lite` or OpenAI `gpt-5.6-luna` and enters a dedicated key in a masked field. The key exists only in the current Streamlit session, one loopback request header, and one request-scoped provider client. It is never written to files, chat history, shared settings, or cross-request caches. The Space has no owner `GEMINI_API_KEY` or `OPENAI_API_KEY` and performs no cross-provider fallback, so invited users cannot spend the owner's model-token balance.
-
-The Space receives a collection-scoped read-only Qdrant key. A temporary write/manage key is revoked immediately after the two collections are built locally. Startup scrolls payloads read-only and rebuilds the structure/fixed BM25 indexes in memory; private `data/raw/` and `storage/bm25_*.json` artifacts are not shipped. Defaults are 20 queries per demo session, two concurrent queries globally, a 60-second provider timeout, and at most 1,000 unexpired anonymous sessions. Key isolation, read-only access, and free `cpu-basic` acceptance have passed. See the [BYOK Hugging Face runbook](docs/deployment/BYOK_HUGGINGFACE_RUNBOOK.md).
-
-## v0.3.2 provider safety cross-check: reliability, provenance, and dual-model runtime
-
-This is the `v0.3.2` source-only runtime and deployment release. The public API/UI defaults to Gemini `gemini-3.5-flash-lite`. When OpenAI is also configured on the server, a user may select `gpt-5.6-luna` per request. The model names can be overridden independently with server-side `GEMINI_GENERATION_MODEL` and `OPENAI_GENERATION_MODEL`. When its key is configured, `LLM_PROVIDER=gemini` controls the default for a request that omits a provider; otherwise the API uses the other configured public provider. `LLM_FALLBACK_ENABLED=true` permits fallback. `GEMINI_API_KEY` and `OPENAI_API_KEY` remain only in the API server environment: the UI neither accepts, stores, nor displays them.
-
-The fallback boundary is fixed: only an operational failure of the primary provider—such as transport failure, rate limiting, a 5xx service response, or an empty response—may trigger at most one attempt through the other configured public provider. Retrieval-layer refusal does not call a generator. A model refusal based on the retrieved law, a provider safety block, or a policy rejection never falls back. The formal evaluation path continues to bind directly to one generator and one judge provider with runtime fallback off, so routing changes cannot silently change the evaluated configuration.
-
-The Streamlit sidebar's **Answer model** selector shows only configured Gemini/OpenAI entries returned by API `/models`; the selected provider is sent with each `/query`. In a query response, `requested_provider` records the requested route, `provider` and `model` are metadata for the model that actually generated the answer, `fallback_used`/`fallback_from` describe rerouting, and `generation_called=false` means retrieval refused before generation. The UI displays requested and actual models separately and warns when fallback occurred. Live provider smoke tests require local server-side secrets and are outside public offline CI.
-
-The `v0.1.0` formal model-quality metrics remain historical results produced by the generator and judge models recorded in `release/manifest.json`; this runtime release has not replaced or independently re-judged those values. It did rerun retrieval and threshold behavior against both the 60-question stress suite and the 40-question formal set as a regression guard, without calling a provider.
-
-## Architecture
+## How it works
 
 ```text
 law JSON / Markdown / text / PDF
@@ -90,38 +55,50 @@ law JSON / Markdown / text / PDF
   -> FastAPI / Streamlit
 ```
 
-The measured eight-way ablation covers both chunking strategies and BM25, vector, hybrid, and hybrid-plus-reranker retrieval. See [DESIGN.md](DESIGN.md) for trade-offs and [EVAL_REPORT.md](EVAL_REPORT.md) for the complete table and failure analysis.
+- **Two-stage refusal:** a top reranker score below 0.03 refuses before generation; above it, the generator is asked to refuse when the retrieved law is insufficient.
+- **Three hand-written domain query-expansion rules** ([`src/rag/retrieval/pipeline.py`](src/rag/retrieval/pipeline.py)): when a question contains specific colloquial cues together, fixed statute terms are appended to the retrieval query only — (1) employer + off-hours + messaging cues add rest-day and working-time terms; (2) severance + new-regime + old-regime + calculation cues add Labor Pension Act, Labor Standards Act, service-years, average-wage, and six-month terms; (3) wage-nonpayment + immediate-resignation cues add Labor Standards Act Article 14 terms. BM25, dense retrieval, and the reranker see the expanded string; the generator still receives the original question. A string match of the current code against the evaluation questions shows the rules fire on 2 of the 40 formal questions, 4 of the 60 stress questions, and 2 of the 10 demonstration-regression questions.
 
-## Clean reviewer path
+## Results in detail
 
-Requirements: Python 3.11 and [uv](https://docs.astral.sh/uv/). Dependency installation may access the configured Python package indexes. After dependencies are installed, these checks do not need a model download, provider, API key, Qdrant, Docker, GPU, or runtime network service.
+**Contribution of each retrieval stage** (eight-way ablation × 40 questions; structure-aware chunking shown):
+
+| Retrieval | Hit@5 | MRR@10 |
+|---|---:|---:|
+| BM25 only | 0.833 | 0.672 |
+| Vector only | 0.900 | 0.850 |
+| Hybrid (RRF) | 0.933 | 0.822 |
+| **Hybrid + reranker (primary)** | **0.967** | **0.906** |
+
+Fusion raises recall but hurts ranking; the reranker restores it. Fixed-size chunking with hybrid + reranker scores a higher Hit@5 (1.000) and a lower MRR@10 (0.847); structure-aware chunking is the primary configuration because the correct article ranks higher and citations resolve to a single article. See [EVAL_REPORT.md](EVAL_REPORT.md) for all eight configurations and the failure analysis.
+
+**Refusal:** all 10 unanswerable questions were refused — 9 directly by the 0.03 threshold and 1 (`eval-32`) by the generator. The single false refusal (`eval-10`, 1/30) also happened at the generator: retrieval missed the correct article and the generator refused rather than guess.
+
+**Stress set:** a separate 60-question set (40 answerable, 20 unanswerable) of long-form, code-switched questions, run against an isolated rebuild of the 2026-08-29 **15-instrument / 884-article** snapshot, measured Hit@5 **0.950**, MRR@10 **0.908**, one direct false refusal among 40 answerable questions, and direct rejection of 17/20 unanswerable questions. The same run reproduced the formal-set 0.967 / 0.906, 0/30, and 9/10. No threshold candidate was better on both sets, so 0.03 was retained.
+
+**Two-provider safety check** (`v0.3.2 provider safety cross-check`): five requests per provider under a US$5-per-provider cap that aborts when exceeded, for Gemini `gemini-3.5-flash-lite` and OpenAI `gpt-5.6-luna`. Gemini observed refusal accuracy `0.8`, citation success `1.0`, and estimated cost `US$0.0022620`; OpenAI observed refusal accuracy `1.0`, citation success `1.0`, and estimated cost `US$0.0026414`. With five requests each this is a safety cross-check, not a model-quality evaluation, and it does not replace the `v0.1.0` formal results. The public trace is strictly content-free: it excludes question/answer text, provider payloads, and credentials.
+
+**Offline demonstration regression and freshness:** a ten-case, fully offline regression (no LLM calls): all six answerable cases retrieve the required articles and all ten retrieval-stage decisions match expectations. A per-article SHA-256 fingerprint of the 15 instruments / 884 articles supports a manual audit for added, removed, or changed articles; nothing is scheduled automatically.
+
+<a id="scope"></a>
+
+## Scope and limitations
+
+- **The evaluation sets are small and written for this project:** 40 formal questions (30 answerable) and 60 stress questions. The numbers describe behaviour on these questions and do not estimate real-world prevalence.
+- **The formal numbers are the `v0.1.0` results** and later releases did not rewrite them. This is the `v0.3.5` source-only runtime and deployment release: source code and deployment configuration only; the complete corpus, model weights, private indexes, and raw provider artifacts are outside the repository.
+- **Faithfulness and relevancy are archived LLM-judge scores:** the committed numeric verdicts can be re-aggregated, but complete generated answers and judge reasons are not published, so they cannot be re-judged from this repository. Retrieval and refusal numbers can be recomputed offline.
+- **The 0.03 reranker threshold is not a universal answerability classifier.** The stress set measured one direct false refusal among 40 answerable questions. A real-use question outside the formal set, written as a long colloquial narrative with the English word “deadline,” scored 0.0146 and was directly false-refused even though the correct article remained in the candidates; the available evidence does not estimate how often this happens.
+- **The knowledge base covers only these 15 instruments (snapshot audited 2026-08-29)**; it is not a general legal database, and statute amendments require a manual re-audit and index rebuild.
+- This is a software portfolio artifact, not legal advice or a production legal service.
+
+## Reproduce and test
 
 ```bash
-uv sync --locked
-uv lock --check
-uv run python scripts/verify_release.py
+uv run python scripts/verify_release.py   # recompute the committed evaluation numbers offline
+uv run ruff check .
 uv run pytest -q
-uv build
-uv run python -W error::UserWarning -c "import sys; sys.path.insert(0, 'src'); import rag.api.main; print('FastAPI import: ok')"
-uv run python -W error::UserWarning scripts/ask.py --help
 ```
 
-The package test builds both sdist and wheel and verifies that the runtime legal-term dictionary is included. The release verifier checks the canonical dataset identity, 8×40 trace grid, metrics, the 0.03 score/stage contract, configuration agreement, two source-data snapshots, strict official-trace schemas, the complete publication inventory, privacy/secret patterns, manually reviewed binary hashes, and immutable GitHub Action pins. Its Git-history audit covers every publishable commit reachable from heads, tags, and remotes; GitHub Actions' ephemeral, non-publishable `refs/remotes/pull/*` merge refs and local `refs/archive/*` recovery evidence remain outside the publication graph.
-
-For the full procedure and expected results, see [docs/release/REVIEWER_GUIDE.md](docs/release/REVIEWER_GUIDE.md). The mapping from each material claim to config, trace, result, and test is in [docs/release/CLAIM_MATRIX.md](docs/release/CLAIM_MATRIX.md).
-
-## Running the application
-
-Application use requires the full corpus, indexes, embedding/reranker models, and either a configured provider or local Ollama. These are intentionally outside the offline reviewer path.
-
-```bash
-uv sync
-cp .env.example .env
-uv run python scripts/download_corpus.py
-uv run python scripts/build_index.py
-uv run python scripts/ask.py "加班費怎麼算?"
-uv run python scripts/run_api.py
-```
+`verify_release.py` needs no model, API key, Qdrant, or Docker: it recomputes the retrieval and refusal numbers above from the committed per-question records and checks the public file list and privacy/secret scan. The full list of checks and the clean reviewer path are in [docs/reproduce.en.md](docs/reproduce.en.md).
 
 ## Data, license, and publication boundary
 
@@ -130,10 +107,16 @@ The full 15-instrument corpus is downloaded at runtime and is not distributed in
 - `data/sample/勞工請假規則.json`
 - `data/sample/勞動基準法施行細則.json`
 
-They are normalized extracts from the Ministry of Justice Department of Information Management dataset [中文法規_命令資料檔下載](https://data.gov.tw/dataset/18290), published under Taiwan's [Open Government Data License 1.0](https://data.gov.tw/license). OGDL permits reproduction, distribution, adaptation, and sublicensing when its attribution requirement is retained. The samples remain under OGDL; the repository's original code is under the [MIT License](LICENSE). See [OGDL_ATTRIBUTION.md](docs/release/OGDL_ATTRIBUTION.md) for the retained attribution and snapshot hashes.
+They are normalized extracts from the Ministry of Justice Department of Information Management dataset [中文法規_命令資料檔下載](https://data.gov.tw/dataset/18290), published under Taiwan's [Open Government Data License 1.0](https://data.gov.tw/license). OGDL permits reproduction, distribution, adaptation, and sublicensing when its attribution requirement is retained. The samples remain under OGDL; the repository's original code is under the [MIT License](LICENSE).
 
-Private raw runs are preserved locally and excluded from the public allowlist. Public official traces other than the provider cross-check do not contain prompts, complete generated answers, judge reasons, provider responses, request identifiers, token usage, API metadata, credentials, private paths, or personal identifiers. Provider cross-check traces publish only strict allowlisted metadata: provider, model, answerability/refusal and citation outcomes, token counts, estimated cost, and elapsed time; they exclude prompts, questions, answers, provider payloads, credentials, private paths, and personal identifiers. See [PUBLICATION_BOUNDARY.md](docs/release/PUBLICATION_BOUNDARY.md).
+Private raw runs are preserved locally and excluded from the public allowlist. Public official traces other than the provider cross-check do not contain prompts, complete generated answers, judge reasons, provider responses, request identifiers, token usage, API metadata, credentials, private paths, or personal identifiers. Provider cross-check traces publish only strict allowlisted metadata: provider, model, answerability/refusal and citation outcomes, token counts, estimated cost, and elapsed time; they exclude prompts, questions, answers, provider payloads, credentials, private paths, and personal identifiers.
 
-## Scope
+## Further reading
 
-This is the `v0.3.5` source-only runtime and deployment release. Its formal model-quality metrics retain the unchanged `v0.1.0` evidence baseline. This release adds a reviewer-first private BYOK interface, a ten-case offline portfolio regression, and a content-free 15-instrument/884-article freshness baseline without presenting the compact demonstration as a new model-quality benchmark. The v0.3.2 Gemini/OpenAI safety cross-check remains archived provider evidence: Gemini observed refusal accuracy `0.8`, citation success `1.0`, and estimated cost `US$0.0022620`; OpenAI observed refusal accuracy `1.0`, citation success `1.0`, and estimated cost `US$0.0026414`. Its strict public trace excludes question/answer text, provider payloads, and credentials, and the cross-check does not replace the formal model-quality baseline. This is an evidence-backed software portfolio artifact, not legal advice or a production legal service. The complete corpus, model weights, private indexes, and raw provider artifacts remain outside this source release.
+- [DESIGN.md](DESIGN.md) — design decisions and trade-offs
+- [EVAL_REPORT.md](EVAL_REPORT.md) — full evaluation tables, ablation, and failure analysis
+- [eval/official/README.md](eval/official/README.md) — published evaluation artifacts
+- [docs/changelog.en.md](docs/changelog.en.md) — v0.3.2–v0.3.5 release notes
+- [docs/reproduce.en.md](docs/reproduce.en.md) — clean reviewer path, running the application, and what `verify_release.py` checks
+- [docs/private-demo.en.md](docs/private-demo.en.md) — how the private demo handles keys
+- [docs/release/](docs/release/REVIEWER_GUIDE.md) — release and audit documents: [three-minute tour](docs/release/V035_REVIEWER_TOUR.md), [interview demo](docs/release/V035_INTERVIEW_DEMO.md), [claim-to-evidence table](docs/release/CLAIM_MATRIX.md), [OGDL attribution and hashes](docs/release/OGDL_ATTRIBUTION.md), [publication boundary](docs/release/PUBLICATION_BOUNDARY.md)

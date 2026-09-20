@@ -17,8 +17,8 @@ PUBLIC_NAME = "kuotunyu"
 PUBLIC_EMAIL = "61350295+kuotunyu@users.noreply.github.com"
 CURRENT_PROVIDER_EVIDENCE_RELEASE = "v0.3.2 provider safety cross-check"
 CURRENT_PROVIDER_EVIDENCE_DOCUMENTS = {
-    "README.md": 2,
-    "README.en.md": 2,
+    "README.md": 1,
+    "README.en.md": 1,
     "DESIGN.md": 1,
     "EVAL_REPORT.md": 1,
     "docs/release/CLAIM_MATRIX.md": 2,

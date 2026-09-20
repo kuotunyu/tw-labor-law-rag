@@ -160,7 +160,9 @@ def test_runbook_keeps_refresh_manual_and_free():
 
 def test_readme_links_safe_manual_qdrant_maintenance():
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    private_demo = (PROJECT_ROOT / "docs/private-demo.md").read_text(encoding="utf-8")
 
-    assert "### 人工更新 Qdrant 法規索引" in readme
-    assert "scripts/rebuild_qdrant_blue_green.py" in readme
-    assert "BLUE_GREEN_QDRANT_MAINTENANCE_DESIGN.md" in readme
+    assert "docs/private-demo.md" in readme
+    assert "### 人工更新 Qdrant 法規索引" in private_demo
+    assert "scripts/rebuild_qdrant_blue_green.py" in private_demo
+    assert "BLUE_GREEN_QDRANT_MAINTENANCE_DESIGN.md" in private_demo
