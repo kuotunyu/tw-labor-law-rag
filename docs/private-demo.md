@@ -6,7 +6,7 @@
 
 ## 私有 BYOK Docker Space（邀請制）
 
-**Demo 狀態：** private Space 正常運行；僅限擁有者與受邀審閱者，不公開列出入口。
+**Demo 狀態：** 自 2026-09-22 起改為公開 Space，任何人都能開啟 [steven0226/tw-labor-law-rag-demo](https://huggingface.co/spaces/steven0226/tw-labor-law-rag-demo)；仍採 BYOK，訪客使用自己的 Gemini 或 OpenAI API key。
 
 私有展示模式採 BYOK（Bring Your Own Key）：受邀者選擇 Gemini `gemini-3.5-flash-lite` 或 OpenAI `gpt-5.6-luna`，並在遮罩欄位輸入自己的專用 API Key。Key 只存在目前 Streamlit 工作階段、送往同容器 loopback FastAPI 的單次內部 header，以及該次請求建立的 provider client；不寫入檔案、聊天紀錄、共用設定或跨請求快取。Space 不設定站長的 `GEMINI_API_KEY`／`OPENAI_API_KEY`，也不做跨 provider fallback，因此受邀者不會消耗站長的模型 token 額度。
 

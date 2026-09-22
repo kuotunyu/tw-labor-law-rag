@@ -28,7 +28,7 @@ Ask a plain-language question about Taiwanese labour law (how overtime pay is ca
 
 These numbers come from a 40-question evaluation set written for this project: 30 answerable questions covering all 15 instruments plus 10 deliberately unanswerable ones, each checked by hand against the statute text. The primary configuration is `structure-aware / hybrid + reranker`.
 
-**Links:** [evaluation report](EVAL_REPORT.md) | [design trade-offs](DESIGN.md) | [per-question evaluation records](eval/official/README.md) | [繁體中文](README.md). The hosted demo is a private Space on Hugging Face (invitation only, URL not listed); it can also be run locally:
+**Links:** [evaluation report](EVAL_REPORT.md) | [design trade-offs](DESIGN.md) | [per-question evaluation records](eval/official/README.md) | [繁體中文](README.md). The hosted demo is a public [Hugging Face Space](https://huggingface.co/spaces/steven0226/tw-labor-law-rag-demo) ([open the app](https://steven0226-tw-labor-law-rag-demo.hf.space)). It is BYOK: visitors paste their own Gemini or OpenAI API key and no owner quota is used; each session is capped at 20 queries, the knowledge base is the 2026-08-29 snapshot, and it is a technical demo, not legal advice. It can also be run locally:
 
 ```bash
 uv sync                                    # Python 3.11 + uv
@@ -118,5 +118,5 @@ Private raw runs are preserved locally and excluded from the public allowlist. P
 - [eval/official/README.md](eval/official/README.md) — published evaluation artifacts
 - [docs/changelog.en.md](docs/changelog.en.md) — v0.3.2–v0.3.5 release notes
 - [docs/reproduce.en.md](docs/reproduce.en.md) — clean reviewer path, running the application, and what `verify_release.py` checks
-- [docs/private-demo.en.md](docs/private-demo.en.md) — how the private demo handles keys
+- [docs/private-demo.en.md](docs/private-demo.en.md) — how the hosted demo handles keys
 - [docs/release/](docs/release/REVIEWER_GUIDE.md) — release and audit documents: [three-minute tour](docs/release/V035_REVIEWER_TOUR.md), [interview demo](docs/release/V035_INTERVIEW_DEMO.md), [claim-to-evidence table](docs/release/CLAIM_MATRIX.md), [OGDL attribution and hashes](docs/release/OGDL_ATTRIBUTION.md), [publication boundary](docs/release/PUBLICATION_BOUNDARY.md)
