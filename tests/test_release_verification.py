@@ -1082,11 +1082,8 @@ def test_public_git_tree_exactly_matches_allowlist_and_has_no_exclusions():
     assert manifest["publication"]["tracked_excluded"] == []
     assert tracked == public_paths()
     assert "docs/release/HUGGINGFACE_ZERO_COST_DESIGN.md" in tracked
-    assert "docs/release/HUGGINGFACE_ZERO_COST_IMPLEMENTATION_PLAN.md" in tracked
     assert "docs/release/RELEASE_EVOLUTION_DESIGN.md" in tracked
-    assert "docs/release/RELEASE_EVOLUTION_IMPLEMENTATION_PLAN.md" in tracked
     assert "docs/release/BLUE_GREEN_QDRANT_MAINTENANCE_DESIGN.md" in tracked
-    assert "docs/release/BLUE_GREEN_QDRANT_MAINTENANCE_IMPLEMENTATION_PLAN.md" in tracked
     assert "scripts/rebuild_qdrant_blue_green.py" in tracked
     assert "src/rag/qdrant_blue_green.py" in tracked
     assert "src/rag/qdrant_maintenance.py" in tracked

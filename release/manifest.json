@@ -240,7 +240,16 @@
         "tags",
         "remotes"
       ],
-      "legacy_public_paths": [],
+      "legacy_public_paths": [
+        "docs/release/BLUE_GREEN_QDRANT_MAINTENANCE_IMPLEMENTATION_PLAN.md",
+        "docs/release/HUGGINGFACE_ZERO_COST_IMPLEMENTATION_PLAN.md",
+        "docs/release/RELEASE_EVOLUTION_IMPLEMENTATION_PLAN.md",
+        "docs/release/RELIABILITY_PROVENANCE_IMPLEMENTATION_PLAN.md",
+        "docs/release/V035_EVIDENCE_FRESHNESS_IMPLEMENTATION_PLAN.md",
+        "docs/release/V035_PORTFOLIO_UI_IMPLEMENTATION_PLAN.md",
+        "docs/release/V035_RELEASE_DEPLOYMENT_IMPLEMENTATION_PLAN.md",
+        "docs/release/WAGE_ARREARS_QUERY_EXPANSION_IMPLEMENTATION_PLAN.md"
+      ],
       "reviewed_binary_sha256": [
         "ee95af1a9a8b92d2e1b8521da48e0a56fcc7447982122193bcc251ef95b86ecb",
         "85d4edcfb6ebcedae57da2cb886c17dada6fa4f7fe58439364cd8ed03f962a25"
