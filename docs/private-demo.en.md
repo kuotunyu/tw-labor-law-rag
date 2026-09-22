@@ -6,7 +6,7 @@ How the hosted demo works, moved unchanged from [README.en.md](../README.en.md).
 
 ## Private BYOK Docker Space (invitation only)
 
-**Demo status:** the private Space is running for the owner and invited reviewers; its entry point is not listed publicly.
+**Demo status:** since 2026-09-22 the Space is public and anyone can open [steven0226/tw-labor-law-rag-demo](https://huggingface.co/spaces/steven0226/tw-labor-law-rag-demo); it remains BYOK, so visitors use their own Gemini or OpenAI API key.
 
 The private Space uses BYOK (Bring Your Own Key). An invited reviewer selects Gemini `gemini-3.5-flash-lite` or OpenAI `gpt-5.6-luna` and enters a dedicated key in a masked field. The key exists only in the current Streamlit session, one loopback request header, and one request-scoped provider client. It is never written to files, chat history, shared settings, or cross-request caches. The Space has no owner `GEMINI_API_KEY` or `OPENAI_API_KEY` and performs no cross-provider fallback, so invited users cannot spend the owner's model-token balance.
 

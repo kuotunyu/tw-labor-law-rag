@@ -1174,18 +1174,28 @@ def test_readme_first_screen_links_english_and_ci():
     assert "actions/workflows/ci.yml/badge.svg?branch=main" in first_screen
 
 
-def test_readmes_present_the_private_demo_and_reviewer_paths_truthfully():
+def test_readmes_present_the_public_byok_demo_and_reviewer_paths_truthfully():
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     readme_en = (PROJECT_ROOT / "README.en.md").read_text(encoding="utf-8")
+    space_url = "https://huggingface.co/spaces/steven0226/tw-labor-law-rag-demo"
     live_url = "https://steven0226-tw-labor-law-rag-demo.hf.space"
 
-    for content in (readme, readme_en):
+    for content, demo_terms in (
+        (readme, ("BYOK", "20 題", "2026-08-29", "不是法律意見")),
+        (readme_en, ("BYOK", "20 queries", "2026-08-29", "not legal advice")),
+    ):
         assert "V035_REVIEWER_TOUR.md" in content
         assert "V035_INTERVIEW_DEMO.md" in content
         assert "2026-08-29" in content
-        assert "private Space" in content
-        assert live_url not in content
+        assert "private Space" not in content
+        assert space_url in content
         assert "bm25_*.pkl" not in content
+        (demo_line,) = [line for line in content.splitlines() if live_url in line]
+        assert space_url in demo_line
+        for term in demo_terms:
+            assert term in demo_line
+        for overclaim in ("production", "正式服務", "正式上線"):
+            assert overclaim not in demo_line.casefold()
     assert "公開 BYOK Docker Space（已上線）" not in readme
     assert "Public BYOK Docker Space (live)" not in readme_en
 

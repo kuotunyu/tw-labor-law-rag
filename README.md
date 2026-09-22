@@ -28,7 +28,7 @@ app_port: 7860
 
 以上數字來自本專案自編的 40 題正式評估集：30 題可答（涵蓋全部 15 部法規）加 10 題刻意設計成不可答，題目與標準答案皆人工對照條文查證；主設定為「按條文切塊＋Hybrid＋reranker」。
 
-**連結：** [評估報告](EVAL_REPORT.md) ｜ [設計取捨](DESIGN.md) ｜ [逐題評估紀錄](eval/official/README.md) ｜ [English](README.en.md)。線上 Demo 部署在 Hugging Face 的 private Space（邀請制，網址不公開）；沒有邀請也能在本機跑：
+**連結：** [評估報告](EVAL_REPORT.md) ｜ [設計取捨](DESIGN.md) ｜ [逐題評估紀錄](eval/official/README.md) ｜ [English](README.en.md)。線上 Demo 是公開的 [Hugging Face Space](https://huggingface.co/spaces/steven0226/tw-labor-law-rag-demo)（[直接開啟](https://steven0226-tw-labor-law-rag-demo.hf.space)），採 BYOK：訪客貼上自己的 Gemini 或 OpenAI API key，不使用站長額度；每個工作階段最多 20 題，知識庫為 2026-08-29 快照，只是技術展示，不是法律意見。也能在本機跑：
 
 ```bash
 uv sync                                    # Python 3.11 + uv；有 NVIDIA GPU 較快，純 CPU 也能跑
@@ -153,5 +153,5 @@ Repository 只散布兩份小型樣本供 loader/chunking 測試:`data/sample/�
 - [eval/dataset/README.md](eval/dataset/README.md) — 評估集 schema 與出題原則
 - [docs/changelog.md](docs/changelog.md) — v0.3.2–v0.3.5 各版本變更
 - [docs/reproduce.md](docs/reproduce.md) — 本機執行、Docker、測試與 `verify_release.py` 的完整檢查項目
-- [docs/private-demo.md](docs/private-demo.md) — 私有 Demo 的金鑰處理方式與雲端索引的人工更新流程
+- [docs/private-demo.md](docs/private-demo.md) — 線上 Demo 的金鑰處理方式與雲端索引的人工更新流程
 - [docs/release/](docs/release/REVIEWER_GUIDE.md) — 發佈與稽核文件：[三分鐘導覽](docs/release/V035_REVIEWER_TOUR.md)、[展示腳本](docs/release/V035_INTERVIEW_DEMO.md)、[數據對照表](docs/release/CLAIM_MATRIX.md)、[OGDL 顯名聲明與檔案雜湊](docs/release/OGDL_ATTRIBUTION.md)、[公開範圍說明](docs/release/PUBLICATION_BOUNDARY.md)
