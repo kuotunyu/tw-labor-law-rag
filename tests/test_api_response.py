@@ -930,6 +930,43 @@ def test_byok_session_quota_and_concurrency_map_to_429(monkeypatch):
 
 
 @pytest.mark.parametrize(
+    "raw_session_header",
+    [
+        "fixed-session.1060.簽章".encode("utf-8"),
+        b"fixed-session.1060.\xff",
+    ],
+)
+def test_byok_query_rejects_non_ascii_session_header_with_401(
+    monkeypatch,
+    raw_session_header,
+):
+    install_byok_query_state(monkeypatch)
+    monkeypatch.setattr(
+        api_main.state,
+        "get_byok_answerer",
+        lambda *_args, **_kwargs: pytest.fail(
+            "malformed BYOK session must stop before retrieval"
+        ),
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        from fastapi.testclient import TestClient
+
+        client = TestClient(api_main.app, raise_server_exceptions=False)
+        response = client.post(
+            "/query",
+            json={"question": "問題", "provider": "gemini"},
+            headers={
+                "X-Provider-Api-Key": "visitor-key",
+                "X-Demo-Session": raw_session_header,
+            },
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "invalid_demo_session"}
+
+
+@pytest.mark.parametrize(
     ("reason_code", "status_code", "detail"),
     [
         ("http_401", 401, "provider_key_rejected"),

@@ -98,7 +98,12 @@ class ByokSessionManager:
                 raise InvalidDemoSession() from None
 
             payload = f"{session_id}.{expiry}"
-            if not hmac.compare_digest(signature, self._signature(payload)):
+            # A hex digest is always ASCII; compare_digest raises TypeError on
+            # non-ASCII str input, so screen that out instead of letting it
+            # escape as a 500.
+            if not signature.isascii() or not hmac.compare_digest(
+                signature, self._signature(payload)
+            ):
                 raise InvalidDemoSession()
 
             session = self._sessions.get(session_id)

@@ -68,6 +68,34 @@ def test_new_issue_cleans_other_expired_session_state():
     assert manager.tracked_sessions == 1
 
 
+@pytest.mark.parametrize(
+    "signature",
+    [
+        "簽章",
+        "ÿ",
+        "0" * 63 + "ÿ",
+    ],
+)
+def test_non_ascii_signature_is_rejected_without_consuming_quota(signature):
+    now = [1_000.0]
+    manager = ByokSessionManager(
+        secret="session-secret",
+        query_limit=1,
+        ttl_seconds=60,
+        clock=lambda: now[0],
+        token_factory=lambda: "fixed-session",
+    )
+    token = manager.issue()
+    session_id, expiry, _signature = token.split(".")
+
+    with pytest.raises(InvalidDemoSession):
+        manager.consume(f"{session_id}.{expiry}.{signature}")
+
+    manager.consume(token)
+    with pytest.raises(SessionQuotaExceeded):
+        manager.consume(token)
+
+
 def test_invalid_session_errors_do_not_retain_token_text():
     manager = ByokSessionManager(
         secret="session-secret",
