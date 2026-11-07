@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools==83.0.0", "wheel==0.46.3"]
+requires = ["setuptools==84.2.1", "wheel==0.46.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -28,7 +28,7 @@ dependencies = [
     "jieba>=0.42.1",
     # jieba still emits a pkg_resources deprecation warning, but imports and
     # tokenization remain compatible with this security-fixed setuptools line.
-    "setuptools==83.0.0",
+    "setuptools==84.2.1",
     "anthropic>=0.40",
     "openai>=1.55",
     "google-genai>=1.0",
